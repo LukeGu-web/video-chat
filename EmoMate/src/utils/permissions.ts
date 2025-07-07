@@ -1,5 +1,5 @@
 import { Camera } from 'expo-camera';
-import { Audio } from 'expo-av';
+import { AudioModule } from 'expo-audio';
 
 export interface PermissionStatus {
   camera: boolean;
@@ -10,10 +10,10 @@ export interface PermissionStatus {
 export const requestCameraAndMicrophonePermissions = async (): Promise<PermissionStatus> => {
   try {
     const cameraPermission = await Camera.requestCameraPermissionsAsync();
-    const microphonePermission = await Audio.requestPermissionsAsync();
+    const microphonePermission = await AudioModule.requestRecordingPermissionsAsync();
 
     const cameraGranted = cameraPermission.status === 'granted';
-    const microphoneGranted = microphonePermission.status === 'granted';
+    const microphoneGranted = microphonePermission.granted;
 
     return {
       camera: cameraGranted,
@@ -33,10 +33,10 @@ export const requestCameraAndMicrophonePermissions = async (): Promise<Permissio
 export const checkCameraAndMicrophonePermissions = async (): Promise<PermissionStatus> => {
   try {
     const cameraPermission = await Camera.getCameraPermissionsAsync();
-    const microphonePermission = await Audio.getPermissionsAsync();
+    const microphonePermission = await AudioModule.getRecordingPermissionsAsync();
 
     const cameraGranted = cameraPermission.status === 'granted';
-    const microphoneGranted = microphonePermission.status === 'granted';
+    const microphoneGranted = microphonePermission.granted;
 
     return {
       camera: cameraGranted,
