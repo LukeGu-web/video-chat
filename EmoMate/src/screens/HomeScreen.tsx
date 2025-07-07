@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Pressable, ScrollView } from 
 import { StackNavigationProp } from '@react-navigation/stack';
 import { colors, sizes } from '../constants';
 import { useUserStore } from '../store';
-import { useSpeechToText } from '../utils';
+import { useSpeechToText, useChatAI, PERSONALITY_PROMPTS } from '../utils';
 
 type RootStackParamList = {
   Welcome: undefined;
@@ -31,6 +31,15 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     isSupported,
   } = useSpeechToText();
 
+  const {
+    messages,
+    isLoading: isAILoading,
+    error: aiError,
+    sendMessage,
+    clearMessages,
+    setPersonality,
+  } = useChatAI({ personality: PERSONALITY_PROMPTS.gentle });
+
   useEffect(() => {
     console.log('Current selectedCharacter:', selectedCharacter);
     
@@ -52,6 +61,17 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
   const handleClearTranscript = () => {
     clearTranscript();
+  };
+
+  const handleSendToAI = async () => {
+    if (transcript.trim()) {
+      await sendMessage(transcript, { modelType: 'haiku' });
+      clearTranscript();
+    }
+  };
+
+  const handleTestAI = () => {
+    sendMessage('你好，我今天感到有点焦虑...', { modelType: 'haiku' });
   };
 
   return (
@@ -119,12 +139,23 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
             <View style={styles.transcriptContainer}>
               <Text style={styles.transcriptLabel}>识别结果:</Text>
               <Text style={styles.transcriptText}>{transcript}</Text>
-              <TouchableOpacity
-                style={styles.clearButton}
-                onPress={handleClearTranscript}
-              >
-                <Text style={styles.clearButtonText}>清除</Text>
-              </TouchableOpacity>
+              <View style={styles.transcriptButtons}>
+                <TouchableOpacity
+                  style={styles.clearButton}
+                  onPress={handleClearTranscript}
+                >
+                  <Text style={styles.clearButtonText}>清除</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.sendButton}
+                  onPress={handleSendToAI}
+                  disabled={isAILoading}
+                >
+                  <Text style={styles.sendButtonText}>
+                    {isAILoading ? '发送中...' : '发送给AI'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
 
@@ -135,6 +166,55 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
             </View>
           )}
         </>
+      </View>
+
+      {/* AI Chat Section */}
+      <View style={styles.chatSection}>
+        <Text style={styles.sectionTitle}>AI 对话测试</Text>
+        
+        <TouchableOpacity 
+          style={styles.testButton} 
+          onPress={handleTestAI}
+          disabled={isAILoading}
+        >
+          <Text style={styles.testButtonText}>
+            {isAILoading ? '🤖 AI思考中...' : '🤖 测试AI对话'}
+          </Text>
+        </TouchableOpacity>
+
+        {/* Messages Display */}
+        {messages.length > 0 && (
+          <View style={styles.messagesContainer}>
+            <Text style={styles.messagesTitle}>对话记录:</Text>
+            {messages.slice(-2).map((message) => ( // 只显示最近2条消息
+              <View 
+                key={message.id} 
+                style={[
+                  styles.messageContainer,
+                  message.role === 'user' ? styles.userMessage : styles.aiMessage
+                ]}
+              >
+                <Text style={styles.messageRole}>
+                  {message.role === 'user' ? '👤 你' : '🤖 AI伴侣'}
+                </Text>
+                <Text style={styles.messageContent}>{message.content}</Text>
+              </View>
+            ))}
+            <TouchableOpacity 
+              style={styles.clearChatButton} 
+              onPress={clearMessages}
+            >
+              <Text style={styles.clearChatButtonText}>清空对话</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* AI Error Display */}
+        {aiError && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{aiError}</Text>
+          </View>
+        )}
       </View>
 
       <TouchableOpacity style={styles.button} onPress={handleGoBack}>
@@ -269,6 +349,95 @@ const styles = StyleSheet.create({
   pressToTalkButtonDisabled: {
     backgroundColor: colors.gray,
     opacity: 0.6,
+  },
+  transcriptButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  sendButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: sizes.borderRadius,
+    flex: 1,
+  },
+  sendButtonText: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  chatSection: {
+    width: '100%',
+    backgroundColor: colors.white,
+    borderRadius: sizes.borderRadius,
+    padding: sizes.padding,
+    marginBottom: 32,
+    alignItems: 'center',
+  },
+  testButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: sizes.borderRadius,
+    marginBottom: 16,
+    minWidth: 180,
+  },
+  testButtonText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  messagesContainer: {
+    width: '100%',
+    marginTop: 16,
+  },
+  messagesTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: colors.primary,
+    marginBottom: 12,
+  },
+  messageContainer: {
+    padding: 12,
+    borderRadius: sizes.borderRadius,
+    marginBottom: 8,
+  },
+  userMessage: {
+    backgroundColor: colors.lightGray,
+    alignSelf: 'flex-end',
+    maxWidth: '80%',
+  },
+  aiMessage: {
+    backgroundColor: '#E3F2FD',
+    alignSelf: 'flex-start',
+    maxWidth: '80%',
+  },
+  messageRole: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginBottom: 4,
+    color: colors.gray,
+  },
+  messageContent: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.black,
+  },
+  clearChatButton: {
+    backgroundColor: colors.secondary,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: sizes.borderRadius,
+    alignSelf: 'center',
+    marginTop: 12,
+  },
+  clearChatButtonText: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: '600',
   },
   button: {
     backgroundColor: colors.secondary,
