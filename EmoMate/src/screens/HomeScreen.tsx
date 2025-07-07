@@ -34,11 +34,13 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const {
     messages,
     isLoading: isAILoading,
+    isSpeaking,
     error: aiError,
     sendMessage,
     clearMessages,
     setPersonality,
-  } = useChatAI({ personality: PERSONALITY_PROMPTS.gentle });
+    stopSpeaking,
+  } = useChatAI({ personality: PERSONALITY_PROMPTS.gentle, enableTTS: true });
 
   useEffect(() => {
     console.log('Current selectedCharacter:', selectedCharacter);
@@ -181,6 +183,19 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
             {isAILoading ? '🤖 AI思考中...' : '🤖 测试AI对话'}
           </Text>
         </TouchableOpacity>
+
+        {/* TTS 状态和控制 */}
+        {isSpeaking && (
+          <View style={styles.speakingContainer}>
+            <Text style={styles.speakingText}>🗣️ AI 正在说话...</Text>
+            <TouchableOpacity 
+              style={styles.stopSpeakingButton} 
+              onPress={stopSpeaking}
+            >
+              <Text style={styles.stopSpeakingButtonText}>停止播放</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Messages Display */}
         {messages.length > 0 && (
@@ -437,6 +452,32 @@ const styles = StyleSheet.create({
   clearChatButtonText: {
     color: colors.white,
     fontSize: 14,
+    fontWeight: '600',
+  },
+  speakingContainer: {
+    backgroundColor: '#E8F5E8',
+    padding: 12,
+    borderRadius: sizes.borderRadius,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  speakingText: {
+    fontSize: 16,
+    color: colors.success,
+    fontWeight: '500',
+    flex: 1,
+  },
+  stopSpeakingButton: {
+    backgroundColor: colors.error,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: sizes.borderRadius,
+  },
+  stopSpeakingButtonText: {
+    color: colors.white,
+    fontSize: 12,
     fontWeight: '600',
   },
   button: {

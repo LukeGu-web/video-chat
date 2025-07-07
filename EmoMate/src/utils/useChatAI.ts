@@ -186,12 +186,21 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     setCurrentPersonality(personality);
   }, []);
 
+  const stopSpeaking = useCallback(() => {
+    stopTTS();
+  }, [stopTTS]);
+
+  // 合并错误信息
+  const combinedError = error || ttsError;
+
   return {
     messages,
     isLoading,
-    error,
+    isSpeaking,
+    error: combinedError,
     sendMessage,
     clearMessages,
     setPersonality,
+    stopSpeaking,
   };
 };
