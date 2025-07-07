@@ -1,9 +1,10 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Pressable, ScrollView } from 'react-native';
+import React, { useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Pressable, ScrollView, FlatList } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { colors, sizes } from '../constants';
-import { useUserStore } from '../store';
+import { useUserStore, ChatMessage } from '../store';
 import { useSpeechToText, useChatAI, PERSONALITY_PROMPTS } from '../utils';
+import { ChatBubble } from '../components';
 
 type RootStackParamList = {
   Welcome: undefined;
@@ -20,7 +21,14 @@ interface Props {
 }
 
 const HomeScreen: React.FC<Props> = ({ navigation }) => {
-  const { selectedCharacter, setSelectedCharacter, addEmotionLog } = useUserStore();
+  const { 
+    selectedCharacter, 
+    setSelectedCharacter, 
+    addEmotionLog,
+    chatHistory,
+    addChatMessage,
+    clearChatHistory
+  } = useUserStore();
   const {
     isListening,
     transcript,
@@ -65,430 +73,339 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     clearTranscript();
   };
 
-  const handleSendToAI = async () => {
-    if (transcript.trim()) {
-      await sendMessage(transcript, { modelType: 'haiku' });
+  // 生成唯一消息ID
+  const generateMessageId = () => {
+    return `msg_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+  };
+
+  // 核心语音对话流程
+  const handleVoiceConversation = useCallback(async (userText: string) => {
+    if (!userText.trim()) return;
+
+    try {
+      // 1. 添加用户消息到聊天历史
+      const userMessage: ChatMessage = {
+        id: generateMessageId(),
+        role: 'user',
+        content: userText.trim(),
+        timestamp: Date.now(),
+        isVoiceMessage: true, // 标记为语音消息
+      };
+      addChatMessage(userMessage);
+
+      // 2. 调用 AI 获取回复
+      await sendMessage(userText, { 
+        modelType: 'haiku',
+        enableTTS: true // 启用语音播放
+      });
+
+    } catch (error) {
+      console.error('Voice conversation error:', error);
+    }
+  }, [addChatMessage, sendMessage]);
+
+  // 语音识别完成后的处理
+  useEffect(() => {
+    if (transcript && !isListening) {
+      // 语音识别完成且有文本时，自动发送给AI
+      handleVoiceConversation(transcript);
       clearTranscript();
     }
-  };
+  }, [transcript, isListening, handleVoiceConversation, clearTranscript]);
 
-  const handleTestAI = () => {
-    sendMessage('你好，我今天感到有点焦虑...', { modelType: 'haiku' });
-  };
+  // 监听AI消息并添加到聊天历史
+  useEffect(() => {
+    if (messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.role === 'assistant') {
+        // 检查是否已经在chatHistory中
+        const existsInHistory = chatHistory.some(msg => 
+          msg.content === lastMessage.content && 
+          Math.abs(msg.timestamp - lastMessage.timestamp) < 1000
+        );
+        
+        if (!existsInHistory) {
+          const aiMessage: ChatMessage = {
+            id: generateMessageId(),
+            role: 'assistant',
+            content: lastMessage.content,
+            timestamp: lastMessage.timestamp,
+            isVoiceMessage: true,
+          };
+          addChatMessage(aiMessage);
+        }
+      }
+    }
+  }, [messages, chatHistory, addChatMessage]);
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Home</Text>
-      <Text style={styles.subtitle}>Welcome to EmoMate!</Text>
-      <Text style={styles.characterText}>
-        当前 AI 伴侣: {selectedCharacter || '未选择'}
-      </Text>
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={handleGoBack}>
+          <Text style={styles.backButtonText}>← 返回</Text>
+        </TouchableOpacity>
+        <Text style={styles.title}>
+          与 {selectedCharacter || 'AI伴侣'} 对话
+        </Text>
+        <TouchableOpacity style={styles.clearButton} onPress={clearChatHistory}>
+          <Text style={styles.clearButtonText}>清空</Text>
+        </TouchableOpacity>
+      </View>
 
-      {/* Speech Recognition Section */}
-      <View style={styles.speechSection}>
-        <Text style={styles.sectionTitle}>语音识别</Text>
-        
-        {/* Debug info */}
-        <Text style={styles.debugText}>
-          支持状态: {isSupported ? '支持' : '不支持'}
-        </Text>
-        
-        {/* More detailed debug info */}
-        <Text style={styles.debugText}>
-          错误信息: {error || '无'}
-        </Text>
-        
-        {error && !isSupported && (
-          <Text style={styles.errorText}>
-            {error}
-          </Text>
+      {/* Chat Messages */}
+      <View style={styles.chatContainer}>
+        {chatHistory.length === 0 ? (
+          <View style={styles.emptyChatContainer}>
+            <Text style={styles.emptyChatText}>
+              👋 按住下方按钮开始语音对话
+            </Text>
+            <Text style={styles.emptyChatSubtext}>
+              说话后会自动识别并发送给AI，AI也会语音回复
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            data={chatHistory}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => <ChatBubble message={item} />}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.chatList}
+          />
+        )}
+      </View>
+
+      {/* Status Display */}
+      <View style={styles.statusContainer}>
+        {/* AI Status */}
+        {isAILoading && (
+          <View style={styles.statusItem}>
+            <Text style={styles.statusText}>🤖 AI 正在思考...</Text>
+          </View>
         )}
         
-        {!isSupported && !error && (
-          <Text style={styles.errorText}>
-            正在检查设备支持...
-          </Text>
+        {/* TTS Status */}
+        {isSpeaking && (
+          <View style={styles.statusItem}>
+            <Text style={styles.statusText}>🗣️ AI 正在说话...</Text>
+            <TouchableOpacity style={styles.stopButton} onPress={stopSpeaking}>
+              <Text style={styles.stopButtonText}>停止</Text>
+            </TouchableOpacity>
+          </View>
         )}
 
-        {/* 始终显示按钮用于测试 */}
-        <>
-          {/* Press to Talk Button */}
+        {/* Speech Recognition Status */}
+        {isListening && (
+          <View style={styles.statusItem}>
+            <Text style={styles.statusText}>🎙️ 正在听您说话...</Text>
+          </View>
+        )}
+
+        {/* Transcript Display */}
+        {transcript && (
+          <View style={styles.transcriptContainer}>
+            <Text style={styles.transcriptText}>"{transcript}"</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Voice Control */}
+      <View style={styles.voiceControlContainer}>
+        {!isSupported ? (
+          <View style={styles.unsupportedContainer}>
+            <Text style={styles.unsupportedText}>
+              设备不支持语音识别功能
+            </Text>
+            <Text style={styles.debugText}>
+              错误: {error || '检查中...'}
+            </Text>
+          </View>
+        ) : (
           <Pressable
             style={[
-              styles.pressToTalkButton,
-              isListening && styles.pressToTalkButtonActive,
-              !isSupported && styles.pressToTalkButtonDisabled
+              styles.voiceButton,
+              isListening && styles.voiceButtonActive,
+              (isAILoading || isSpeaking) && styles.voiceButtonDisabled
             ]}
-            onPressIn={isSupported ? startListening : undefined}
-            onPressOut={isSupported ? stopListening : undefined}
-            disabled={!isSupported}
+            onPressIn={startListening}
+            onPressOut={stopListening}
+            disabled={isAILoading || isSpeaking}
           >
-            <Text style={styles.pressToTalkText}>
-              {!isSupported ? '🚫 设备不支持' : 
-               isListening ? '🎤 Listening...' : '🎙️ 按住说话'}
+            <Text style={styles.voiceButtonText}>
+              {isListening ? '🎤' : '🎙️'}
+            </Text>
+            <Text style={styles.voiceButtonLabel}>
+              {isListening ? '松开结束' : 
+               isAILoading ? 'AI思考中' :
+               isSpeaking ? 'AI说话中' : '按住说话'}
             </Text>
           </Pressable>
-
-          {/* Listening Status */}
-          {isListening && (
-            <View style={styles.listeningContainer}>
-              <Text style={styles.listeningText}>🔊 正在听您说话...</Text>
-            </View>
-          )}
-
-          {/* Transcript Display */}
-          {transcript && (
-            <View style={styles.transcriptContainer}>
-              <Text style={styles.transcriptLabel}>识别结果:</Text>
-              <Text style={styles.transcriptText}>{transcript}</Text>
-              <View style={styles.transcriptButtons}>
-                <TouchableOpacity
-                  style={styles.clearButton}
-                  onPress={handleClearTranscript}
-                >
-                  <Text style={styles.clearButtonText}>清除</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.sendButton}
-                  onPress={handleSendToAI}
-                  disabled={isAILoading}
-                >
-                  <Text style={styles.sendButtonText}>
-                    {isAILoading ? '发送中...' : '发送给AI'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-
-          {/* Error Display */}
-          {error && isSupported && (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{error}</Text>
-            </View>
-          )}
-        </>
-      </View>
-
-      {/* AI Chat Section */}
-      <View style={styles.chatSection}>
-        <Text style={styles.sectionTitle}>AI 对话测试</Text>
-        
-        <TouchableOpacity 
-          style={styles.testButton} 
-          onPress={handleTestAI}
-          disabled={isAILoading}
-        >
-          <Text style={styles.testButtonText}>
-            {isAILoading ? '🤖 AI思考中...' : '🤖 测试AI对话'}
-          </Text>
-        </TouchableOpacity>
-
-        {/* TTS 状态和控制 */}
-        {isSpeaking && (
-          <View style={styles.speakingContainer}>
-            <Text style={styles.speakingText}>🗣️ AI 正在说话...</Text>
-            <TouchableOpacity 
-              style={styles.stopSpeakingButton} 
-              onPress={stopSpeaking}
-            >
-              <Text style={styles.stopSpeakingButtonText}>停止播放</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Messages Display */}
-        {messages.length > 0 && (
-          <View style={styles.messagesContainer}>
-            <Text style={styles.messagesTitle}>对话记录:</Text>
-            {messages.slice(-2).map((message) => ( // 只显示最近2条消息
-              <View 
-                key={message.id} 
-                style={[
-                  styles.messageContainer,
-                  message.role === 'user' ? styles.userMessage : styles.aiMessage
-                ]}
-              >
-                <Text style={styles.messageRole}>
-                  {message.role === 'user' ? '👤 你' : '🤖 AI伴侣'}
-                </Text>
-                <Text style={styles.messageContent}>{message.content}</Text>
-              </View>
-            ))}
-            <TouchableOpacity 
-              style={styles.clearChatButton} 
-              onPress={clearMessages}
-            >
-              <Text style={styles.clearChatButtonText}>清空对话</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* AI Error Display */}
-        {aiError && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{aiError}</Text>
-          </View>
         )}
       </View>
-
-      <TouchableOpacity style={styles.button} onPress={handleGoBack}>
-        <Text style={styles.buttonText}>Go Back</Text>
-      </TouchableOpacity>
-    </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flexGrow: 1,
+    flex: 1,
     backgroundColor: colors.background,
-    justifyContent: 'center',
+  },
+  header: {
+    flexDirection: 'row',
     alignItems: 'center',
-    padding: sizes.padding,
+    justifyContent: 'space-between',
+    paddingHorizontal: sizes.padding,
+    paddingVertical: 12,
+    backgroundColor: colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.lightGray,
+  },
+  backButton: {
+    padding: 8,
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: colors.primary,
+    fontWeight: '500',
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: colors.primary,
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: colors.gray,
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  characterText: {
     fontSize: 18,
-    color: colors.black,
-    marginBottom: 32,
-    textAlign: 'center',
-    fontWeight: '500',
-  },
-  speechSection: {
-    width: '100%',
-    backgroundColor: colors.white,
-    borderRadius: sizes.borderRadius,
-    padding: sizes.padding,
-    marginBottom: 32,
-    alignItems: 'center',
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.primary,
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  pressToTalkButton: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 50,
-    marginBottom: 16,
-    minWidth: 200,
-    alignItems: 'center',
-  },
-  pressToTalkButtonActive: {
-    backgroundColor: colors.error,
-    transform: [{ scale: 1.05 }],
-  },
-  pressToTalkText: {
-    color: colors.white,
-    fontSize: 18,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  listeningContainer: {
-    backgroundColor: colors.lightGray,
-    padding: 12,
-    borderRadius: sizes.borderRadius,
-    marginBottom: 16,
-  },
-  listeningText: {
-    fontSize: 16,
-    color: colors.primary,
-    textAlign: 'center',
-    fontWeight: '500',
-  },
-  transcriptContainer: {
-    backgroundColor: colors.lightGray,
-    padding: 16,
-    borderRadius: sizes.borderRadius,
-    marginBottom: 16,
-    width: '100%',
-  },
-  transcriptLabel: {
-    fontSize: 16,
     fontWeight: 'bold',
     color: colors.black,
-    marginBottom: 8,
-  },
-  transcriptText: {
-    fontSize: 16,
-    color: colors.black,
-    marginBottom: 12,
-    lineHeight: 24,
+    flex: 1,
+    textAlign: 'center',
   },
   clearButton: {
-    backgroundColor: colors.secondary,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: sizes.borderRadius,
-    alignSelf: 'flex-end',
+    padding: 8,
   },
   clearButtonText: {
-    color: colors.white,
     fontSize: 14,
-    fontWeight: '600',
+    color: colors.error,
+    fontWeight: '500',
   },
-  errorContainer: {
-    backgroundColor: colors.error,
-    padding: 12,
-    borderRadius: sizes.borderRadius,
-    marginBottom: 16,
-  },
-  errorText: {
-    color: colors.white,
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  debugText: {
-    fontSize: 14,
-    color: colors.gray,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  pressToTalkButtonDisabled: {
-    backgroundColor: colors.gray,
-    opacity: 0.6,
-  },
-  transcriptButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  sendButton: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: sizes.borderRadius,
+  chatContainer: {
     flex: 1,
+    backgroundColor: colors.background,
   },
-  sendButtonText: {
-    color: colors.white,
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  chatSection: {
-    width: '100%',
-    backgroundColor: colors.white,
-    borderRadius: sizes.borderRadius,
-    padding: sizes.padding,
-    marginBottom: 32,
+  emptyChatContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: sizes.padding * 2,
   },
-  testButton: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: sizes.borderRadius,
-    marginBottom: 16,
-    minWidth: 180,
-  },
-  testButtonText: {
-    color: colors.white,
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  messagesContainer: {
-    width: '100%',
-    marginTop: 16,
-  },
-  messagesTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.primary,
-    marginBottom: 12,
-  },
-  messageContainer: {
-    padding: 12,
-    borderRadius: sizes.borderRadius,
-    marginBottom: 8,
-  },
-  userMessage: {
-    backgroundColor: colors.lightGray,
-    alignSelf: 'flex-end',
-    maxWidth: '80%',
-  },
-  aiMessage: {
-    backgroundColor: '#E3F2FD',
-    alignSelf: 'flex-start',
-    maxWidth: '80%',
-  },
-  messageRole: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    marginBottom: 4,
+  emptyChatText: {
+    fontSize: 18,
     color: colors.gray,
+    textAlign: 'center',
+    marginBottom: 8,
+    fontWeight: '500',
   },
-  messageContent: {
+  emptyChatSubtext: {
     fontSize: 14,
+    color: colors.gray,
+    textAlign: 'center',
     lineHeight: 20,
-    color: colors.black,
   },
-  clearChatButton: {
-    backgroundColor: colors.secondary,
-    paddingHorizontal: 16,
+  chatList: {
+    paddingVertical: 16,
+  },
+  statusContainer: {
+    backgroundColor: colors.white,
+    paddingHorizontal: sizes.padding,
     paddingVertical: 8,
-    borderRadius: sizes.borderRadius,
-    alignSelf: 'center',
-    marginTop: 12,
+    minHeight: 60,
+    justifyContent: 'center',
   },
-  clearChatButtonText: {
-    color: colors.white,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  speakingContainer: {
-    backgroundColor: '#E8F5E8',
-    padding: 12,
-    borderRadius: sizes.borderRadius,
-    marginBottom: 16,
+  statusItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingVertical: 4,
   },
-  speakingText: {
+  statusText: {
     fontSize: 16,
-    color: colors.success,
+    color: colors.primary,
     fontWeight: '500',
     flex: 1,
   },
-  stopSpeakingButton: {
+  stopButton: {
     backgroundColor: colors.error,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: sizes.borderRadius,
   },
-  stopSpeakingButtonText: {
+  stopButtonText: {
     color: colors.white,
     fontSize: 12,
     fontWeight: '600',
   },
-  button: {
-    backgroundColor: colors.secondary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+  transcriptContainer: {
+    backgroundColor: colors.lightGray,
+    padding: 12,
     borderRadius: sizes.borderRadius,
+    marginVertical: 8,
   },
-  buttonText: {
-    color: colors.white,
+  transcriptText: {
     fontSize: 16,
+    color: colors.black,
+    fontStyle: 'italic',
+    textAlign: 'center',
+  },
+  voiceControlContainer: {
+    backgroundColor: colors.white,
+    paddingHorizontal: sizes.padding,
+    paddingVertical: 24,
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: colors.lightGray,
+  },
+  unsupportedContainer: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  unsupportedText: {
+    fontSize: 16,
+    color: colors.error,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  debugText: {
+    fontSize: 12,
+    color: colors.gray,
+    textAlign: 'center',
+  },
+  voiceButton: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  voiceButtonActive: {
+    backgroundColor: colors.error,
+    transform: [{ scale: 1.1 }],
+  },
+  voiceButtonDisabled: {
+    backgroundColor: colors.gray,
+    opacity: 0.6,
+  },
+  voiceButtonText: {
+    fontSize: 32,
+    marginBottom: 4,
+  },
+  voiceButtonLabel: {
+    fontSize: 12,
+    color: colors.white,
     fontWeight: '600',
     textAlign: 'center',
   },
