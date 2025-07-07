@@ -1,5 +1,6 @@
 import React, { useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Pressable, ScrollView, FlatList } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { colors, sizes } from '../constants';
 import { useUserStore, ChatMessage } from '../store';
@@ -139,7 +140,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   }, [messages, chatHistory, addChatMessage]);
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={handleGoBack}>
@@ -242,7 +243,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           </Pressable>
         )}
       </View>
-    </View>
+    </SafeAreaView>
   );
 };
 

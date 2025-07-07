@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { colors, sizes } from '../constants';
 import { requestCameraAndMicrophonePermissions, checkCameraAndMicrophonePermissions, PermissionStatus } from '../utils';
@@ -60,15 +61,15 @@ const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
 
   if (isCheckingPermissions) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView style={styles.container}>
         <Text style={styles.title}>Welcome to EmoMate</Text>
         <Text style={styles.subtitle}>正在检查权限...</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <Text style={styles.title}>Welcome to EmoMate</Text>
       <Text style={styles.subtitle}>Your emotional companion</Text>
       
@@ -93,7 +94,8 @@ const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
           {permissionStatus.allGranted ? 'Get Started' : '请求权限'}
         </Text>
       </TouchableOpacity>
-    </View>
+
+    </SafeAreaView>
   );
 };
 

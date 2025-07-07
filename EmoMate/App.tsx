@@ -4,6 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { WelcomeScreen, HomeScreen } from './src/screens';
+import './global.css';
 
 export type RootStackParamList = {
   Welcome: undefined;
