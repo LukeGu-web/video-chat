@@ -1,8 +1,7 @@
 import React, { useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Pressable, ScrollView, FlatList } from 'react-native';
+import { View, Text, TouchableOpacity, Pressable, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { colors, sizes } from '../constants';
 import { useUserStore, ChatMessage } from '../store';
 import { useSpeechToText, useChatAI, PERSONALITY_PROMPTS } from '../utils';
 import { ChatBubble } from '../components';
@@ -140,28 +139,28 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   }, [messages, chatHistory, addChatMessage]);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView className="flex-1 bg-background">
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={handleGoBack}>
-          <Text style={styles.backButtonText}>← 返回</Text>
+      <View className="flex-row justify-between items-center px-4 py-3 bg-white border-b border-gray-200">
+        <TouchableOpacity onPress={handleGoBack}>
+          <Text className="text-primary font-medium">← 返回</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>
+        <Text className="text-lg font-bold text-black">
           与 {selectedCharacter || 'AI伴侣'} 对话
         </Text>
-        <TouchableOpacity style={styles.clearButton} onPress={clearChatHistory}>
-          <Text style={styles.clearButtonText}>清空</Text>
+        <TouchableOpacity onPress={clearChatHistory}>
+          <Text className="text-red-500 text-sm font-medium">清空</Text>
         </TouchableOpacity>
       </View>
 
       {/* Chat Messages */}
-      <View style={styles.chatContainer}>
+      <View className="flex-1">
         {chatHistory.length === 0 ? (
-          <View style={styles.emptyChatContainer}>
-            <Text style={styles.emptyChatText}>
+          <View className="flex-1 justify-center items-center px-8">
+            <Text className="text-xl text-gray-600 text-center mb-4">
               👋 按住下方按钮开始语音对话
             </Text>
-            <Text style={styles.emptyChatSubtext}>
+            <Text className="text-sm text-gray-500 text-center">
               说话后会自动识别并发送给AI，AI也会语音回复
             </Text>
           </View>
@@ -171,71 +170,76 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => <ChatBubble message={item} />}
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.chatList}
+            contentContainerStyle={{ paddingVertical: 8 }}
           />
         )}
       </View>
 
       {/* Status Display */}
-      <View style={styles.statusContainer}>
+      <View className="px-4 py-2 bg-gray-50 border-t border-gray-200">
         {/* AI Status */}
         {isAILoading && (
-          <View style={styles.statusItem}>
-            <Text style={styles.statusText}>🤖 AI 正在思考...</Text>
+          <View className="flex-row items-center justify-center py-2">
+            <Text className="text-sm text-gray-600">🤖 AI 正在思考...</Text>
           </View>
         )}
         
         {/* TTS Status */}
         {isSpeaking && (
-          <View style={styles.statusItem}>
-            <Text style={styles.statusText}>🗣️ AI 正在说话...</Text>
-            <TouchableOpacity style={styles.stopButton} onPress={stopSpeaking}>
-              <Text style={styles.stopButtonText}>停止</Text>
+          <View className="flex-row items-center justify-between py-2">
+            <Text className="text-sm text-gray-600">🗣️ AI 正在说话...</Text>
+            <TouchableOpacity 
+              className="px-3 py-1 bg-red-500 rounded-full"
+              onPress={stopSpeaking}
+            >
+              <Text className="text-white text-xs font-medium">停止</Text>
             </TouchableOpacity>
           </View>
         )}
 
         {/* Speech Recognition Status */}
         {isListening && (
-          <View style={styles.statusItem}>
-            <Text style={styles.statusText}>🎙️ 正在听您说话...</Text>
+          <View className="flex-row items-center justify-center py-2">
+            <Text className="text-sm text-gray-600">🎙️ 正在听您说话...</Text>
           </View>
         )}
 
         {/* Transcript Display */}
         {transcript && (
-          <View style={styles.transcriptContainer}>
-            <Text style={styles.transcriptText}>"{transcript}"</Text>
+          <View className="py-2">
+            <Text className="text-sm text-gray-700 italic text-center">"{transcript}"</Text>
           </View>
         )}
       </View>
 
       {/* Voice Control */}
-      <View style={styles.voiceControlContainer}>
+      <View className="px-4 py-6 bg-white border-t border-gray-200">
         {!isSupported ? (
-          <View style={styles.unsupportedContainer}>
-            <Text style={styles.unsupportedText}>
+          <View className="items-center">
+            <Text className="text-red-500 text-center mb-2">
               设备不支持语音识别功能
             </Text>
-            <Text style={styles.debugText}>
+            <Text className="text-xs text-gray-500 text-center">
               错误: {error || '检查中...'}
             </Text>
           </View>
         ) : (
           <Pressable
-            style={[
-              styles.voiceButton,
-              isListening && styles.voiceButtonActive,
-              (isAILoading || isSpeaking) && styles.voiceButtonDisabled
-            ]}
+            className={`w-20 h-20 rounded-full items-center justify-center mx-auto ${
+              isListening 
+                ? 'bg-red-500' 
+                : (isAILoading || isSpeaking) 
+                  ? 'bg-gray-400' 
+                  : 'bg-primary'
+            }`}
             onPressIn={startListening}
             onPressOut={stopListening}
             disabled={isAILoading || isSpeaking}
           >
-            <Text style={styles.voiceButtonText}>
+            <Text className="text-white text-2xl mb-1">
               {isListening ? '🎤' : '🎙️'}
             </Text>
-            <Text style={styles.voiceButtonLabel}>
+            <Text className="text-white text-xs text-center font-medium">
               {isListening ? '松开结束' : 
                isAILoading ? 'AI思考中' :
                isSpeaking ? 'AI说话中' : '按住说话'}
@@ -246,170 +250,5 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: sizes.padding,
-    paddingVertical: 12,
-    backgroundColor: colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.lightGray,
-  },
-  backButton: {
-    padding: 8,
-  },
-  backButtonText: {
-    fontSize: 16,
-    color: colors.primary,
-    fontWeight: '500',
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.black,
-    flex: 1,
-    textAlign: 'center',
-  },
-  clearButton: {
-    padding: 8,
-  },
-  clearButtonText: {
-    fontSize: 14,
-    color: colors.error,
-    fontWeight: '500',
-  },
-  chatContainer: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  emptyChatContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: sizes.padding * 2,
-  },
-  emptyChatText: {
-    fontSize: 18,
-    color: colors.gray,
-    textAlign: 'center',
-    marginBottom: 8,
-    fontWeight: '500',
-  },
-  emptyChatSubtext: {
-    fontSize: 14,
-    color: colors.gray,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  chatList: {
-    paddingVertical: 16,
-  },
-  statusContainer: {
-    backgroundColor: colors.white,
-    paddingHorizontal: sizes.padding,
-    paddingVertical: 8,
-    minHeight: 60,
-    justifyContent: 'center',
-  },
-  statusItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 4,
-  },
-  statusText: {
-    fontSize: 16,
-    color: colors.primary,
-    fontWeight: '500',
-    flex: 1,
-  },
-  stopButton: {
-    backgroundColor: colors.error,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: sizes.borderRadius,
-  },
-  stopButtonText: {
-    color: colors.white,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  transcriptContainer: {
-    backgroundColor: colors.lightGray,
-    padding: 12,
-    borderRadius: sizes.borderRadius,
-    marginVertical: 8,
-  },
-  transcriptText: {
-    fontSize: 16,
-    color: colors.black,
-    fontStyle: 'italic',
-    textAlign: 'center',
-  },
-  voiceControlContainer: {
-    backgroundColor: colors.white,
-    paddingHorizontal: sizes.padding,
-    paddingVertical: 24,
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: colors.lightGray,
-  },
-  unsupportedContainer: {
-    alignItems: 'center',
-    paddingVertical: 20,
-  },
-  unsupportedText: {
-    fontSize: 16,
-    color: colors.error,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  debugText: {
-    fontSize: 12,
-    color: colors.gray,
-    textAlign: 'center',
-  },
-  voiceButton: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  voiceButtonActive: {
-    backgroundColor: colors.error,
-    transform: [{ scale: 1.1 }],
-  },
-  voiceButtonDisabled: {
-    backgroundColor: colors.gray,
-    opacity: 0.6,
-  },
-  voiceButtonText: {
-    fontSize: 32,
-    marginBottom: 4,
-  },
-  voiceButtonLabel: {
-    fontSize: 12,
-    color: colors.white,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-});
 
 export default HomeScreen;

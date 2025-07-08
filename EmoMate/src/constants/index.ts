@@ -1,2 +1,1 @@
-export * from './colors';
-export * from './sizes';
+// Constants directory - migrated to tailwind.config.js

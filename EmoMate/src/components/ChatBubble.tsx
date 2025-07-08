@@ -1,6 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { colors, sizes } from '../constants';
+import { View, Text } from 'react-native';
 import { ChatMessage } from '../store/userStore';
 
 interface ChatBubbleProps {
@@ -15,105 +14,30 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({ message }) => {
   });
 
   return (
-    <View style={[
-      styles.container,
-      isUser ? styles.userContainer : styles.aiContainer
-    ]}>
-      <View style={[
-        styles.bubble,
-        isUser ? styles.userBubble : styles.aiBubble
-      ]}>
+    <View className={`my-1 px-4 ${isUser ? 'items-end' : 'items-start'}`}>
+      <View className={`max-w-[80%] px-4 py-3 rounded-bubble relative ${
+        isUser 
+          ? 'bg-primary rounded-br-bubble-sm' 
+          : 'bg-white rounded-bl-bubble-sm shadow-chat'
+      }`}>
         {message.isVoiceMessage && (
-          <View style={styles.voiceIndicator}>
-            <Text style={styles.voiceIcon}>
+          <View className="absolute -top-2 right-2 bg-background rounded-full w-6 h-6 items-center justify-center">
+            <Text className="text-xs">
               {isUser ? '🎙️' : '🗣️'}
             </Text>
           </View>
         )}
-        <Text style={[
-          styles.messageText,
-          isUser ? styles.userText : styles.aiText
-        ]}>
+        <Text className={`text-base leading-5 ${
+          isUser ? 'text-white' : 'text-black'
+        }`}>
           {message.content}
         </Text>
-        <Text style={[
-          styles.timeText,
-          isUser ? styles.userTimeText : styles.aiTimeText
-        ]}>
+        <Text className={`text-xs mt-1 self-end ${
+          isUser ? 'text-white opacity-70' : 'text-gray-500'
+        }`}>
           {time}
         </Text>
       </View>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    marginVertical: 4,
-    paddingHorizontal: sizes.padding,
-  },
-  userContainer: {
-    alignItems: 'flex-end',
-  },
-  aiContainer: {
-    alignItems: 'flex-start',
-  },
-  bubble: {
-    maxWidth: '80%',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 20,
-    position: 'relative',
-  },
-  userBubble: {
-    backgroundColor: colors.primary,
-    borderBottomRightRadius: 6,
-  },
-  aiBubble: {
-    backgroundColor: colors.white,
-    borderBottomLeftRadius: 6,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  voiceIndicator: {
-    position: 'absolute',
-    top: -8,
-    right: 8,
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    width: 24,
-    height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  voiceIcon: {
-    fontSize: 12,
-  },
-  messageText: {
-    fontSize: 16,
-    lineHeight: 22,
-  },
-  userText: {
-    color: colors.white,
-  },
-  aiText: {
-    color: colors.black,
-  },
-  timeText: {
-    fontSize: 12,
-    marginTop: 4,
-    alignSelf: 'flex-end',
-  },
-  userTimeText: {
-    color: 'rgba(255, 255, 255, 0.7)',
-  },
-  aiTimeText: {
-    color: colors.gray,
-  },
-});

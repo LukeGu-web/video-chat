@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { colors, sizes } from '../constants';
 import { requestCameraAndMicrophonePermissions, checkCameraAndMicrophonePermissions, PermissionStatus } from '../utils';
 
 type RootStackParamList = {
@@ -61,36 +60,39 @@ const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
 
   if (isCheckingPermissions) {
     return (
-      <SafeAreaView style={styles.container}>
-        <Text style={styles.title}>Welcome to EmoMate</Text>
-        <Text style={styles.subtitle}>正在检查权限...</Text>
+      <SafeAreaView className="flex-1 bg-background justify-center items-center px-4">
+        <Text className="text-4xl font-bold text-primary mb-4 text-center">Welcome to EmoMate</Text>
+        <Text className="text-lg text-gray-500 mb-12 text-center">正在检查权限...</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Welcome to EmoMate</Text>
-      <Text style={styles.subtitle}>Your emotional companion</Text>
+    <SafeAreaView className="flex-1 bg-background justify-center items-center px-4">
+      <Text className="text-4xl font-bold text-primary mb-4 text-center">Welcome to EmoMate</Text>
+      <Text className="text-lg text-gray-500 mb-12 text-center">Your emotional companion</Text>
       
       {!permissionStatus.allGranted && (
-        <View style={styles.permissionContainer}>
-          <Text style={styles.permissionText}>
+        <View className="bg-white p-4 rounded-lg mb-8 items-center">
+          <Text className="text-base text-black text-center mb-4">
             请开启摄像头与麦克风权限以便与 AI 对话
           </Text>
-          <View style={styles.permissionStatus}>
-            <Text style={[styles.statusText, { color: permissionStatus.camera ? colors.success : colors.error }]}>
+          <View className="gap-2 items-center">
+            <Text className={`text-sm font-medium ${permissionStatus.camera ? 'text-green-600' : 'text-red-600'}`}>
               摄像头: {permissionStatus.camera ? '已授权' : '未授权'}
             </Text>
-            <Text style={[styles.statusText, { color: permissionStatus.microphone ? colors.success : colors.error }]}>
+            <Text className={`text-sm font-medium ${permissionStatus.microphone ? 'text-green-600' : 'text-red-600'}`}>
               麦克风: {permissionStatus.microphone ? '已授权' : '未授权'}
             </Text>
           </View>
         </View>
       )}
       
-      <TouchableOpacity style={styles.button} onPress={handleGetStarted}>
-        <Text style={styles.buttonText}>
+      <TouchableOpacity 
+        className="bg-primary px-8 py-4 rounded-lg min-w-[200px]"
+        onPress={handleGetStarted}
+      >
+        <Text className="text-white text-lg font-semibold text-center">
           {permissionStatus.allGranted ? 'Get Started' : '请求权限'}
         </Text>
       </TouchableOpacity>
@@ -98,62 +100,5 @@ const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
     </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: sizes.padding,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: colors.primary,
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 18,
-    color: colors.gray,
-    marginBottom: 48,
-    textAlign: 'center',
-  },
-  permissionContainer: {
-    backgroundColor: colors.white,
-    padding: sizes.padding,
-    borderRadius: sizes.borderRadius,
-    marginBottom: 32,
-    alignItems: 'center',
-  },
-  permissionText: {
-    fontSize: 16,
-    color: colors.black,
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  permissionStatus: {
-    gap: 8,
-    alignItems: 'center',
-  },
-  statusText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  button: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: sizes.borderRadius,
-    minWidth: 200,
-  },
-  buttonText: {
-    color: colors.white,
-    fontSize: 18,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-});
 
 export default WelcomeScreen;
