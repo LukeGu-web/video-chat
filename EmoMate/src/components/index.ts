@@ -1,6 +1,7 @@
 export * from './ChatBubble';
 export { default as LoadingDots } from './LoadingDots';
 export { default as ListeningIndicator } from './ListeningIndicator';
+export { default as LottieTest } from './LottieTest';
 export { default as TypingIndicator } from './TypingIndicator';
 export { default as ErrorToast } from './ErrorToast';
 export { default as Header } from './Header';

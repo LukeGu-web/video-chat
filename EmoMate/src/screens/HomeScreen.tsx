@@ -1,10 +1,11 @@
 import React, { useEffect, useCallback, useState } from 'react';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, TouchableOpacity, Text } from 'react-native';
+import { SafeAreaView as SafeAreaViewRN } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useUserStore, ChatMessage } from '../store';
 import { useSpeechToText, useChatAI } from '../utils';
 import { PERSONALITY_PROMPTS } from '../constants';
-import { Header, ChatList, VoiceControl, ErrorToast } from '../components';
+import { Header, ChatList, VoiceControl, ErrorToast, LottieTest } from '../components';
 
 type RootStackParamList = {
   Welcome: undefined;
@@ -53,6 +54,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   // Error toast state
   const [showErrorToast, setShowErrorToast] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  
+  // Test mode state
+  const [isTestMode, setIsTestMode] = useState(false);
 
   // Handle errors
   useEffect(() => {
@@ -175,8 +179,29 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     }
   }, [messages, chatHistory, addChatMessage]);
 
+  if (isTestMode) {
+    return (
+      <SafeAreaViewRN className='flex-1 bg-background'>
+        {/* Test Mode Header */}
+        <View className='flex-row items-center justify-between p-4 bg-white border-b border-gray-200'>
+          <TouchableOpacity
+            onPress={() => setIsTestMode(false)}
+            className='px-4 py-2 bg-blue-500 rounded-lg'
+          >
+            <Text className='text-white font-medium'>返回聊天</Text>
+          </TouchableOpacity>
+          <Text className='text-lg font-bold text-gray-800'>Lottie 动画测试</Text>
+          <View className='w-20' />
+        </View>
+
+        {/* Lottie Test Component */}
+        <LottieTest />
+      </SafeAreaViewRN>
+    );
+  }
+
   return (
-    <SafeAreaView className='flex-1 bg-background'>
+    <SafeAreaViewRN className='flex-1 bg-background'>
       {/* Error Toast */}
       <ErrorToast
         message={errorMessage}
@@ -185,15 +210,27 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         duration={4000}
       />
 
-      {/* Header */}
-      <Header
-        characterName={selectedCharacter || 'AI伴侣'}
-        onGoBack={handleGoBack}
-        onClearChat={clearChatHistory}
-        onTestTTS={handleTestTTS}
-        onSwitchTTS={handleSwitchTTS}
-        ttsProvider={currentTTSProvider}
-      />
+      {/* Header with Test Mode Button */}
+      <View className='bg-white border-b border-gray-200'>
+        <Header
+          characterName={selectedCharacter || 'AI伴侣'}
+          onGoBack={handleGoBack}
+          onClearChat={clearChatHistory}
+          onTestTTS={handleTestTTS}
+          onSwitchTTS={handleSwitchTTS}
+          ttsProvider={currentTTSProvider}
+        />
+        
+        {/* Test Mode Toggle */}
+        <View className='px-4 pb-3'>
+          <TouchableOpacity
+            onPress={() => setIsTestMode(true)}
+            className='self-end px-3 py-1 bg-purple-500 rounded-full'
+          >
+            <Text className='text-white text-sm font-medium'>测试动画</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
       {/* Chat List */}
       <ChatList
@@ -218,7 +255,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         onStopListening={stopListening}
         onStopSpeaking={stopSpeaking}
       />
-    </SafeAreaView>
+    </SafeAreaViewRN>
   );
 };
 
