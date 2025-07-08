@@ -1,10 +1,10 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useState } from 'react';
 import { View, Text, TouchableOpacity, Pressable, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useUserStore, ChatMessage } from '../store';
 import { useSpeechToText, useChatAI, PERSONALITY_PROMPTS } from '../utils';
-import { ChatBubble } from '../components';
+import { ChatBubble, ListeningIndicator, TypingIndicator, ErrorToast } from '../components';
 
 type RootStackParamList = {
   Welcome: undefined;
@@ -49,6 +49,24 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     setPersonality,
     stopSpeaking,
   } = useChatAI({ personality: PERSONALITY_PROMPTS.gentle, enableTTS: true });
+
+  // Error toast state
+  const [showErrorToast, setShowErrorToast] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  // Handle errors
+  useEffect(() => {
+    if (error || aiError) {
+      const message = error || aiError;
+      setErrorMessage(message);
+      setShowErrorToast(true);
+    }
+  }, [error, aiError]);
+
+  const handleDismissError = () => {
+    setShowErrorToast(false);
+    setErrorMessage('');
+  };
 
   useEffect(() => {
     // Character selection updated
@@ -140,6 +158,14 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
+      {/* Error Toast */}
+      <ErrorToast
+        message={errorMessage}
+        isVisible={showErrorToast}
+        onDismiss={handleDismissError}
+        duration={4000}
+      />
+      
       {/* Header */}
       <View className="flex-row justify-between items-center px-4 py-3 bg-white border-b border-gray-200">
         <TouchableOpacity onPress={handleGoBack}>
@@ -157,18 +183,43 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       <View className="flex-1">
         {chatHistory.length === 0 ? (
           <View className="flex-1 justify-center items-center px-8">
-            <Text className="text-xl text-gray-600 text-center mb-4">
-              👋 按住下方按钮开始语音对话
-            </Text>
-            <Text className="text-sm text-gray-500 text-center">
-              说话后会自动识别并发送给AI，AI也会语音回复
-            </Text>
+            {/* Listening State */}
+            {isListening ? (
+              <ListeningIndicator isVisible={true} />
+            ) : (
+              <>
+                <Text className="text-xl text-gray-600 text-center mb-4">
+                  👋 按住下方按钮开始语音对话
+                </Text>
+                <Text className="text-sm text-gray-500 text-center">
+                  说话后会自动识别并发送给AI，AI也会语音回复
+                </Text>
+              </>
+            )}
           </View>
         ) : (
           <FlatList
             data={chatHistory}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => <ChatBubble message={item} />}
+            ListFooterComponent={() => (
+              <>
+                {/* Typing Indicator */}
+                {isAILoading && (
+                  <TypingIndicator 
+                    isVisible={true} 
+                    characterName={selectedCharacter || 'AI'}
+                  />
+                )}
+                
+                {/* Listening State in Chat */}
+                {isListening && (
+                  <View className="px-4 py-2">
+                    <ListeningIndicator isVisible={true} />
+                  </View>
+                )}
+              </>
+            )}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingVertical: 8 }}
           />
@@ -177,13 +228,6 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
       {/* Status Display */}
       <View className="px-4 py-2 bg-gray-50 border-t border-gray-200">
-        {/* AI Status */}
-        {isAILoading && (
-          <View className="flex-row items-center justify-center py-2">
-            <Text className="text-sm text-gray-600">🤖 AI 正在思考...</Text>
-          </View>
-        )}
-        
         {/* TTS Status */}
         {isSpeaking && (
           <View className="flex-row items-center justify-between py-2">
@@ -194,13 +238,6 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
             >
               <Text className="text-white text-xs font-medium">停止</Text>
             </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Speech Recognition Status */}
-        {isListening && (
-          <View className="flex-row items-center justify-center py-2">
-            <Text className="text-sm text-gray-600">🎙️ 正在听您说话...</Text>
           </View>
         )}
 
