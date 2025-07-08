@@ -2,7 +2,8 @@ import React, { useEffect, useCallback, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useUserStore, ChatMessage } from '../store';
-import { useSpeechToText, useChatAI, PERSONALITY_PROMPTS } from '../utils';
+import { useSpeechToText, useChatAI } from '../utils';
+import { PERSONALITY_PROMPTS } from '../constants';
 import { Header, ChatList, VoiceControl, ErrorToast } from '../components';
 
 type RootStackParamList = {

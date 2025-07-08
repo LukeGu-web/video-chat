@@ -1,6 +1,11 @@
 import { useState, useCallback } from 'react';
-import Constants from 'expo-constants';
 import { useTTS } from './useTTS';
+import { 
+  CLAUDE_API_CONFIG, 
+  getClaudeApiKey, 
+  PERSONALITY_PROMPTS,
+  AI_ERROR_MESSAGES 
+} from '../constants/ai';
 
 export interface ChatMessage {
   id: string;
@@ -27,27 +32,7 @@ export interface UseChatAIReturn {
   stopSpeaking: () => void; // 停止 TTS 播放
 }
 
-// 预设人格模板
-export const PERSONALITY_PROMPTS = {
-  gentle:
-    '你是一个温柔而共情的 AI朋友，你知道自己是虚拟的。请用贴心、平静的语气回应用户表达的情绪，避免生硬建议，优先安慰、倾听和共鸣。',
-  cheerful:
-    '你是一个活泼开朗的 AI朋友，总是能给用户带来正能量。用乐观积极的语气回应，适当使用emoji表情，让对话充满活力。',
-  wise: '你是一个睿智沉稳的 AI朋友，善于给出深度思考和人生建议。用理性而温暖的语气回应，提供有价值的见解和指导。',
-  companion:
-    '你是用户最贴心的 AI伴侣，了解用户的喜好和情感需求。用亲密而关怀的语气回应，让用户感受到陪伴和理解。',
-};
-
-// Claude 3 API 配置
-const CLAUDE_API_CONFIG = {
-  baseURL: 'https://api.anthropic.com/v1/messages',
-  models: {
-    haiku: 'claude-3-haiku-20240307',
-    sonnet: 'claude-3-sonnet-20240229',
-  },
-  maxTokens: 1024,
-  defaultModel: 'haiku' as const,
-};
+// 预设人格模板和API配置现在从 constants/ai.ts 导入
 
 export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -68,11 +53,9 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     messages: ChatMessage[],
     config: ChatAIConfig
   ): Promise<string> => {
-    const apiKey = config.apiKey || Constants.expoConfig?.extra?.claudeApiKey;
+    const apiKey = config.apiKey || getClaudeApiKey();
     if (!apiKey) {
-      throw new Error(
-        'Claude API密钥未配置。请在环境变量中设置CLAUDE_API_KEY。'
-      );
+      throw new Error(AI_ERROR_MESSAGES.API_KEY_MISSING);
     }
 
     const model = config.modelType
@@ -100,7 +83,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
+        'anthropic-version': CLAUDE_API_CONFIG.version,
       },
       body: JSON.stringify(requestBody),
     });
@@ -109,7 +92,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       const errorData = await response.json().catch(() => null);
       throw new Error(
         errorData?.error?.message ||
-          `API调用失败: ${response.status} ${response.statusText}`
+          `${AI_ERROR_MESSAGES.API_CALL_FAILED}: ${response.status} ${response.statusText}`
       );
     }
 

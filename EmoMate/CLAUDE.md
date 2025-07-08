@@ -56,11 +56,23 @@ The app implements a permission-first design:
 ```
 src/
 ├── screens/     # Screen components (WelcomeScreen, HomeScreen)
-├── components/  # Reusable UI components (currently empty)
+├── components/  # Reusable UI components (ChatBubble, ErrorToast, etc.)
 ├── store/       # Zustand state management
-├── utils/       # Utility functions (permissions, etc.)
-└── constants/   # App constants (colors, sizes)
+├── utils/       # Utility functions (useChatAI, useTTS, useSpeechToText, permissions)
+└── constants/   # App constants (ai.ts, colors, sizes)
 ```
+
+### Core Utility Modules
+- **`useChatAI.ts`** - Claude AI integration hook with TTS support
+- **`useTTS.ts`** - Text-to-speech functionality using expo-speech
+- **`useSpeechToText.ts`** - Speech recognition using expo-speech-recognition
+- **`permissions.ts`** - Camera and microphone permission utilities
+
+### AI Configuration (constants/ai.ts)
+- **`CLAUDE_API_CONFIG`** - API endpoints, models, and settings
+- **`PERSONALITY_PROMPTS`** - Pre-defined AI personality templates
+- **`AI_CHARACTERS`** - Character configurations with avatars
+- **`getClaudeApiKey()`** - Secure API key retrieval function
 
 ### TypeScript Patterns
 - All files use TypeScript with proper interfaces
