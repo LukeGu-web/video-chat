@@ -44,7 +44,7 @@ ${capabilityPrompt}`;
 // 实用的能力查询函数
 export const hasCapability = (capabilityId: string): boolean => {
   const capabilities = getAICapabilities();
-  const capability = capabilities.find(cap => cap.id === capabilityId);
+  const capability = capabilities.find((cap) => cap.id === capabilityId);
   return capability?.isAvailable || false;
 };
 
@@ -55,8 +55,8 @@ export const getCapabilityStatus = () => {
     canListen: hasCapability('voice_recognition'),
     canChat: hasCapability('text_conversation'),
     canProvideEmotionalSupport: hasCapability('emotional_support'),
-    availableCapabilities: capabilities.filter(cap => cap.isAvailable),
-    totalCapabilities: capabilities.length
+    availableCapabilities: capabilities.filter((cap) => cap.isAvailable),
+    totalCapabilities: capabilities.length,
   };
 };
 
@@ -113,20 +113,20 @@ export const ELEVENLABS_CONFIG = {
     turbo: 'eleven_turbo_v2',
   },
   defaultModel: 'eleven_multilingual_v2' as const,
-  // 中文语音 ID（可以根据需要更换）
+  // 语音 ID 配置
   voices: {
-    // 使用 ElevenLabs 的多语言预设语音（支持中文）
-    chinese_female: 'EXAVITQu4vr4xnSDxMaL', // Bella - 多语言女声
-    chinese_male: 'TxGEqnHWrfWFTfGW9XjX',   // Josh - 多语言男声 
+    // ElevenLabs 预设语音（备用）
+    chinese_female: 'hkfHEbBvdQFNX4uWHqRF', // Bella - 多语言女声
+    chinese_male: 'TxGEqnHWrfWFTfGW9XjX', // Josh - 多语言男声
     multilingual_female: 'EXAVITQu4vr4xnSDxMaL', // Bella
-    multilingual_male: 'TxGEqnHWrfWFTfGW9XjX',   // Josh
-    default: 'EXAVITQu4vr4xnSDxMaL', // 默认使用 Bella
+    multilingual_male: 'TxGEqnHWrfWFTfGW9XjX', // Josh
+    default: 'hkfHEbBvdQFNX4uWHqRF', // 默认使用指定的语音
   },
   defaultVoice: 'chinese_female' as const,
   settings: {
-    stability: 0.6,        // 稍微提高稳定性，避免发音变化过大
+    stability: 0.6, // 稍微提高稳定性，避免发音变化过大
     similarity_boost: 0.9, // 提高相似度，保持语音一致性
-    style: 0.2,            // 降低风格化，更自然的语音
+    style: 0.2, // 降低风格化，更自然的语音
     use_speaker_boost: true, // 启用说话者增强
   },
 };
@@ -151,52 +151,52 @@ export interface AICapability {
 export const getAICapabilities = (): AICapability[] => {
   const claudeApiKey = getClaudeApiKey();
   const elevenLabsApiKey = getElevenLabsApiKey();
-  
+
   return [
     {
       id: 'text_conversation',
       name: '文本对话',
       description: '可以进行智能文本对话，回答问题，提供建议和支持',
       isAvailable: !!claudeApiKey,
-      provider: 'Claude'
+      provider: 'Claude',
     },
     {
       id: 'voice_synthesis',
       name: '语音合成',
       description: '可以将文字转换为自然的语音，用真人般的声音说话',
       isAvailable: !!elevenLabsApiKey,
-      provider: 'ElevenLabs'
+      provider: 'ElevenLabs',
     },
     {
       id: 'voice_recognition',
       name: '语音识别',
       description: '可以听懂用户的语音输入，理解口语内容',
       isAvailable: true, // 使用设备原生能力
-      provider: 'Device'
+      provider: 'Device',
     },
     {
       id: 'emotional_support',
       name: '情感支持',
       description: '可以提供情感陪伴，理解和回应用户的情感需求',
       isAvailable: !!claudeApiKey,
-      provider: 'Claude'
-    }
+      provider: 'Claude',
+    },
   ];
 };
 
 // 生成AI能力描述文本，用于system prompt
 export const generateCapabilityPrompt = (): string => {
   const capabilities = getAICapabilities();
-  const availableCapabilities = capabilities.filter(cap => cap.isAvailable);
-  
+  const availableCapabilities = capabilities.filter((cap) => cap.isAvailable);
+
   if (availableCapabilities.length === 0) {
     return '你当前只能进行基础的文本交流。';
   }
-  
+
   const capabilityList = availableCapabilities
-    .map(cap => `- ${cap.name}: ${cap.description}`)
+    .map((cap) => `- ${cap.name}: ${cap.description}`)
     .join('\n');
-    
+
   return `你具备以下能力：
 
 ${capabilityList}

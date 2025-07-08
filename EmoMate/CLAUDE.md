@@ -6,17 +6,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 EmoMate is a React Native mobile application built with Expo that serves as an emotional companion AI chat application. The app provides intelligent voice-first AI interactions with multi-modal capabilities including text chat, speech recognition, and high-quality text-to-speech synthesis.
 
-### Current Development Status: 🚀 **Beta-Ready** 
+### Current Development Status: 🚀 **Beta-Ready**
+
 - **Core Features**: ✅ Complete (Voice chat, AI integration, UI/UX)
 - **Architecture**: ✅ Production-ready with TypeScript and modern patterns
 - **AI Integration**: ✅ Advanced multi-provider system (Claude + ElevenLabs)
 - **Testing & Deployment**: 🔄 Ready for implementation
 
-### Key Achievements:
+### Key Achievements
+
 - **Voice-First Design**: Complete speech recognition + synthesis pipeline
 - **AI Capability Management**: Dynamic multi-service integration system
 - **Hybrid TTS**: ElevenLabs premium quality with Expo Speech fallback
 - **Modern Architecture**: TypeScript, Zustand + Immer, component-driven design
+- **Custom Voice**: Using ElevenLabs voice ID `hkfHEbBvdQFNX4uWHqRF` for personalized experience
 
 ## Development Commands
 
@@ -149,7 +152,7 @@ src/
 
 ### 🎯 Advanced Features Implemented
 - **AI Capability Management**: Dynamic service detection and capability awareness
-- **Multi-Provider TTS**: ElevenLabs premium quality with intelligent fallback
+- **Multi-Provider TTS**: ElevenLabs (voice ID: `hkfHEbBvdQFNX4uWHqRF`) with Expo Speech fallback
 - **Voice-First UX**: Complete speech recognition → AI response → TTS pipeline
 - **Real-time UI States**: Loading, generating, speaking, listening indicators
 - **Chat History**: Persistent conversation storage with message bubbles
