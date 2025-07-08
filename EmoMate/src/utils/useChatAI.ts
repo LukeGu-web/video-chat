@@ -27,6 +27,7 @@ export interface UseChatAIReturn {
   messages: ChatMessage[];
   isLoading: boolean;
   isSpeaking: boolean; // TTS 播放状态
+  isGenerating: boolean; // TTS 生成状态
   error: string | null;
   currentTTSProvider: TTSProvider; // 当前TTS提供商
   sendMessage: (content: string, config?: ChatAIConfig) => Promise<void>;
@@ -49,6 +50,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
   // 集成混合 TTS 功能
   const { 
     isSpeaking, 
+    isGenerating,
     speak, 
     stop: stopTTS, 
     error: ttsError,
@@ -199,6 +201,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     messages,
     isLoading,
     isSpeaking,
+    isGenerating,
     error: combinedError,
     currentTTSProvider: currentProvider,
     sendMessage,

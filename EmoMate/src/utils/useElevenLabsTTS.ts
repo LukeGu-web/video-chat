@@ -5,6 +5,7 @@ import { ELEVENLABS_CONFIG, getElevenLabsApiKey } from '../constants/ai';
 
 export interface UseElevenLabsTTSReturn {
   isSpeaking: boolean;
+  isGenerating: boolean; // 新增：是否正在生成语音
   error: string | null;
   speak: (text: string, voiceId?: string) => Promise<void>;
   stop: () => Promise<void>;
@@ -14,6 +15,8 @@ export const useElevenLabsTTS = (): UseElevenLabsTTSReturn => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [audioUri, setAudioUri] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false); // 新增：语音生成状态
+  const [playbackTimer, setPlaybackTimer] = useState<NodeJS.Timeout | null>(null);
   
   // Initialize audio player with null to avoid native module errors
   const audioPlayer = useAudioPlayer(null);
@@ -83,23 +86,35 @@ export const useElevenLabsTTS = (): UseElevenLabsTTSReturn => {
 
   // Monitor audio player state changes
   useEffect(() => {
+    // isSpeaking 只在实际播放音频时为 true
     setIsSpeaking(audioPlayer.playing);
     
+    // 检查音频是否播放完成（currentTime >= duration）
+    if (!audioPlayer.playing && audioPlayer.duration > 0 && audioPlayer.currentTime >= audioPlayer.duration - 0.1) {
+      setIsSpeaking(false);
+      // 清理备用定时器
+      if (playbackTimer) {
+        clearTimeout(playbackTimer);
+        setPlaybackTimer(null);
+      }
+    }
+    
     // 当音频播放完成时清理临时文件
-    if (!audioPlayer.playing && audioUri && audioPlayer.currentTime > 0) {
+    if (!audioPlayer.playing && !isGenerating && audioUri && audioPlayer.currentTime > 0) {
       // 延迟清理，确保音频已完全停止
       setTimeout(() => {
         FileSystem.deleteAsync(audioUri, { idempotent: true });
         setAudioUri(null);
       }, 500);
     }
-  }, [audioPlayer.playing, audioUri, audioPlayer.currentTime]);
+  }, [audioPlayer.playing, audioUri, audioPlayer.currentTime, audioPlayer.duration, isGenerating]);
 
   const speak = useCallback(async (text: string, voiceId?: string) => {
     if (!text.trim()) return;
 
     try {
       setError(null);
+      setIsGenerating(true); // 开始生成语音
       
       // 停止当前播放
       if (audioPlayer.playing) {
@@ -122,10 +137,23 @@ export const useElevenLabsTTS = (): UseElevenLabsTTSReturn => {
       // 等待音频加载完成后播放
       setTimeout(() => {
         audioPlayer.play();
+        // 强制在播放后短暂延迟重置生成状态，确保状态转换
+        setTimeout(() => {
+          setIsGenerating(false);
+          
+          // 设置备用定时器，基于估算的播放时长来停止播放状态
+          // 估算：每个字符约0.2秒，加上1秒缓冲时间
+          const estimatedDuration = (text.length * 0.2 + 1) * 1000;
+          const timer = setTimeout(() => {
+            setIsSpeaking(false);
+          }, estimatedDuration);
+          setPlaybackTimer(timer);
+        }, 50);
       }, 100);
 
     } catch (err) {
       setError(err instanceof Error ? err.message : '语音合成失败');
+      setIsGenerating(false);
       setIsSpeaking(false);
       console.error('ElevenLabs TTS Error:', err);
     }
@@ -137,7 +165,16 @@ export const useElevenLabsTTS = (): UseElevenLabsTTSReturn => {
         audioPlayer.pause();
         audioPlayer.seekTo(0);
       }
+      
+      // 停止所有状态
+      setIsGenerating(false);
       setIsSpeaking(false);
+      
+      // 清理备用定时器
+      if (playbackTimer) {
+        clearTimeout(playbackTimer);
+        setPlaybackTimer(null);
+      }
       
       // 清理临时音频文件
       if (audioUri) {
@@ -146,11 +183,19 @@ export const useElevenLabsTTS = (): UseElevenLabsTTSReturn => {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : '停止播放失败');
+      setIsGenerating(false);
+      setIsSpeaking(false); // 确保即使出错也重置状态
+      // 清理备用定时器
+      if (playbackTimer) {
+        clearTimeout(playbackTimer);
+        setPlaybackTimer(null);
+      }
     }
-  }, [audioPlayer, audioUri]);
+  }, [audioPlayer, audioUri, playbackTimer]);
 
   return {
     isSpeaking,
+    isGenerating,
     error,
     speak,
     stop,

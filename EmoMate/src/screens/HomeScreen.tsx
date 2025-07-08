@@ -40,6 +40,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     messages,
     isLoading: isAILoading,
     isSpeaking,
+    isGenerating,
     error: aiError,
     currentTTSProvider,
     sendMessage,
@@ -210,6 +211,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         isSupported={isSupported}
         isAILoading={isAILoading}
         isSpeaking={isSpeaking}
+        isGenerating={isGenerating}
         error={error}
         transcript={transcript}
         onStartListening={startListening}

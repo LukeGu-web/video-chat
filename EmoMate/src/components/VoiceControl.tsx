@@ -6,6 +6,7 @@ interface VoiceControlProps {
   isSupported?: boolean;
   isAILoading?: boolean;
   isSpeaking?: boolean;
+  isGenerating?: boolean; // 新增：是否正在生成语音
   error?: string | null;
   transcript?: string;
   onStartListening?: () => void;
@@ -18,27 +19,39 @@ const VoiceControl: React.FC<VoiceControlProps> = ({
   isSupported = true,
   isAILoading = false,
   isSpeaking = false,
+  isGenerating = false,
   error,
   transcript,
   onStartListening,
   onStopListening,
   onStopSpeaking
 }) => {
-  const isDisabled = isAILoading || isSpeaking;
+  const isDisabled = isAILoading || isSpeaking || isGenerating;
 
   return (
     <>
       {/* Status Display */}
       <View className="px-4 py-2 bg-gray-50 border-t border-gray-200">
-        {/* TTS Status */}
+        {/* TTS Status - 生成状态（无停止按钮） */}
+        {isGenerating && !isSpeaking && (
+          <View className="flex-row items-center py-3 px-2 bg-blue-50 rounded-lg mb-2">
+            <Text className="text-lg mr-2">⚙️</Text>
+            <Text className="text-sm text-blue-700 font-medium">AI 生成语音中...</Text>
+          </View>
+        )}
+        
+        {/* TTS Status - 播放状态（有停止按钮） */}
         {isSpeaking && (
-          <View className="flex-row items-center justify-between py-2">
-            <Text className="text-sm text-gray-600">🗣️ AI 正在说话...</Text>
+          <View className="flex-row items-center justify-between py-3 px-2 bg-blue-50 rounded-lg mb-2">
+            <View className="flex-row items-center">
+              <Text className="text-lg mr-2">🗣️</Text>
+              <Text className="text-sm text-blue-700 font-medium">AI 正在说话...</Text>
+            </View>
             <TouchableOpacity 
-              className="px-3 py-1 bg-red-500 rounded-full"
+              className="px-4 py-2 bg-red-500 rounded-full shadow-sm"
               onPress={onStopSpeaking}
             >
-              <Text className="text-white text-xs font-medium">停止</Text>
+              <Text className="text-white text-sm font-bold">停止语音</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -81,6 +94,7 @@ const VoiceControl: React.FC<VoiceControlProps> = ({
             <Text className="text-white text-xs text-center font-medium">
               {isListening ? '松开结束' : 
                isAILoading ? 'AI思考中' :
+               isGenerating ? '生成语音中' :
                isSpeaking ? 'AI说话中' : '按住说话'}
             </Text>
           </Pressable>

@@ -12,6 +12,7 @@ export interface UseHybridTTSConfig {
 
 export interface UseHybridTTSReturn {
   isSpeaking: boolean;
+  isGenerating: boolean; // 新增：是否正在生成语音
   error: string | null;
   currentProvider: TTSProvider;
   speak: (text: string, voiceId?: string) => Promise<void>;
@@ -84,12 +85,17 @@ export const useHybridTTS = (config?: UseHybridTTSConfig): UseHybridTTSReturn =>
     ? elevenLabsTTS.isSpeaking 
     : expoTTS.isSpeaking;
 
+  const isGenerating = currentProvider === 'elevenlabs' 
+    ? elevenLabsTTS.isGenerating 
+    : false; // Expo TTS 没有生成阶段
+
   const error = currentProvider === 'elevenlabs' 
     ? elevenLabsTTS.error 
     : expoTTS.error;
 
   return {
     isSpeaking,
+    isGenerating,
     error,
     currentProvider,
     speak,
