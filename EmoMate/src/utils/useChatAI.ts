@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { useTTS } from './useTTS';
+import { useHybridTTS, TTSProvider } from './useHybridTTS';
 import { 
   CLAUDE_API_CONFIG, 
   getClaudeApiKey, 
@@ -19,6 +19,8 @@ export interface ChatAIConfig {
   modelType?: 'haiku' | 'sonnet';
   apiKey?: string;
   enableTTS?: boolean; // 是否启用语音合成
+  ttsProvider?: TTSProvider; // TTS 提供商选择
+  voiceId?: string; // ElevenLabs 语音 ID
 }
 
 export interface UseChatAIReturn {
@@ -26,10 +28,12 @@ export interface UseChatAIReturn {
   isLoading: boolean;
   isSpeaking: boolean; // TTS 播放状态
   error: string | null;
+  currentTTSProvider: TTSProvider; // 当前TTS提供商
   sendMessage: (content: string, config?: ChatAIConfig) => Promise<void>;
   clearMessages: () => void;
   setPersonality: (personality: string) => void;
   stopSpeaking: () => void; // 停止 TTS 播放
+  switchTTSProvider: (provider: TTSProvider) => void; // 切换TTS提供商
 }
 
 // 预设人格模板和API配置现在从 constants/ai.ts 导入
@@ -42,8 +46,18 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     initialConfig?.personality || PERSONALITY_PROMPTS.gentle
   );
 
-  // 集成 TTS 功能
-  const { isSpeaking, speak, stop: stopTTS, error: ttsError } = useTTS();
+  // 集成混合 TTS 功能
+  const { 
+    isSpeaking, 
+    speak, 
+    stop: stopTTS, 
+    error: ttsError,
+    currentProvider,
+    switchProvider
+  } = useHybridTTS({
+    preferredProvider: initialConfig?.ttsProvider || 'elevenlabs',
+    fallbackToExpo: true
+  });
 
   const generateMessageId = () => {
     return `msg_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
@@ -136,7 +150,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
         if (config?.enableTTS !== false) {
           // 默认启用，除非明确设为 false
           setTimeout(() => {
-            speak(aiResponse).catch(() => {
+            speak(aiResponse, config?.voiceId).catch(() => {
               // TTS error handled silently
             });
           }, 500); // 稍微延迟以确保消息已显示
@@ -174,6 +188,10 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     stopTTS();
   }, [stopTTS]);
 
+  const switchTTSProvider = useCallback((provider: TTSProvider) => {
+    switchProvider(provider);
+  }, [switchProvider]);
+
   // 合并错误信息
   const combinedError = error || ttsError;
 
@@ -182,9 +200,11 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     isLoading,
     isSpeaking,
     error: combinedError,
+    currentTTSProvider: currentProvider,
     sendMessage,
     clearMessages,
     setPersonality,
     stopSpeaking,
+    switchTTSProvider,
   };
 };

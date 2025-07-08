@@ -45,6 +45,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     eas: {
       projectId: "d96cc4b9-d302-44a3-83f0-362985174c0e"
     },
-    claudeApiKey: process.env.CLAUDE_API_KEY
+    claudeApiKey: process.env.CLAUDE_API_KEY,
+    elevenLabsApiKey: process.env.ELEVENLABS_API_KEY
   }
 });

@@ -63,16 +63,20 @@ src/
 ```
 
 ### Core Utility Modules
-- **`useChatAI.ts`** - Claude AI integration hook with TTS support
-- **`useTTS.ts`** - Text-to-speech functionality using expo-speech
+- **`useChatAI.ts`** - Claude AI integration hook with hybrid TTS support
+- **`useTTS.ts`** - Text-to-speech functionality using expo-speech (fallback)
+- **`useElevenLabsTTS.ts`** - High-quality TTS using ElevenLabs API
+- **`useHybridTTS.ts`** - Smart TTS provider switching (ElevenLabs + Expo fallback)
 - **`useSpeechToText.ts`** - Speech recognition using expo-speech-recognition
 - **`permissions.ts`** - Camera and microphone permission utilities
 
 ### AI Configuration (constants/ai.ts)
 - **`CLAUDE_API_CONFIG`** - API endpoints, models, and settings
+- **`ELEVENLABS_CONFIG`** - ElevenLabs TTS API configuration and voice settings
 - **`PERSONALITY_PROMPTS`** - Pre-defined AI personality templates
 - **`AI_CHARACTERS`** - Character configurations with avatars
-- **`getClaudeApiKey()`** - Secure API key retrieval function
+- **`getClaudeApiKey()`** - Secure Claude API key retrieval function
+- **`getElevenLabsApiKey()`** - Secure ElevenLabs API key retrieval function
 
 ### TypeScript Patterns
 - All files use TypeScript with proper interfaces
@@ -120,6 +124,13 @@ src/
 - Emotion analysis and logging
 - Chat history and conversation management
 - User preference persistence
+
+### TTS Integration Notes
+- **ElevenLabs Integration**: High-quality, natural-sounding AI voices
+- **Hybrid TTS System**: Automatically falls back to expo-speech if ElevenLabs fails
+- **Audio Dependencies**: Uses browser Audio API for cross-platform compatibility
+- **API Key Management**: Securely handled through environment variables and Expo config
+- **Voice Configuration**: Supports custom voice IDs and quality settings
 
 ### Missing Infrastructure
 - Testing framework (Jest/React Native Testing Library)

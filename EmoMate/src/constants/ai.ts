@@ -17,6 +17,11 @@ export const getClaudeApiKey = (): string | undefined => {
   return Constants.expoConfig?.extra?.claudeApiKey;
 };
 
+// 获取 ElevenLabs API Key
+export const getElevenLabsApiKey = (): string | undefined => {
+  return Constants.expoConfig?.extra?.elevenLabsApiKey;
+};
+
 // 预设人格模板
 export const PERSONALITY_PROMPTS = {
   gentle:
@@ -34,25 +39,25 @@ export const AI_CHARACTERS = {
     name: '温柔小助手',
     personality: PERSONALITY_PROMPTS.gentle,
     avatar: '😊',
-    description: '温柔贴心，善于倾听和安慰'
+    description: '温柔贴心，善于倾听和安慰',
   },
   cheerful: {
     name: '活力伙伴',
     personality: PERSONALITY_PROMPTS.cheerful,
     avatar: '🌟',
-    description: '充满活力，带来正能量'
+    description: '充满活力，带来正能量',
   },
   wise: {
     name: '智慧导师',
     personality: PERSONALITY_PROMPTS.wise,
     avatar: '🤔',
-    description: '睿智深刻，提供人生指导'
+    description: '睿智深刻，提供人生指导',
   },
   companion: {
     name: '贴心伴侣',
     personality: PERSONALITY_PROMPTS.companion,
     avatar: '💝',
-    description: '亲密陪伴，理解用户需求'
+    description: '亲密陪伴，理解用户需求',
   },
 };
 
@@ -71,6 +76,32 @@ export const TTS_CONFIG = {
   defaultPitch: 1.0,
   defaultVolume: 1.0,
   language: 'zh-CN',
+};
+
+// ElevenLabs 配置
+export const ELEVENLABS_CONFIG = {
+  baseURL: 'https://api.elevenlabs.io/v1',
+  models: {
+    multilingual: 'eleven_multilingual_v2',
+    turbo: 'eleven_turbo_v2',
+  },
+  defaultModel: 'eleven_multilingual_v2' as const,
+  // 中文语音 ID（可以根据需要更换）
+  voices: {
+    // 使用 ElevenLabs 的多语言预设语音（支持中文）
+    chinese_female: 'EXAVITQu4vr4xnSDxMaL', // Bella - 多语言女声
+    chinese_male: 'TxGEqnHWrfWFTfGW9XjX',   // Josh - 多语言男声 
+    multilingual_female: 'EXAVITQu4vr4xnSDxMaL', // Bella
+    multilingual_male: 'TxGEqnHWrfWFTfGW9XjX',   // Josh
+    default: 'EXAVITQu4vr4xnSDxMaL', // 默认使用 Bella
+  },
+  defaultVoice: 'chinese_female' as const,
+  settings: {
+    stability: 0.6,        // 稍微提高稳定性，避免发音变化过大
+    similarity_boost: 0.9, // 提高相似度，保持语音一致性
+    style: 0.2,            // 降低风格化，更自然的语音
+    use_speaker_boost: true, // 启用说话者增强
+  },
 };
 
 // 语音识别配置

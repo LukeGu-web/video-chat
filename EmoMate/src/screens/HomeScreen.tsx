@@ -41,10 +41,12 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     isLoading: isAILoading,
     isSpeaking,
     error: aiError,
+    currentTTSProvider,
     sendMessage,
     clearMessages,
     setPersonality,
     stopSpeaking,
+    switchTTSProvider,
   } = useChatAI({ personality: PERSONALITY_PROMPTS.gentle, enableTTS: true });
 
   // Error toast state
@@ -87,6 +89,22 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const handleClearTranscript = () => {
     clearTranscript();
   };
+
+  const handleTestTTS = useCallback(async () => {
+    try {
+      await sendMessage('你好，这是一个语音测试', {
+        enableTTS: true,
+        modelType: 'haiku'
+      });
+    } catch (error) {
+      console.error('TTS test failed:', error);
+    }
+  }, [sendMessage]);
+
+  const handleSwitchTTS = useCallback(() => {
+    const newProvider = currentTTSProvider === 'elevenlabs' ? 'expo' : 'elevenlabs';
+    switchTTSProvider(newProvider);
+  }, [currentTTSProvider, switchTTSProvider]);
 
   // 生成唯一消息ID
   const generateMessageId = () => {
@@ -171,6 +189,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         characterName={selectedCharacter || 'AI伴侣'}
         onGoBack={handleGoBack}
         onClearChat={clearChatHistory}
+        onTestTTS={handleTestTTS}
+        onSwitchTTS={handleSwitchTTS}
+        ttsProvider={currentTTSProvider}
       />
 
       {/* Chat List */}
