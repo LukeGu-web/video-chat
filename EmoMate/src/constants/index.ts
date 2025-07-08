@@ -1,1 +1,0 @@
-// Constants directory - migrated to tailwind.config.js

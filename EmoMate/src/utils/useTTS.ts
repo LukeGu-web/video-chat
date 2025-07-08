@@ -42,7 +42,6 @@ export const useTTS = (initialConfig?: TTSConfig): UseTTSReturn => {
 
       // 检查是否有可用的语音
       const voices = await Speech.getAvailableVoicesAsync();
-      console.log('Available voices:', voices);
 
       // 合并配置
       const ttsConfig = {
@@ -60,7 +59,7 @@ export const useTTS = (initialConfig?: TTSConfig): UseTTSReturn => {
       // 如果没有中文语音，使用英文语音
       let finalConfig = ttsConfig;
       if (!chineseVoice && ttsConfig.language?.startsWith('zh')) {
-        console.log('No Chinese voice found, using English fallback');
+        // Using English fallback if no Chinese voice
         finalConfig = {
           ...ttsConfig,
           ...FALLBACK_CONFIG,
@@ -74,29 +73,24 @@ export const useTTS = (initialConfig?: TTSConfig): UseTTSReturn => {
         rate: finalConfig.rate,
         voice: finalConfig.voice || chineseVoice?.identifier,
         onStart: () => {
-          console.log('TTS started');
           setIsSpeaking(true);
         },
         onDone: () => {
-          console.log('TTS finished');
           setIsSpeaking(false);
         },
         onStopped: () => {
-          console.log('TTS stopped');
           setIsSpeaking(false);
         },
         onError: (error) => {
-          console.error('TTS error:', error);
           setError(`语音播放失败: ${error.message || error}`);
           setIsSpeaking(false);
         },
       };
 
       // 开始语音合成
-      await Speech.speak(text, speechOptions);
+      Speech.speak(text, speechOptions);
 
     } catch (err) {
-      console.error('TTS speak error:', err);
       setError(err instanceof Error ? err.message : '语音合成失败');
       setIsSpeaking(false);
     }
@@ -108,7 +102,7 @@ export const useTTS = (initialConfig?: TTSConfig): UseTTSReturn => {
       setIsSpeaking(false);
       setError(null);
     } catch (err) {
-      console.error('TTS stop error:', err);
+      // TTS stop error handled silently
       setError('停止语音播放失败');
     }
   }, []);

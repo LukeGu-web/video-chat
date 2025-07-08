@@ -21,7 +21,7 @@ export const requestCameraAndMicrophonePermissions = async (): Promise<Permissio
       allGranted: cameraGranted && microphoneGranted,
     };
   } catch (error) {
-    console.error('Error requesting permissions:', error);
+    // Permission request error handled below
     return {
       camera: false,
       microphone: false,
@@ -44,7 +44,7 @@ export const checkCameraAndMicrophonePermissions = async (): Promise<PermissionS
       allGranted: cameraGranted && microphoneGranted,
     };
   } catch (error) {
-    console.error('Error checking permissions:', error);
+    // Permission check error handled below
     return {
       camera: false,
       microphone: false,

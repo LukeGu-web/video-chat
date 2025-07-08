@@ -51,7 +51,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   } = useChatAI({ personality: PERSONALITY_PROMPTS.gentle, enableTTS: true });
 
   useEffect(() => {
-    console.log('Current selectedCharacter:', selectedCharacter);
+    // Character selection updated
     
     // 示例：设置一个默认角色
     if (!selectedCharacter) {
@@ -100,7 +100,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       });
 
     } catch (error) {
-      console.error('Voice conversation error:', error);
+      // Handle voice conversation error silently
     }
   }, [addChatMessage, sendMessage]);
 

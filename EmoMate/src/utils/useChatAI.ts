@@ -152,13 +152,13 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
         if (config?.enableTTS !== false) {
           // 默认启用，除非明确设为 false
           setTimeout(() => {
-            speak(aiResponse).catch((err) => {
-              console.error('TTS speak error:', err);
+            speak(aiResponse).catch(() => {
+              // TTS error handled silently
             });
           }, 500); // 稍微延迟以确保消息已显示
         }
       } catch (err) {
-        console.error('Claude API Error:', err);
+        // API error handled below
         setError(err instanceof Error ? err.message : '发送消息失败');
 
         // 添加错误消息

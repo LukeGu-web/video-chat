@@ -32,7 +32,6 @@ export const useSpeechToText = (): UseSpeechToTextReturn => {
     const checkSupport = async () => {
       try {
         const supported = await getSupportedLocales();
-        console.log('Supported locales:', supported);
 
         // supported could be array or object depending on platform
         let availableLanguages: any[] = [];
@@ -48,8 +47,6 @@ export const useSpeechToText = (): UseSpeechToTextReturn => {
           ];
         }
 
-        console.log('Available languages:', availableLanguages);
-
         setIsSupported(availableLanguages.length > 0);
 
         if (availableLanguages.length === 0) {
@@ -60,7 +57,6 @@ export const useSpeechToText = (): UseSpeechToTextReturn => {
           setError(`可用语言: ${availableLanguages.join(', ')}`);
         }
       } catch (err) {
-        console.error('Speech recognition check error:', err);
         setIsSupported(false);
         setError(`语音识别初始化失败: ${err}`);
       }
