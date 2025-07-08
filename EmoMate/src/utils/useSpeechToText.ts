@@ -54,7 +54,7 @@ export const useSpeechToText = (): UseSpeechToTextReturn => {
             '没有可用的语音识别模型。请在iOS设置中启用听写功能或添加键盘语言。'
           );
         } else {
-          setError(`可用语言: ${availableLanguages.join(', ')}`);
+          // setError(`可用语言: ${availableLanguages.join(', ')}`);
         }
       } catch (err) {
         setIsSupported(false);

@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import Constants from 'expo-constants';
 import { useTTS } from './useTTS';
 
 export interface ChatMessage {
@@ -67,7 +68,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     messages: ChatMessage[],
     config: ChatAIConfig
   ): Promise<string> => {
-    const apiKey = config.apiKey || process.env.CLAUDE_API_KEY;
+    const apiKey = config.apiKey || Constants.expoConfig?.extra?.claudeApiKey;
     if (!apiKey) {
       throw new Error(
         'Claude API密钥未配置。请在环境变量中设置CLAUDE_API_KEY。'

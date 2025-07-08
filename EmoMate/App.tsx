@@ -15,7 +15,7 @@ const Stack = createStackNavigator<RootStackParamList>();
 
 export default function App() {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView className="flex-1">
       <NavigationContainer>
         <Stack.Navigator
           initialRouteName="Welcome"
