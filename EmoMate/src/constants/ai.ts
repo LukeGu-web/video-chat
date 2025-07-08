@@ -33,6 +33,33 @@ export const PERSONALITY_PROMPTS = {
     '你是用户最贴心的 AI伴侣，了解用户的喜好和情感需求。用亲密而关怀的语气回应，让用户感受到陪伴和理解。',
 };
 
+// 构建完整的系统提示，包含人格和能力信息
+export const buildSystemPrompt = (personality: string): string => {
+  const capabilityPrompt = generateCapabilityPrompt();
+  return `${personality}
+
+${capabilityPrompt}`;
+};
+
+// 实用的能力查询函数
+export const hasCapability = (capabilityId: string): boolean => {
+  const capabilities = getAICapabilities();
+  const capability = capabilities.find(cap => cap.id === capabilityId);
+  return capability?.isAvailable || false;
+};
+
+export const getCapabilityStatus = () => {
+  const capabilities = getAICapabilities();
+  return {
+    canSpeak: hasCapability('voice_synthesis'),
+    canListen: hasCapability('voice_recognition'),
+    canChat: hasCapability('text_conversation'),
+    canProvideEmotionalSupport: hasCapability('emotional_support'),
+    availableCapabilities: capabilities.filter(cap => cap.isAvailable),
+    totalCapabilities: capabilities.length
+  };
+};
+
 // AI 角色配置
 export const AI_CHARACTERS = {
   gentle: {
@@ -110,4 +137,73 @@ export const SPEECH_RECOGNITION_CONFIG = {
   continuous: false,
   interimResults: false,
   maxAlternatives: 1,
+};
+
+// AI 能力配置系统
+export interface AICapability {
+  id: string;
+  name: string;
+  description: string;
+  isAvailable: boolean;
+  provider?: string;
+}
+
+export const getAICapabilities = (): AICapability[] => {
+  const claudeApiKey = getClaudeApiKey();
+  const elevenLabsApiKey = getElevenLabsApiKey();
+  
+  return [
+    {
+      id: 'text_conversation',
+      name: '文本对话',
+      description: '可以进行智能文本对话，回答问题，提供建议和支持',
+      isAvailable: !!claudeApiKey,
+      provider: 'Claude'
+    },
+    {
+      id: 'voice_synthesis',
+      name: '语音合成',
+      description: '可以将文字转换为自然的语音，用真人般的声音说话',
+      isAvailable: !!elevenLabsApiKey,
+      provider: 'ElevenLabs'
+    },
+    {
+      id: 'voice_recognition',
+      name: '语音识别',
+      description: '可以听懂用户的语音输入，理解口语内容',
+      isAvailable: true, // 使用设备原生能力
+      provider: 'Device'
+    },
+    {
+      id: 'emotional_support',
+      name: '情感支持',
+      description: '可以提供情感陪伴，理解和回应用户的情感需求',
+      isAvailable: !!claudeApiKey,
+      provider: 'Claude'
+    }
+  ];
+};
+
+// 生成AI能力描述文本，用于system prompt
+export const generateCapabilityPrompt = (): string => {
+  const capabilities = getAICapabilities();
+  const availableCapabilities = capabilities.filter(cap => cap.isAvailable);
+  
+  if (availableCapabilities.length === 0) {
+    return '你当前只能进行基础的文本交流。';
+  }
+  
+  const capabilityList = availableCapabilities
+    .map(cap => `- ${cap.name}: ${cap.description}`)
+    .join('\n');
+    
+  return `你具备以下能力：
+
+${capabilityList}
+
+重要提醒：
+- 当用户询问你的能力时，请基于上述能力列表回答
+- 如果用户要求使用语音功能，你可以自信地告诉他们你能够说话
+- 你的回复会自动转换为语音播放给用户
+- 不要说"我无法发声"或"我只能文字回复"等话，因为你确实具备语音能力`;
 };

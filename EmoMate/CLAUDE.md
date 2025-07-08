@@ -78,6 +78,19 @@ src/
 - **`getClaudeApiKey()`** - Secure Claude API key retrieval function
 - **`getElevenLabsApiKey()`** - Secure ElevenLabs API key retrieval function
 
+### AI Capability Management System
+- **`getAICapabilities()`** - Dynamically checks and returns available AI capabilities
+- **`generateCapabilityPrompt()`** - Creates system prompt text describing AI's current abilities
+- **`buildSystemPrompt()`** - Combines personality with capability information for Claude
+- **`hasCapability()`** - Quick check if specific capability is available
+- **`getCapabilityStatus()`** - Returns comprehensive capability status object
+
+#### Current AI Capabilities:
+- **Text Conversation** (Claude) - Intelligent dialogue and responses
+- **Voice Synthesis** (ElevenLabs) - Natural text-to-speech conversion
+- **Voice Recognition** (Device) - Speech-to-text input processing
+- **Emotional Support** (Claude) - Empathetic companion interactions
+
 ### TypeScript Patterns
 - All files use TypeScript with proper interfaces
 - Navigation params are strictly typed

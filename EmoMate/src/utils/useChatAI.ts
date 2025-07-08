@@ -4,7 +4,8 @@ import {
   CLAUDE_API_CONFIG, 
   getClaudeApiKey, 
   PERSONALITY_PROMPTS,
-  AI_ERROR_MESSAGES 
+  AI_ERROR_MESSAGES,
+  buildSystemPrompt
 } from '../constants/ai';
 
 export interface ChatMessage {
@@ -78,8 +79,9 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       ? CLAUDE_API_CONFIG.models[config.modelType]
       : CLAUDE_API_CONFIG.models[CLAUDE_API_CONFIG.defaultModel];
 
-    // 构建API消息格式
-    const systemMessage = config.personality || currentPersonality;
+    // 构建API消息格式，包含能力信息
+    const personalityText = config.personality || currentPersonality;
+    const systemMessage = buildSystemPrompt(personalityText);
     const apiMessages = messages
       .filter((msg) => msg.role !== 'system')
       .map((msg) => ({
