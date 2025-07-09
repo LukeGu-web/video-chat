@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import LottieView from 'lottie-react-native';
 
 // 动画状态类型
-type AnimationState = 'idle' | 'speaking' | 'listening' | 'thinking' | 'happy';
+type AnimationState = 'idle' | 'speaking' | 'listening' | 'thinking' | 'happy' | 'angry' | 'love' | 'sad';
 
 // 动画文件映射
 const animationFiles = {
@@ -12,6 +12,9 @@ const animationFiles = {
   listening: require('../../assets/animations/listening.json'),
   thinking: require('../../assets/animations/thinking.json'),
   happy: require('../../assets/animations/happy.json'),
+  angry: require('../../assets/animations/angry.json'),
+  love: require('../../assets/animations/love.json'),
+  sad: require('../../assets/animations/sad.json'),
 };
 
 const LottieTest: React.FC = () => {
@@ -119,6 +122,27 @@ const LottieTest: React.FC = () => {
           onPress={() => handleStateChange('happy')}
         >
           <Text style={styles.buttonText}>开心</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.button, currentState === 'angry' && styles.activeButton]}
+          onPress={() => handleStateChange('angry')}
+        >
+          <Text style={styles.buttonText}>愤怒</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.button, currentState === 'love' && styles.activeButton]}
+          onPress={() => handleStateChange('love')}
+        >
+          <Text style={styles.buttonText}>爱心</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.button, currentState === 'sad' && styles.activeButton]}
+          onPress={() => handleStateChange('sad')}
+        >
+          <Text style={styles.buttonText}>悲伤</Text>
         </TouchableOpacity>
       </View>
 
