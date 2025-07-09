@@ -11,61 +11,64 @@ type RootStackParamList = {
   ChatHistory: undefined;
 };
 
-type ChatHistoryScreenNavigationProp = StackNavigationProp<RootStackParamList, 'ChatHistory'>;
+type ChatHistoryScreenNavigationProp = StackNavigationProp<
+  RootStackParamList,
+  'ChatHistory'
+>;
 
 interface Props {
   navigation: ChatHistoryScreenNavigationProp;
 }
 
 const ChatHistoryScreen: React.FC<Props> = ({ navigation }) => {
-  const { chatHistory, selectedCharacter } = useUserStore();
+  const { chatHistory, selectedCharacter, clearChatHistory } = useUserStore();
 
   const handleGoBack = () => {
     navigation.goBack();
   };
 
+  const handleClearHistory = () => {
+    clearChatHistory();
+  };
+
   return (
-    <SafeAreaView className="flex-1 bg-background">
+    <SafeAreaView className='flex-1 bg-background'>
       {/* Header with Back Button */}
-      <View className="bg-white border-b border-gray-200">
-        <View className="flex-row items-center justify-between p-4">
+      <View className='bg-white border-b border-gray-200'>
+        <View className='flex-row items-center justify-between p-4'>
           <TouchableOpacity
             onPress={handleGoBack}
-            className="flex-row items-center"
+            className='flex-row items-center'
           >
-            <Text className="text-blue-500 text-16 font-medium">← 返回</Text>
+            <Text className='text-blue-500 text-16 font-medium'>← 返回</Text>
           </TouchableOpacity>
-          
-          <Text className="text-lg font-bold text-gray-800">
-            聊天记录
-          </Text>
-          
-          <View className="w-16" />
+
+          <Text className='text-lg font-bold text-gray-800'>聊天记录</Text>
+
+          <TouchableOpacity
+            onPress={handleClearHistory}
+            className='px-3 py-1 bg-red-500 rounded-lg'
+          >
+            <Text className='text-white text-sm font-medium'>清空</Text>
+          </TouchableOpacity>
         </View>
-        
+
         {/* Character Info */}
-        <View className="px-4 pb-3">
+        {/* <View className="px-4 pb-3">
           <Text className="text-sm text-gray-600">
             与 {selectedCharacter || 'AI伴侣'} 的对话
           </Text>
-        </View>
+        </View> */}
       </View>
 
       {/* Chat History Content */}
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-        <ChatList
-          messages={chatHistory}
-          isLoading={false}
-          isListening={false}
-          characterName={selectedCharacter || 'AI'}
-          showTyping={false}
-          showListening={false}
-        />
+      <ScrollView className='flex-1' showsVerticalScrollIndicator={false}>
+        <ChatList messages={chatHistory} />
       </ScrollView>
 
       {/* Message Count Footer */}
-      <View className="bg-white border-t border-gray-200 px-4 py-3">
-        <Text className="text-center text-sm text-gray-500">
+      <View className='bg-white border-t border-gray-200 px-4 py-3'>
+        <Text className='text-center text-sm text-gray-500'>
           共 {chatHistory.length} 条消息
         </Text>
       </View>

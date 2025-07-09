@@ -5,7 +5,14 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { useUserStore, ChatMessage } from '../store';
 import { useSpeechToText, useChatAI } from '../utils';
 import { PERSONALITY_PROMPTS } from '../constants';
-import { Header, VoiceControl, ErrorToast, LottieTest, AnimatedCharacter, CurrentSpeechBubble } from '../components';
+import {
+  Header,
+  VoiceControl,
+  ErrorToast,
+  LottieTest,
+  AnimatedCharacter,
+  CurrentSpeechBubble,
+} from '../components';
 
 type RootStackParamList = {
   Welcome: undefined;
@@ -26,7 +33,6 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     addEmotionLog,
     chatHistory,
     addChatMessage,
-    clearChatHistory,
   } = useUserStore();
   const {
     isListening,
@@ -46,8 +52,6 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     error: aiError,
     currentTTSProvider,
     sendMessage,
-    clearMessages,
-    setPersonality,
     stopSpeaking,
     switchTTSProvider,
   } = useChatAI({ personality: PERSONALITY_PROMPTS.gentle, enableTTS: true });
@@ -55,7 +59,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   // Error toast state
   const [showErrorToast, setShowErrorToast] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  
+
   // Test mode state
   const [isTestMode, setIsTestMode] = useState(false);
 
@@ -96,15 +100,11 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     navigation.navigate('ChatHistory');
   };
 
-  const handleClearTranscript = () => {
-    clearTranscript();
-  };
-
   const handleTestTTS = useCallback(async () => {
     try {
       await sendMessage('你好，这是一个语音测试', {
         enableTTS: true,
-        modelType: 'haiku'
+        modelType: 'haiku',
       });
     } catch (error) {
       console.error('TTS test failed:', error);
@@ -112,7 +112,8 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   }, [sendMessage]);
 
   const handleSwitchTTS = useCallback(() => {
-    const newProvider = currentTTSProvider === 'elevenlabs' ? 'expo' : 'elevenlabs';
+    const newProvider =
+      currentTTSProvider === 'elevenlabs' ? 'expo' : 'elevenlabs';
     switchTTSProvider(newProvider);
   }, [currentTTSProvider, switchTTSProvider]);
 
@@ -195,7 +196,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           >
             <Text className='text-white font-medium'>返回聊天</Text>
           </TouchableOpacity>
-          <Text className='text-lg font-bold text-gray-800'>Lottie 动画测试</Text>
+          <Text className='text-lg font-bold text-gray-800'>
+            Lottie 动画测试
+          </Text>
           <View className='w-20' />
         </View>
 
@@ -220,22 +223,20 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         <Header
           characterName={selectedCharacter || 'AI伴侣'}
           onGoBack={handleGoBack}
-          onClearChat={clearChatHistory}
-          onTestTTS={handleTestTTS}
           onSwitchTTS={handleSwitchTTS}
           onGoToChatHistory={handleGoToChatHistory}
           ttsProvider={currentTTSProvider}
         />
-        
+
         {/* Test Mode Toggle */}
-        <View className='px-4 pb-3'>
+        {/* <View className='px-4 pb-3'>
           <TouchableOpacity
             onPress={() => setIsTestMode(true)}
             className='self-end px-3 py-1 bg-purple-500 rounded-full'
           >
             <Text className='text-white text-sm font-medium'>测试动画</Text>
           </TouchableOpacity>
-        </View>
+        </View> */}
       </View>
 
       {/* Main Content Area */}
@@ -243,7 +244,15 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         {/* Animated Character */}
         <View className='items-center mb-8'>
           <AnimatedCharacter
-            status={isSpeaking ? 'speaking' : isListening ? 'listening' : isGenerating ? 'thinking' : 'idle'}
+            status={
+              isSpeaking
+                ? 'speaking'
+                : isListening
+                ? 'listening'
+                : isGenerating
+                ? 'thinking'
+                : 'idle'
+            }
             size={280}
             loop={true}
             className='shadow-lg'
@@ -253,7 +262,8 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         {/* Current Speech Bubble */}
         <CurrentSpeechBubble
           currentMessage={
-            chatHistory.filter(msg => msg.role === 'assistant').slice(-1)[0]?.content || ''
+            chatHistory.filter((msg) => msg.role === 'assistant').slice(-1)[0]
+              ?.content || ''
           }
         />
       </View>
