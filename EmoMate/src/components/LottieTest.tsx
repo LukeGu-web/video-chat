@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import LottieView from 'lottie-react-native';
 
 // 动画状态类型
-type AnimationState = 'idle' | 'speaking' | 'listening' | 'thinking';
+type AnimationState = 'idle' | 'speaking' | 'listening' | 'thinking' | 'happy';
 
 // 动画文件映射
 const animationFiles = {
@@ -11,6 +11,7 @@ const animationFiles = {
   speaking: require('../../assets/animations/speaking.json'),
   listening: require('../../assets/animations/listening.json'),
   thinking: require('../../assets/animations/thinking.json'),
+  happy: require('../../assets/animations/happy.json'),
 };
 
 const LottieTest: React.FC = () => {
@@ -111,6 +112,13 @@ const LottieTest: React.FC = () => {
           onPress={() => handleStateChange('thinking')}
         >
           <Text style={styles.buttonText}>思考</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.button, currentState === 'happy' && styles.activeButton]}
+          onPress={() => handleStateChange('happy')}
+        >
+          <Text style={styles.buttonText}>开心</Text>
         </TouchableOpacity>
       </View>
 
