@@ -7,6 +7,7 @@ interface HeaderProps {
   onClearChat?: () => void;
   onTestTTS?: () => void;
   onSwitchTTS?: () => void;
+  onGoToChatHistory?: () => void;
   ttsProvider?: string;
 }
 
@@ -16,6 +17,7 @@ const Header: React.FC<HeaderProps> = ({
   onClearChat,
   onTestTTS,
   onSwitchTTS,
+  onGoToChatHistory,
   ttsProvider
 }) => {
   return (
@@ -27,9 +29,16 @@ const Header: React.FC<HeaderProps> = ({
         <Text className="text-lg font-bold text-black">
           与 {characterName} 对话
         </Text>
-        <TouchableOpacity onPress={onClearChat}>
-          <Text className="text-red-500 text-sm font-medium">清空</Text>
-        </TouchableOpacity>
+        <View className="flex-row items-center space-x-3">
+          {onGoToChatHistory && (
+            <TouchableOpacity onPress={onGoToChatHistory}>
+              <Text className="text-blue-500 text-sm font-medium">聊天记录</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity onPress={onClearChat}>
+            <Text className="text-red-500 text-sm font-medium">清空</Text>
+          </TouchableOpacity>
+        </View>
       </View>
       
       {/* TTS Status and Controls */}

@@ -3,12 +3,13 @@ import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { WelcomeScreen, HomeScreen } from './src/screens';
+import { WelcomeScreen, HomeScreen, ChatHistoryScreen } from './src/screens';
 import './global.css';
 
 export type RootStackParamList = {
   Welcome: undefined;
   Home: undefined;
+  ChatHistory: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -25,6 +26,7 @@ export default function App() {
         >
           <Stack.Screen name="Welcome" component={WelcomeScreen} />
           <Stack.Screen name="Home" component={HomeScreen} />
+          <Stack.Screen name="ChatHistory" component={ChatHistoryScreen} />
         </Stack.Navigator>
         <StatusBar style="auto" />
       </NavigationContainer>

@@ -9,3 +9,5 @@ export { default as ChatList } from './ChatList';
 export { default as VoiceControl } from './VoiceControl';
 export { default as VoiceWaveAnimation } from './VoiceWaveAnimation';
 export { default as AICapabilityStatus } from './AICapabilityStatus';
+export { default as AnimatedCharacter } from './AnimatedCharacter';
+export { default as CurrentSpeechBubble } from './CurrentSpeechBubble';

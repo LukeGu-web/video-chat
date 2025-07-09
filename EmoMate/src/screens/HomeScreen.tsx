@@ -5,11 +5,12 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { useUserStore, ChatMessage } from '../store';
 import { useSpeechToText, useChatAI } from '../utils';
 import { PERSONALITY_PROMPTS } from '../constants';
-import { Header, ChatList, VoiceControl, ErrorToast, LottieTest } from '../components';
+import { Header, VoiceControl, ErrorToast, LottieTest, AnimatedCharacter, CurrentSpeechBubble } from '../components';
 
 type RootStackParamList = {
   Welcome: undefined;
   Home: undefined;
+  ChatHistory: undefined;
 };
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Home'>;
@@ -89,6 +90,10 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
   const handleGoBack = () => {
     navigation.goBack();
+  };
+
+  const handleGoToChatHistory = () => {
+    navigation.navigate('ChatHistory');
   };
 
   const handleClearTranscript = () => {
@@ -218,6 +223,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           onClearChat={clearChatHistory}
           onTestTTS={handleTestTTS}
           onSwitchTTS={handleSwitchTTS}
+          onGoToChatHistory={handleGoToChatHistory}
           ttsProvider={currentTTSProvider}
         />
         
@@ -232,15 +238,25 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         </View>
       </View>
 
-      {/* Chat List */}
-      <ChatList
-        messages={chatHistory}
-        isLoading={isAILoading}
-        isListening={isListening}
-        characterName={selectedCharacter || 'AI'}
-        showTyping={true}
-        showListening={true}
-      />
+      {/* Main Content Area */}
+      <View className='flex-1 justify-center'>
+        {/* Animated Character */}
+        <View className='items-center mb-8'>
+          <AnimatedCharacter
+            status={isSpeaking ? 'speaking' : isListening ? 'listening' : isGenerating ? 'thinking' : 'idle'}
+            size={280}
+            loop={true}
+            className='shadow-lg'
+          />
+        </View>
+
+        {/* Current Speech Bubble */}
+        <CurrentSpeechBubble
+          currentMessage={
+            chatHistory.filter(msg => msg.role === 'assistant').slice(-1)[0]?.content || ''
+          }
+        />
+      </View>
 
       {/* Voice Control */}
       <VoiceControl
