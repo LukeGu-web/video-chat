@@ -10,7 +10,9 @@ import {
   generateEmotionalResponsePrompt,
   validateAndOptimizeResponse,
   PROACTIVE_CONVERSATION_CONFIG,
-  selectProactiveTopic
+  selectProactiveTopic,
+  detectConversationType,
+  getResponseLengthConfig
 } from '../constants/ai';
 import { AI_PERSONALITY } from '../constants/personality';
 
@@ -19,6 +21,7 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: number;
+  conversationType?: 'simple' | 'normal' | 'detailed' | 'storytelling'; // 对话类型（可选，用于调试）
 }
 
 export interface ChatAIConfig {
@@ -142,19 +145,19 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     proactiveTimer.current = setTimeout(() => {
       if (!hasShownProactiveMessage.current && isProactiveModeEnabled) {
         hasShownProactiveMessage.current = true;
-        const topic = selectProactiveTopic('short');
+        const topic = selectProactiveTopic('short', messages);
         sendProactiveMessage(topic);
         
         // 设置中等停顿检测
         proactiveTimer.current = setTimeout(() => {
           if (isProactiveModeEnabled) {
-            const mediumTopic = selectProactiveTopic('medium');
+            const mediumTopic = selectProactiveTopic('medium', messages);
             sendProactiveMessage(mediumTopic);
             
             // 设置长时间停顿检测
             proactiveTimer.current = setTimeout(() => {
               if (isProactiveModeEnabled) {
-                const longTopic = selectProactiveTopic('long');
+                const longTopic = selectProactiveTopic('long', messages);
                 sendProactiveMessage(longTopic);
               }
             }, PROACTIVE_CONVERSATION_CONFIG.silenceDetection.longPause - PROACTIVE_CONVERSATION_CONFIG.silenceDetection.mediumPause);
@@ -188,7 +191,8 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
 
   const callClaudeAPI = async (
     messages: ChatMessage[],
-    config: ChatAIConfig
+    config: ChatAIConfig,
+    conversationType: 'simple' | 'normal' | 'detailed' | 'storytelling' = 'normal'
   ): Promise<string> => {
     const apiKey = config.apiKey || getClaudeApiKey();
     if (!apiKey) {
@@ -199,11 +203,17 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       ? CLAUDE_API_CONFIG.models[config.modelType]
       : CLAUDE_API_CONFIG.models[CLAUDE_API_CONFIG.defaultModel];
 
-    // 构建API消息格式，包含人格和情绪信息
+    // 获取动态token配置
+    const lengthConfig = getResponseLengthConfig(conversationType);
+
+    // 构建API消息格式，包含人格、情绪和上下文信息
     const personalityText = config.personality || currentPersonality;
-    const systemMessage = buildSystemPrompt(personalityText, config.userEmotion);
-    const apiMessages = messages
+    const systemMessage = buildSystemPrompt(personalityText, config.userEmotion, conversationType);
+    
+    // 保留更多上下文消息以保持对话连贯性
+    const contextMessages = messages
       .filter((msg) => msg.role !== 'system')
+      .slice(-10) // 保留最近10条消息作为上下文
       .map((msg) => ({
         role: msg.role,
         content: msg.content,
@@ -211,9 +221,9 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
 
     const requestBody = {
       model,
-      max_tokens: CLAUDE_API_CONFIG.maxTokens,
+      max_tokens: lengthConfig.maxTokens, // 使用动态token配置
       system: systemMessage,
-      messages: apiMessages,
+      messages: contextMessages,
     };
 
     const response = await fetch(CLAUDE_API_CONFIG.baseURL, {
@@ -237,8 +247,8 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     const data = await response.json();
     const rawResponse = data.content?.[0]?.text || '抱歉，我无法生成回复。';
     
-    // 验证和优化回应格式
-    return validateAndOptimizeResponse(rawResponse);
+    // 验证和优化回应格式，传入对话类型
+    return validateAndOptimizeResponse(rawResponse, conversationType);
   };
 
   const sendMessage = useCallback(
@@ -267,14 +277,18 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
         // 检测用户情绪
         const detectedEmotion = detectUserEmotion(content);
         
+        // 检测对话类型
+        const conversationType = detectConversationType(content, updatedMessages);
+        console.log(`[ChatAI] 对话类型检测: "${content}" -> ${conversationType}`);
+        
         // 合并配置，包含情绪信息
         const enhancedConfig = {
           ...config,
           userEmotion: config?.userEmotion || detectedEmotion
         };
 
-        // 调用Claude API
-        const aiResponse = await callClaudeAPI(updatedMessages, enhancedConfig);
+        // 调用Claude API，传入对话类型
+        const aiResponse = await callClaudeAPI(updatedMessages, enhancedConfig, conversationType);
 
         // 添加AI回复
         const aiMessage: ChatMessage = {
@@ -282,6 +296,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
           role: 'assistant',
           content: aiResponse,
           timestamp: Date.now(),
+          conversationType: conversationType, // 记录对话类型用于调试
         };
 
         setMessages([...updatedMessages, aiMessage]);

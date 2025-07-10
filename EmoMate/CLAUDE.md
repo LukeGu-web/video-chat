@@ -20,6 +20,8 @@ EmoMate is a React Native mobile application built with Expo that serves as an e
 - **Hybrid TTS**: ElevenLabs premium quality with Expo Speech fallback
 - **Modern Architecture**: TypeScript, Zustand + Immer, component-driven design
 - **Custom Voice**: Using ElevenLabs voice ID `hkfHEbBvdQFNX4uWHqRF` for personalized experience
+- **Advanced AI Personality**: 兰兰 (LanLan) - 温柔姐姐型 AI character with contextual awareness
+- **Intelligent Conversation**: Dynamic response length and proactive interaction system
 
 ## Development Commands
 
@@ -86,12 +88,19 @@ src/
 - **`permissions.ts`** - Camera and microphone permission utilities
 
 ### AI Configuration (constants/ai.ts)
-- **`CLAUDE_API_CONFIG`** - API endpoints, models, and settings
-- **`ELEVENLABS_CONFIG`** - ElevenLabs TTS API configuration and voice settings
+- **`CLAUDE_API_CONFIG`** - API endpoints, models, and dynamic token settings
+- **`ELEVENLABS_CONFIG`** - ElevenLabs TTS API configuration with emotion-based voice settings
 - **`PERSONALITY_PROMPTS`** - Pre-defined AI personality templates
 - **`AI_CHARACTERS`** - Character configurations with avatars
 - **`getClaudeApiKey()`** - Secure Claude API key retrieval function
 - **`getElevenLabsApiKey()`** - Secure ElevenLabs API key retrieval function
+
+### Advanced AI Personality System (constants/personality.ts)
+- **`AI_PERSONALITY`** - Complete personality configuration for 兰兰 character
+- **Character Definition**: 17-year-old gentle Japanese high school girl inspired by 毛利兰
+- **Speaking Patterns**: Natural Chinese conversation with gentle Japanese-style mannerisms
+- **Emotional Expressions**: Context-aware emotional responses and language patterns
+- **Behavior Guidelines**: Detailed do's and don'ts for consistent character portrayal
 
 ### AI Capability Management System
 - **`getAICapabilities()`** - Dynamically checks and returns available AI capabilities
@@ -100,11 +109,26 @@ src/
 - **`hasCapability()`** - Quick check if specific capability is available
 - **`getCapabilityStatus()`** - Returns comprehensive capability status object
 
+### Intelligent Conversation System
+- **`detectConversationType()`** - Analyzes user input to determine response complexity (simple/normal/detailed/storytelling)
+- **`getResponseLengthConfig()`** - Dynamic token and character limits based on conversation type
+- **`validateAndOptimizeResponse()`** - Smart response formatting and length optimization
+- **`analyzeConversationContext()`** - Extracts current topics (movies, books, games, personal, events)
+- **`selectProactiveTopic()`** - Context-aware proactive conversation based on discussion history
+- **`preprocessTextForNaturalSpeech()`** - SSML-like text processing for natural speech patterns
+
+### Proactive Conversation System
+- **Silence Detection**: 1min → 2min → 3min graduated response intervals
+- **Context Awareness**: Remembers current discussion topics (movies, books, games, etc.)
+- **Intelligent Topics**: Generates relevant follow-up questions based on conversation context
+- **Emotional Adaptation**: Adjusts proactive messages based on user's emotional state
+
 #### Current AI Capabilities:
-- **Text Conversation** (Claude) - Intelligent dialogue and responses
-- **Voice Synthesis** (ElevenLabs) - Natural text-to-speech conversion
+- **Text Conversation** (Claude) - Intelligent dialogue with dynamic response length
+- **Voice Synthesis** (ElevenLabs) - Emotion-aware natural text-to-speech conversion
 - **Voice Recognition** (Device) - Speech-to-text input processing
-- **Emotional Support** (Claude) - Empathetic companion interactions
+- **Emotional Support** (Claude) - Context-aware empathetic companion interactions
+- **Proactive Engagement** - Smart conversation continuation with topic awareness
 
 ### TypeScript Patterns
 - All files use TypeScript with proper interfaces
@@ -117,6 +141,100 @@ src/
 - Mixed Chinese/English interface (ready for i18n)
 - Permission-aware UI that adapts based on user permissions
 - Modern React patterns with hooks and functional components
+
+## AI Character System: 兰兰 (LanLan)
+
+### Character Overview
+EmoMate features **兰兰 (LanLan)**, a sophisticated AI companion with a carefully crafted personality system designed for natural, engaging conversations.
+
+#### Core Character Traits
+- **Name**: 兰兰 (LanLan)
+- **Age**: 17 years old
+- **Personality**: 温柔的日本女高中生 (Gentle Japanese high school girl)
+- **Inspiration**: 毛利兰 from Detective Conan
+- **Role**: 温柔姐姐 (Gentle older sister figure)
+
+#### Language & Communication Style
+- **Primary Language**: Chinese conversation with natural expressiveness
+- **Speaking Style**: Short, natural responses (1-2 sentences preferred)
+- **Tone**: Gentle, caring, occasionally shy
+- **Expressions**: Uses cute interjections like "诶？", "嗯…", "欸嘿嘿"
+- **Emotional Range**: Context-aware emotional responses with authentic reactions
+
+### Dynamic Conversation System
+
+#### Intelligent Response Adaptation
+```typescript
+// Response types based on user input analysis
+- Simple (20-50 chars): Greetings, confirmations → "嗯嗯，好的呢~"
+- Normal (50-120 chars): Daily chat → "真的吗？那太好了呢~你还想聊什么？"
+- Detailed (120-300 chars): Explanations → Full explanations while maintaining character
+- Storytelling (200-500 chars): Movie plots, stories → Rich, engaging narratives
+```
+
+#### Context-Aware Proactive Conversation
+- **1 Minute Silence**: Gentle check-ins related to current topic
+- **2 Minute Silence**: Topic-specific follow-up questions
+- **3 Minute Silence**: Deeper engagement attempts
+
+**Example Context Awareness**:
+```
+If discussing movies: "嗯…你觉得这个电影怎么样呢？"
+If discussing games: "这个游戏好玩吗？"
+If discussing personal topics: "嗯…还想说什么吗？"
+```
+
+### Advanced Voice System
+
+#### ElevenLabs Integration
+- **Voice ID**: `hkfHEbBvdQFNX4uWHqRF` (专为兰兰优化)
+- **Emotion-Aware Settings**: Dynamic voice parameters based on user emotion
+- **Natural Prosody**: SSML-enhanced text processing for realistic speech patterns
+
+#### Voice Parameter Optimization
+```typescript
+// Emotional voice settings examples
+gentle: { stability: 0.4, similarity_boost: 0.7, style: 0.25 }
+happy: { stability: 0.3, similarity_boost: 0.65, style: 0.4 }
+caring: { stability: 0.6, similarity_boost: 0.8, style: 0.2 }
+shy: { stability: 0.45, similarity_boost: 0.75, style: 0.35 }
+```
+
+### Conversation Flow Examples
+
+#### Movie Discussion
+```
+User: "我最近看了《流浪地球》"
+兰兰: "哇，《流浪地球》很棒呢！剧情怎么样？" (storytelling mode)
+
+[1 minute silence]
+兰兰: "嗯…你觉得这个电影怎么样呢？" (context-aware proactive)
+
+User: "给我讲讲剧情"
+兰兰: [200-500 character detailed plot summary] (storytelling response)
+```
+
+#### Personal Chat
+```
+User: "今天心情不好"
+兰兰: "诶？怎么了…要不要和我说说？" (caring mode, emotion detection)
+
+[2 minutes silence]
+兰兰: "刚才说的那个话题，你还想聊吗？" (personal topic continuation)
+```
+
+### Technical Implementation
+
+#### Key Configuration Files
+- **`constants/personality.ts`**: Complete character definition and behavioral patterns
+- **`constants/ai.ts`**: Dynamic conversation system and voice optimization
+- **`utils/useChatAI.ts`**: Intelligent conversation management with context awareness
+
+#### Character Consistency Features
+- **Memory System**: Maintains conversation context across interactions
+- **Behavioral Constraints**: Defined do's and don'ts for consistent personality
+- **Emotional Adaptation**: Responds appropriately to user's emotional state
+- **Topic Tracking**: Remembers and continues relevant discussion topics
 
 ## Development Workflow
 
@@ -152,11 +270,15 @@ src/
 
 ### 🎯 Advanced Features Implemented
 - **AI Capability Management**: Dynamic service detection and capability awareness
-- **Multi-Provider TTS**: ElevenLabs (voice ID: `hkfHEbBvdQFNX4uWHqRF`) with Expo Speech fallback
-- **Voice-First UX**: Complete speech recognition → AI response → TTS pipeline
+- **Multi-Provider TTS**: ElevenLabs (voice ID: `hkfHEbBvdQFNX4uWHqRF`) with emotion-aware settings
+- **Voice-First UX**: Complete speech recognition → AI response → TTS pipeline with natural prosody
 - **Real-time UI States**: Loading, generating, speaking, listening indicators
 - **Chat History**: Persistent conversation storage with message bubbles
-- **Character Personalities**: 4 pre-configured AI personality templates
+- **Advanced AI Personality**: 兰兰 character with complete personality system
+- **Intelligent Conversation**: Dynamic response length based on conversation type
+- **Proactive Engagement**: Context-aware conversation continuation (1min/2min/3min intervals)
+- **Emotion Recognition**: User emotion detection with appropriate response adaptation
+- **Natural Speech**: SSML-enhanced text processing for natural voice synthesis
 
 ### 🔄 Architecture Achievements
 - **TypeScript Integration**: 100% typed codebase with strict mode
@@ -198,11 +320,14 @@ src/
 | Build Configuration | 100% | ✅ Complete |
 
 ### 🎯 Key Technical Achievements
-1. **Advanced AI Integration**: Claude API with capability-aware system prompts
-2. **Hybrid Audio System**: ElevenLabs + Expo Speech with intelligent fallback
-3. **Voice-First UX**: Complete speech → AI → voice response pipeline
-4. **Real-time State Management**: Dynamic UI states for all voice/AI operations
-5. **Production Architecture**: TypeScript, modern React patterns, scalable structure
+1. **Advanced AI Integration**: Claude API with capability-aware system prompts and dynamic response adaptation
+2. **Sophisticated Character System**: 兰兰 personality with complete behavioral patterns and emotional intelligence
+3. **Intelligent Conversation Management**: Context-aware topic tracking and proactive engagement system
+4. **Hybrid Audio System**: ElevenLabs + Expo Speech with emotion-based voice parameter optimization
+5. **Voice-First UX**: Complete speech → AI → voice response pipeline with natural prosody
+6. **Dynamic Response System**: Adaptive conversation length based on content type (simple/normal/detailed/storytelling)
+7. **Real-time State Management**: Dynamic UI states for all voice/AI operations
+8. **Production Architecture**: TypeScript, modern React patterns, scalable structure
 
 ### 🚀 Next Phase Recommendations
 1. **Quality Assurance**: Implement testing framework and code quality tools

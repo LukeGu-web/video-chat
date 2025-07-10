@@ -8,9 +8,17 @@ export const CLAUDE_API_CONFIG = {
     haiku: 'claude-3-haiku-20240307',
     sonnet: 'claude-3-sonnet-20240229',
   },
-  maxTokens: 100, // 减少token数量以确保简短回应
+  maxTokens: 300, // 增加token数量以支持深度对话
   defaultModel: 'haiku' as const,
   version: '2023-06-01',
+  
+  // 动态token配置
+  dynamicTokens: {
+    simple: 80,      // 简单回应
+    normal: 150,     // 正常对话
+    detailed: 300,   // 详细讲解
+    storytelling: 500 // 故事讲述
+  }
 };
 
 // 获取 API Key
@@ -26,9 +34,7 @@ export const getElevenLabsApiKey = (): string | undefined => {
 // 基于角色设定的系统提示
 export const createPersonalitySystemPrompt = (): string => {
   const character = AI_PERSONALITY.character;
-  const speaking = AI_PERSONALITY.speaking;
   const behavior = AI_PERSONALITY.behavior;
-  const emotions = AI_PERSONALITY.emotionMapping;
 
   return `你是${character.name}，一个${character.age}岁的${character.personality}，就像《名侦探柯南》里的毛利兰一样温柔体贴。你将以"${character.role}"的身份与用户进行对话交流。
 
@@ -91,13 +97,34 @@ ${behavior.shouldNot.map(item => `- ${item}`).join('\n')}
 - 用户问问题时，回应："嗯…让我想想哦~"
 - 用户夸奖时，回应："诶嘿嘿，谢谢你呢~"
 
-## 严格要求
-⚠️ 以下要求必须严格遵守：
-1. 回应长度：20-50个字符，绝不超过60个字符
-2. 句子数量：最多2句话，优先单句回应
-3. 语气自然：像真实的女高中生，不要像正式的AI助手
-4. 情感表达：每个回应都要包含情感色彩
-5. 语言风格：用中文对话，但保持温柔可爱的语气`;
+## 智能回应要求
+⚠️ 根据对话类型调整回应：
+
+### 简单对话（问候、确认等）
+- 长度：20-50个字符
+- 句子：1句话
+- 风格：简短可爱
+
+### 正常对话（日常聊天）
+- 长度：50-120个字符  
+- 句子：1-2句话
+- 风格：温柔自然
+
+### 详细讲解（用户询问具体信息）
+- 长度：120-300个字符
+- 句子：2-4句话
+- 风格：详细但温柔，可以分段
+
+### 故事讲述（剧情、内容描述）
+- 长度：200-500个字符
+- 句子：3-6句话
+- 风格：生动有趣，保持连贯性
+
+## 上下文记忆要求
+- 记住刚才说过的话，保持话题连贯
+- 如果刚才提到要"搜索"或"了解"，要继续完成这个承诺
+- 不要重复询问刚才已经回答过的问题
+- 保持角色一致性，用温柔的语气`;
 };
 
 // 预设人格模板（保持向后兼容）
@@ -110,9 +137,9 @@ export const PERSONALITY_PROMPTS = {
 };
 
 // 构建完整的系统提示，包含人格和能力信息
-export const buildSystemPrompt = (personality: string, userEmotion?: string): string => {
+export const buildSystemPrompt = (personality: string, userEmotion?: string, conversationType: 'simple' | 'normal' | 'detailed' | 'storytelling' = 'normal'): string => {
   const capabilityPrompt = generateCapabilityPrompt();
-  const emotionalPrompt = generateEmotionalResponsePrompt(userEmotion);
+  const emotionalPrompt = generateEmotionalResponsePrompt(userEmotion, conversationType);
   
   return `${personality}
 
@@ -349,60 +376,76 @@ ${capabilityList}
 - 不要说"我无法发声"或"我只能文字回复"等话，因为你确实具备语音能力`;
 };
 
-// 根据用户情绪生成合适的回应风格提示
-export const generateEmotionalResponsePrompt = (userEmotion?: string): string => {
+// 根据用户情绪和对话类型生成合适的回应风格提示
+export const generateEmotionalResponsePrompt = (userEmotion?: string, conversationType: 'simple' | 'normal' | 'detailed' | 'storytelling' = 'normal'): string => {
   if (!userEmotion) return '';
 
-  const emotions = AI_PERSONALITY.emotionMapping;
+  const lengthGuidance = conversationType === 'simple' ? '保持简短，20-50字以内' :
+                        conversationType === 'normal' ? '适中长度，50-120字' :
+                        conversationType === 'detailed' ? '可以详细一些，120-300字' :
+                        '可以生动讲述，200-500字';
   
   switch (userEmotion.toLowerCase()) {
     case 'happy':
     case 'excited':
     case 'joy':
-      return `\n\n用户现在看起来很开心，你应该用"太好了呢！"、"真开心！"、"好棒哦！"这样的表达来回应，语气要充满活力和共鸣。记住保持简短，20-50字以内。`;
+      return `\n\n用户现在看起来很开心，你应该用"太好了呢！"、"真开心！"、"好棒哦！"这样的表达来回应，语气要充满活力和共鸣。${lengthGuidance}。`;
     
     case 'sad':
     case 'depressed':
     case 'upset':
-      return `\n\n用户现在看起来很难过，你应该用"没事吧…"、"好担心"、"要紧吗"这样的表达来回应，语气要温柔关怀，多给予安慰。记住保持简短，20-50字以内。`;
+      return `\n\n用户现在看起来很难过，你应该用"没事吧…"、"好担心"、"要紧吗"这样的表达来回应，语气要温柔关怀，多给予安慰。${lengthGuidance}。`;
     
     case 'confused':
     case 'thinking':
-      return `\n\n用户现在看起来在思考或有困惑，你应该用"嗯…"、"让我想想"、"这样啊"这样的表达来回应，耐心地帮助他们理清思路。记住保持简短，20-50字以内。`;
+      return `\n\n用户现在看起来在思考或有困惑，你应该用"嗯…"、"让我想想"、"这样啊"这样的表达来回应，耐心地帮助他们理清思路。${lengthGuidance}。`;
     
     case 'nervous':
     case 'shy':
-      return `\n\n用户现在看起来有些紧张或害羞，你应该用"诶嘿嘿"、"有点不好意思"、"那个…"这样的表达来回应，营造轻松的氛围。记住保持简短，20-50字以内。`;
+      return `\n\n用户现在看起来有些紧张或害羞，你应该用"诶嘿嘿"、"有点不好意思"、"那个…"这样的表达来回应，营造轻松的氛围。${lengthGuidance}。`;
     
     default:
-      return `\n\n用户现在需要关心，你应该用"怎么了？"、"要不要紧"、"别担心哦"这样的表达来回应，表现出你的关怀。记住保持简短，20-50字以内。`;
+      return `\n\n用户现在需要关心，你应该用"怎么了？"、"要不要紧"、"别担心哦"这样的表达来回应，表现出你的关怀。${lengthGuidance}。`;
   }
 };
 
-// 验证和优化回应格式
-export const validateAndOptimizeResponse = (response: string): string => {
-  // 移除多余的换行符
-  let optimized = response.replace(/\n+/g, ' ').trim();
+// 智能验证和优化回应格式 - 根据对话类型动态调整
+export const validateAndOptimizeResponse = (response: string, conversationType: 'simple' | 'normal' | 'detailed' | 'storytelling' = 'normal'): string => {
+  const lengthConfig = getResponseLengthConfig(conversationType);
+  let optimized = response;
   
-  // 长度检查和截断
-  if (optimized.length > 60) {
-    // 找到最后一个句号、问号或感叹号
-    const lastPunctuation = Math.max(
-      optimized.lastIndexOf('。', 50),
-      optimized.lastIndexOf('？', 50),
-      optimized.lastIndexOf('！', 50),
-      optimized.lastIndexOf('~', 50)
-    );
+  // 根据对话类型决定是否保留换行
+  if (lengthConfig.allowMultiParagraph) {
+    // 对于详细和故事讲述，保留段落结构但优化换行
+    optimized = optimized.replace(/\n{3,}/g, '\n\n').trim();
+  } else {
+    // 对于简单和正常对话，移除换行
+    optimized = optimized.replace(/\n+/g, ' ').trim();
+  }
+  
+  // 动态长度检查和截断
+  if (optimized.length > lengthConfig.maxCharacters) {
+    // 寻找合适的截断点
+    const punctuationMarks = ['。', '！', '？', '~', '…'];
+    let bestCutPoint = -1;
     
-    if (lastPunctuation > 20) {
-      optimized = optimized.substring(0, lastPunctuation + 1);
+    // 在允许长度内寻找最后一个合适的标点符号
+    for (let i = lengthConfig.maxCharacters * 0.8; i < lengthConfig.maxCharacters; i++) {
+      if (punctuationMarks.includes(optimized[i])) {
+        bestCutPoint = i + 1;
+      }
+    }
+    
+    if (bestCutPoint > lengthConfig.maxCharacters * 0.6) {
+      optimized = optimized.substring(0, bestCutPoint);
     } else {
-      optimized = optimized.substring(0, 50) + '~';
+      // 如果找不到合适的截断点，在句子中间截断并添加省略号
+      optimized = optimized.substring(0, lengthConfig.maxCharacters - 3) + '…';
     }
   }
   
-  // 确保有合适的语气词结尾
-  if (!optimized.match(/[。？！~…呢哦]$/)) {
+  // 确保有合适的结尾（仅对简单和正常对话）
+  if (!lengthConfig.allowMultiParagraph && !optimized.match(/[。？！~…呢哦]$/)) {
     optimized += '~';
   }
   
@@ -473,9 +516,9 @@ export const preprocessTextForNaturalSpeech = (text: string): string => {
 export const PROACTIVE_CONVERSATION_CONFIG = {
   // 沉默检测时间（毫秒）
   silenceDetection: {
-    shortPause: 8000,  // 8秒后主动关心
-    mediumPause: 20000, // 20秒后主动话题
-    longPause: 45000,   // 45秒后深度互动
+    shortPause: 60000,  // 1分钟后主动关心
+    mediumPause: 120000, // 2分钟后主动话题
+    longPause: 180000,   // 3分钟后深度互动
   },
   
   // 主动话题库
@@ -547,8 +590,153 @@ export const getCurrentTimePeriod = (): 'morning' | 'afternoon' | 'evening' | 'n
   return 'night';
 };
 
-// 智能选择主动话题
-export const selectProactiveTopic = (pauseType: 'short' | 'medium' | 'long'): string => {
+// 分析对话上下文，提取关键话题
+export const analyzeConversationContext = (messages: any[]): {
+  currentTopic: string | null;
+  topicType: 'movie' | 'book' | 'game' | 'event' | 'personal' | 'general' | null;
+  lastDiscussion: string;
+} => {
+  // 获取最近5条消息进行分析
+  const recentMessages = messages.slice(-5);
+  const conversationText = recentMessages
+    .map(msg => msg.content)
+    .join(' ')
+    .toLowerCase();
+
+  // 电影相关关键词
+  const movieKeywords = ['电影', '影片', '剧情', '演员', '导演', '票房', '上映', '观影', '片子'];
+  // 书籍相关关键词  
+  const bookKeywords = ['书', '小说', '作者', '情节', '章节', '阅读', '文学', '故事'];
+  // 游戏相关关键词
+  const gameKeywords = ['游戏', '玩法', '角色', '关卡', '剧情', '攻略', '通关'];
+  // 个人经历关键词
+  const personalKeywords = ['我', '今天', '昨天', '工作', '学习', '家人', '朋友', '心情'];
+  // 事件关键词
+  const eventKeywords = ['新闻', '发生', '事件', '最近', '听说', '看到'];
+
+  let currentTopic: string | null = null;
+  let topicType: 'movie' | 'book' | 'game' | 'event' | 'personal' | 'general' | null = null;
+  let lastDiscussion = '';
+
+  // 检测话题类型
+  if (movieKeywords.some(keyword => conversationText.includes(keyword))) {
+    topicType = 'movie';
+    // 提取可能的电影名称或相关讨论点
+    const movieMatch = conversationText.match(/(电影|影片|片子)[\s]*([^\s，。！？]{2,10})/);
+    currentTopic = movieMatch ? movieMatch[2] : '电影';
+    lastDiscussion = recentMessages.slice(-2).map(msg => msg.content).join(' ');
+  } else if (bookKeywords.some(keyword => conversationText.includes(keyword))) {
+    topicType = 'book';
+    const bookMatch = conversationText.match(/(书|小说)[\s]*([^\s，。！？]{2,10})/);
+    currentTopic = bookMatch ? bookMatch[2] : '书';
+    lastDiscussion = recentMessages.slice(-2).map(msg => msg.content).join(' ');
+  } else if (gameKeywords.some(keyword => conversationText.includes(keyword))) {
+    topicType = 'game';
+    const gameMatch = conversationText.match(/游戏[\s]*([^\s，。！？]{2,10})/);
+    currentTopic = gameMatch ? gameMatch[1] : '游戏';
+    lastDiscussion = recentMessages.slice(-2).map(msg => msg.content).join(' ');
+  } else if (personalKeywords.some(keyword => conversationText.includes(keyword))) {
+    topicType = 'personal';
+    currentTopic = '个人话题';
+    lastDiscussion = recentMessages.slice(-1)[0]?.content || '';
+  } else if (eventKeywords.some(keyword => conversationText.includes(keyword))) {
+    topicType = 'event';
+    currentTopic = '事件讨论';
+    lastDiscussion = recentMessages.slice(-2).map(msg => msg.content).join(' ');
+  } else {
+    topicType = 'general';
+    currentTopic = '一般聊天';
+    lastDiscussion = recentMessages.slice(-1)[0]?.content || '';
+  }
+
+  return { currentTopic, topicType, lastDiscussion };
+};
+
+// 根据上下文生成相关话题
+export const generateContextualTopic = (
+  pauseType: 'short' | 'medium' | 'long',
+  context: { currentTopic: string | null; topicType: string | null; lastDiscussion: string }
+): string => {
+  const { currentTopic, topicType } = context;
+
+  // 如果有明确的话题上下文，生成相关询问
+  if (topicType && currentTopic) {
+    switch (pauseType) {
+      case 'short':
+        switch (topicType) {
+          case 'movie':
+            return Math.random() < 0.5 
+              ? '嗯…你觉得这个电影怎么样呢？'
+              : '对这部电影还有什么想法吗？';
+          case 'book':
+            return Math.random() < 0.5
+              ? '这本书你觉得怎么样？'
+              : '还想聊聊这个故事吗？';
+          case 'game':
+            return Math.random() < 0.5
+              ? '这个游戏好玩吗？'
+              : '游戏进展得怎么样了？';
+          case 'personal':
+            return Math.random() < 0.5
+              ? '嗯…还想说什么吗？'
+              : '怎么突然不说话了呢？';
+          case 'event':
+            return Math.random() < 0.5
+              ? '对这个事情你怎么看？'
+              : '还有什么想法吗？';
+          default:
+            return '嗯…你在想什么呢？';
+        }
+
+      case 'medium':
+        switch (topicType) {
+          case 'movie':
+            return Math.random() < 0.5
+              ? `刚才聊的${currentTopic}，你还有什么想了解的吗？`
+              : '要不要我们继续聊聊电影的其他部分？';
+          case 'book':
+            return Math.random() < 0.5
+              ? `关于${currentTopic}，还有什么想讨论的？`
+              : '这个故事还有什么印象深刻的地方吗？';
+          case 'game':
+            return Math.random() < 0.5
+              ? `${currentTopic}这个游戏还有什么好玩的地方？`
+              : '游戏里有什么让你印象深刻的吗？';
+          case 'personal':
+            return '刚才说的那个话题，你还想聊吗？';
+          case 'event':
+            return '对于刚才讨论的事情，你还有什么看法？';
+          default:
+            return '要不我们继续刚才的话题吧~';
+        }
+
+      case 'long':
+        switch (topicType) {
+          case 'movie':
+            return '诶，我们刚才在聊电影呢，你是不是还在思考剧情？要不要分享一下你的想法？';
+          case 'book':
+            return '刚才聊的那本书很有意思呢，你觉得故事里哪个部分最打动你？';
+          case 'game':
+            return '游戏的话题总是很有趣呢~你平时还玩什么类型的游戏吗？';
+          case 'personal':
+            return '刚才你说的事情我很感兴趣呢，想了解更多你的想法~';
+          case 'event':
+            return '刚才讨论的那个话题挺深刻的，你是不是还在思考？';
+          default:
+            return '我们的对话很有意思呢，还想继续聊下去~';
+        }
+
+      default:
+        return '嗯…你在想什么呢？';
+    }
+  }
+
+  // 如果没有明确上下文，使用原有的通用话题
+  return selectGeneralTopic(pauseType);
+};
+
+// 通用话题选择（原有逻辑）
+export const selectGeneralTopic = (pauseType: 'short' | 'medium' | 'long'): string => {
   const topics = PROACTIVE_CONVERSATION_CONFIG.topics;
   
   switch (pauseType) {
@@ -569,6 +757,116 @@ export const selectProactiveTopic = (pauseType: 'short' | 'medium' | 'long'): st
     
     default:
       return topics.caring[0];
+  }
+};
+
+// 智能选择主动话题（整合上下文分析）
+export const selectProactiveTopic = (pauseType: 'short' | 'medium' | 'long', conversationHistory: any[] = []): string => {
+  // 分析对话上下文
+  const context = analyzeConversationContext(conversationHistory);
+  
+  // 调试日志
+  console.log(`[ProactiveTopic] ${pauseType}停顿 | 话题类型: ${context.topicType} | 当前话题: ${context.currentTopic}`);
+  
+  // 根据上下文生成相关话题
+  const selectedTopic = generateContextualTopic(pauseType, context);
+  console.log(`[ProactiveTopic] 选择的话题: "${selectedTopic}"`);
+  
+  return selectedTopic;
+};
+
+// 对话类型检测
+export const detectConversationType = (userMessage: string, conversationHistory: any[]): 'simple' | 'normal' | 'detailed' | 'storytelling' => {
+  const message = userMessage.toLowerCase();
+  
+  // 检测是否是请求详细信息的询问
+  const detailRequests = [
+    '讲讲', '说说', '介绍', '解释', '详细', '具体', '怎么样', '什么内容', 
+    '剧情', '故事', '过程', '经历', '发生了什么', '告诉我', '分享',
+    '电影', '书', '游戏', '新闻', '事件'
+  ];
+  
+  const storytellingKeywords = [
+    '故事', '情节', '剧情', '内容', '讲述', '描述', '经过', '发生',
+    '电影讲的', '书说的', '游戏剧情', '新闻内容'
+  ];
+  
+  // 检查是否有上下文延续 (AI刚刚提到要搜索或要讲解)
+  const lastAIMessage = conversationHistory
+    .filter(msg => msg.role === 'assistant')
+    .slice(-1)[0]?.content || '';
+  
+  const hasContextContinuation = lastAIMessage.includes('搜索') || 
+                                 lastAIMessage.includes('查一下') ||
+                                 lastAIMessage.includes('了解') ||
+                                 lastAIMessage.includes('想想');
+  
+  // 如果是故事讲述类请求
+  if (storytellingKeywords.some(keyword => message.includes(keyword))) {
+    return 'storytelling';
+  }
+  
+  // 如果是详细信息请求或有上下文延续
+  if (detailRequests.some(keyword => message.includes(keyword)) || hasContextContinuation) {
+    return 'detailed';
+  }
+  
+  // 简单的问候、确认、情感表达
+  const simplePatterns = [
+    /^(好|嗯|哦|是|对|没事|谢谢|再见|你好)$/,
+    /^(哈哈|呵呵|嘿嘿|诶嘿嘿)$/,
+    /^.{1,5}$/  // 5个字符以内的简短回应
+  ];
+  
+  if (simplePatterns.some(pattern => pattern.test(message))) {
+    return 'simple';
+  }
+  
+  return 'normal';
+};
+
+// 智能长度控制 - 根据对话类型调整
+export const getResponseLengthConfig = (conversationType: 'simple' | 'normal' | 'detailed' | 'storytelling') => {
+  switch (conversationType) {
+    case 'simple':
+      return {
+        maxTokens: CLAUDE_API_CONFIG.dynamicTokens.simple,
+        maxCharacters: 50,
+        targetSentences: 1,
+        allowMultiParagraph: false
+      };
+    
+    case 'normal':
+      return {
+        maxTokens: CLAUDE_API_CONFIG.dynamicTokens.normal,
+        maxCharacters: 120,
+        targetSentences: 2,
+        allowMultiParagraph: false
+      };
+    
+    case 'detailed':
+      return {
+        maxTokens: CLAUDE_API_CONFIG.dynamicTokens.detailed,
+        maxCharacters: 300,
+        targetSentences: 4,
+        allowMultiParagraph: true
+      };
+    
+    case 'storytelling':
+      return {
+        maxTokens: CLAUDE_API_CONFIG.dynamicTokens.storytelling,
+        maxCharacters: 500,
+        targetSentences: 6,
+        allowMultiParagraph: true
+      };
+    
+    default:
+      return {
+        maxTokens: CLAUDE_API_CONFIG.dynamicTokens.normal,
+        maxCharacters: 120,
+        targetSentences: 2,
+        allowMultiParagraph: false
+      };
   }
 };
 
