@@ -1,11 +1,12 @@
 import React, { useRef, useEffect } from 'react';
 import { View } from 'react-native';
 import LottieView from 'lottie-react-native';
+import { useAIStatus } from '../store';
 
 type AnimationState = 'idle' | 'speaking' | 'listening' | 'thinking' | 'happy' | 'angry' | 'love' | 'sad';
 
 interface AnimatedCharacterProps {
-  status: string;
+  status?: string; // 可选，如果不传则使用全局 AI 状态
   size?: number;
   loop?: boolean;
   className?: string;
@@ -44,8 +45,14 @@ const AnimatedCharacter: React.FC<AnimatedCharacterProps> = ({
 }) => {
   const animationRef = useRef<LottieView>(null);
   
+  // 获取全局 AI 状态
+  const { aiStatus } = useAIStatus();
+  
+  // 确定要使用的状态：优先使用传入的 status，否则使用全局 aiStatus
+  const currentStatus = status || aiStatus;
+  
   // 获取动画源文件
-  const animationSource = getAnimationSource(status);
+  const animationSource = getAnimationSource(currentStatus);
 
   // 当状态改变时重新播放动画
   useEffect(() => {
@@ -57,7 +64,7 @@ const AnimatedCharacter: React.FC<AnimatedCharacterProps> = ({
     }, 100);
 
     return () => clearTimeout(timer);
-  }, [status]);
+  }, [currentStatus]);
 
   return (
     <View 
@@ -65,7 +72,7 @@ const AnimatedCharacter: React.FC<AnimatedCharacterProps> = ({
       style={{ width: size, height: size }}
     >
       <LottieView
-        key={status}
+        key={currentStatus}
         ref={animationRef}
         source={animationSource}
         autoPlay={true}

@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useUserStore } from '../store';
 import { ChatList } from '../components';
@@ -16,12 +17,9 @@ type ChatHistoryScreenNavigationProp = StackNavigationProp<
   'ChatHistory'
 >;
 
-interface Props {
-  navigation: ChatHistoryScreenNavigationProp;
-}
-
-const ChatHistoryScreen: React.FC<Props> = ({ navigation }) => {
-  const { chatHistory, selectedCharacter, clearChatHistory } = useUserStore();
+const ChatHistoryScreen: React.FC = () => {
+  const navigation = useNavigation<ChatHistoryScreenNavigationProp>();
+  const { chatHistory, clearChatHistory } = useUserStore();
 
   const handleGoBack = () => {
     navigation.goBack();
@@ -62,9 +60,9 @@ const ChatHistoryScreen: React.FC<Props> = ({ navigation }) => {
       </View>
 
       {/* Chat History Content */}
-      <ScrollView className='flex-1' showsVerticalScrollIndicator={false}>
+      <View className='flex-1'>
         <ChatList messages={chatHistory} />
-      </ScrollView>
+      </View>
 
       {/* Message Count Footer */}
       <View className='bg-white border-t border-gray-200 px-4 py-3'>

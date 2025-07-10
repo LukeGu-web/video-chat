@@ -6,7 +6,8 @@
       "Bash(expo install:*)",
       "Bash(npx expo install:*)",
       "Bash(mkdir:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(rm:*)"
     ],
     "deny": []
   }

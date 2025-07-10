@@ -2,7 +2,7 @@ import React, { useEffect, useCallback, useState } from 'react';
 import { View, TouchableOpacity, Text } from 'react-native';
 import { SafeAreaView as SafeAreaViewRN } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { useUserStore, ChatMessage } from '../store';
+import { useUserStore, ChatMessage, useAIStatus } from '../store';
 import { useSpeechToText, useChatAI } from '../utils';
 import { PERSONALITY_PROMPTS } from '../constants';
 import {
@@ -11,7 +11,6 @@ import {
   ErrorToast,
   LottieTest,
   AnimatedCharacter,
-  CurrentSpeechBubble,
 } from '../components';
 
 type RootStackParamList = {
@@ -34,6 +33,8 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     chatHistory,
     addChatMessage,
   } = useUserStore();
+
+  const { setAIStatus } = useAIStatus();
   const {
     isListening,
     transcript,
@@ -72,6 +73,23 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     }
   }, [error, aiError]);
 
+  // 统一的 AI 状态管理
+  useEffect(() => {
+    if (isListening) {
+      // 1. 开始语音识别时：listening 状态
+      setAIStatus('listening');
+    } else if (isGenerating) {
+      // 2. 正在生成回复：thinking 状态
+      setAIStatus('thinking');
+    } else if (isSpeaking) {
+      // 3. 正在播放 TTS：speaking 状态
+      setAIStatus('speaking');
+    } else {
+      // 4. 其他情况：idle 状态
+      setAIStatus('idle');
+    }
+  }, [isListening, isGenerating, isSpeaking, setAIStatus]);
+
   const handleDismissError = () => {
     setShowErrorToast(false);
     setErrorMessage('');
@@ -100,17 +118,6 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     navigation.navigate('ChatHistory');
   };
 
-  const handleTestTTS = useCallback(async () => {
-    try {
-      await sendMessage('你好，这是一个语音测试', {
-        enableTTS: true,
-        modelType: 'haiku',
-      });
-    } catch (error) {
-      console.error('TTS test failed:', error);
-    }
-  }, [sendMessage]);
-
   const handleSwitchTTS = useCallback(() => {
     const newProvider =
       currentTTSProvider === 'elevenlabs' ? 'expo' : 'elevenlabs';
@@ -122,42 +129,53 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     return `msg_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   };
 
-  // 核心语音对话流程
-  const handleVoiceConversation = useCallback(
-    async (userText: string) => {
-      if (!userText.trim()) return;
+  // AI 对话流程
+  const runAIFlow = useCallback(
+    async (inputText: string) => {
+      if (!inputText.trim()) return;
 
       try {
         // 1. 添加用户消息到聊天历史
         const userMessage: ChatMessage = {
           id: generateMessageId(),
           role: 'user',
-          content: userText.trim(),
+          content: inputText.trim(),
           timestamp: Date.now(),
-          isVoiceMessage: true, // 标记为语音消息
+          isVoiceMessage: true,
         };
         addChatMessage(userMessage);
 
-        // 2. 调用 AI 获取回复
-        await sendMessage(userText, {
+        // 2. 调用 AI 获取回复并播放 TTS
+        await sendMessage(inputText, {
           modelType: 'haiku',
           enableTTS: true, // 启用语音播放
         });
+
+        // 注意：状态变化由统一的 useEffect 管理
       } catch (error) {
-        // Handle voice conversation error silently
+        console.error('AI flow error:', error);
+        // 错误处理，状态会自动回到 idle
       }
     },
     [addChatMessage, sendMessage]
   );
 
-  // 语音识别完成后的处理
+  // 核心语音对话流程（使用 runAIFlow）
+  const handleVoiceConversation = useCallback(
+    async (userText: string) => {
+      await runAIFlow(userText);
+    },
+    [runAIFlow]
+  );
+
+  // 监听语音识别完成
   useEffect(() => {
-    if (transcript && !isListening) {
-      // 语音识别完成且有文本时，自动发送给AI
+    if (!isListening && transcript) {
+      // 语音识别完成且有文本时，清空transcript并发送给AI
       handleVoiceConversation(transcript);
       clearTranscript();
     }
-  }, [transcript, isListening, handleVoiceConversation, clearTranscript]);
+  }, [isListening, transcript, handleVoiceConversation, clearTranscript]);
 
   // 监听AI消息并添加到聊天历史
   useEffect(() => {
@@ -228,11 +246,11 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           ttsProvider={currentTTSProvider}
         />
 
-        {/* Test Mode Toggle */}
-        {/* <View className='px-4 pb-3'>
+        {/* Test Mode Button */}
+        {/* <View className='px-4 pb-3 flex-row justify-end'>
           <TouchableOpacity
             onPress={() => setIsTestMode(true)}
-            className='self-end px-3 py-1 bg-purple-500 rounded-full'
+            className='px-3 py-1 bg-purple-500 rounded-full'
           >
             <Text className='text-white text-sm font-medium'>测试动画</Text>
           </TouchableOpacity>
@@ -242,30 +260,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       {/* Main Content Area */}
       <View className='flex-1 justify-center'>
         {/* Animated Character */}
-        <View className='items-center mb-8'>
-          <AnimatedCharacter
-            status={
-              isSpeaking
-                ? 'speaking'
-                : isListening
-                ? 'listening'
-                : isGenerating
-                ? 'thinking'
-                : 'idle'
-            }
-            size={280}
-            loop={true}
-            className='shadow-lg'
-          />
+        <View className='items-center'>
+          <AnimatedCharacter size={280} loop={true} className='shadow-lg' />
         </View>
-
-        {/* Current Speech Bubble */}
-        <CurrentSpeechBubble
-          currentMessage={
-            chatHistory.filter((msg) => msg.role === 'assistant').slice(-1)[0]
-              ?.content || ''
-          }
-        />
       </View>
 
       {/* Voice Control */}
