@@ -115,8 +115,6 @@ export const useElevenLabsTTS = (): UseElevenLabsTTSReturn => {
     const voice = voiceId || ELEVENLABS_CONFIG.voices[ELEVENLABS_CONFIG.defaultVoice];
     const url = `${ELEVENLABS_CONFIG.baseURL}/text-to-speech/${voice}/stream/with-timestamps`;
     
-    console.log('🎵 开始生成带时间戳的语音:', { text, voice, url });
-    
     // 创建临时文件路径
     const fileName = `elevenlabs_${Date.now()}.mp3`;
     const fileUri = FileSystem.documentDirectory + fileName;
@@ -144,13 +142,11 @@ export const useElevenLabsTTS = (): UseElevenLabsTTSReturn => {
             processedLines.add(line);
             try {
               const data = JSON.parse(line);
-              console.log('📦 收到流式数据:', data);
               
               if (data.audio_base64) {
                 audioData += data.audio_base64;
               }
               if (data.alignment && data.alignment.characters) {
-                console.log('🔤 处理字符对齐信息:', data.alignment.characters.length, '个字符');
                 // 处理字符级别的对齐信息，合并成单词或短语
                 const chars = data.alignment.characters;
                 let currentSegment = '';
@@ -171,7 +167,6 @@ export const useElevenLabsTTS = (): UseElevenLabsTTSReturn => {
                         start: segmentStart,
                         end: char.end_time_seconds
                       });
-                      console.log('📝 添加段落:', currentSegment.trim(), `(${segmentStart}s - ${char.end_time_seconds}s)`);
                     }
                     currentSegment = '';
                   }
@@ -185,11 +180,10 @@ export const useElevenLabsTTS = (): UseElevenLabsTTSReturn => {
                     start: segmentStart,
                     end: lastChar.end_time_seconds
                   });
-                  console.log('📝 添加最后段落:', currentSegment.trim(), `(${segmentStart}s - ${lastChar.end_time_seconds}s)`);
                 }
               }
             } catch (e) {
-              console.log('⚠️ 解析JSON失败:', line, e);
+              // 忽略解析错误的行
             }
           }
         }
@@ -203,16 +197,13 @@ export const useElevenLabsTTS = (): UseElevenLabsTTSReturn => {
               await FileSystem.writeAsStringAsync(fileUri, audioData, {
                 encoding: FileSystem.EncodingType.Base64,
               });
-              console.log('💾 音频文件已保存:', fileUri);
             }
             
-            console.log('✅ 生成完成，共', segments.length, '个段落');
             resolve({ audioUri: fileUri, segments });
           } catch (error) {
             reject(new Error(`保存音频文件失败: ${error}`));
           }
         } else {
-          console.error('❌ ElevenLabs API调用失败:', xhr.status, xhr.responseText);
           reject(new Error(`ElevenLabs API调用失败: ${xhr.status}`));
         }
       };
@@ -234,28 +225,29 @@ export const useElevenLabsTTS = (): UseElevenLabsTTSReturn => {
 
   // Monitor audio player state changes
   useEffect(() => {
-    // isSpeaking 只在实际播放音频时为 true
+    // 更新 isSpeaking 状态
     setIsSpeaking(audioPlayer.playing);
     
-    // 检查音频是否播放完成（currentTime >= duration）
-    if (!audioPlayer.playing && audioPlayer.duration > 0 && audioPlayer.currentTime >= audioPlayer.duration - 0.1) {
+    // 检查音频是否播放完成
+    if (!audioPlayer.playing && audioPlayer.duration > 0) {
       setIsSpeaking(false);
-      // 清理备用定时器
+      setCurrentSegment('');
+      
+      // 清理计时器
       if (playbackTimer) {
-        clearTimeout(playbackTimer);
+        clearInterval(playbackTimer);
         setPlaybackTimer(null);
       }
+      
+      // 延迟清理音频文件
+      if (!isGenerating && audioUri && audioPlayer.currentTime > 0) {
+        setTimeout(() => {
+          FileSystem.deleteAsync(audioUri, { idempotent: true });
+          setAudioUri(null);
+        }, 500);
+      }
     }
-    
-    // 当音频播放完成时清理临时文件
-    if (!audioPlayer.playing && !isGenerating && audioUri && audioPlayer.currentTime > 0) {
-      // 延迟清理，确保音频已完全停止
-      setTimeout(() => {
-        FileSystem.deleteAsync(audioUri, { idempotent: true });
-        setAudioUri(null);
-      }, 500);
-    }
-  }, [audioPlayer.playing, audioUri, audioPlayer.currentTime, audioPlayer.duration, isGenerating]);
+  }, [audioPlayer.playing, audioPlayer.currentTime, audioPlayer.duration, isGenerating, audioUri, playbackTimer]);
 
   const speak = useCallback(async (text: string, voiceId?: string) => {
     if (!text.trim()) return;
@@ -276,15 +268,11 @@ export const useElevenLabsTTS = (): UseElevenLabsTTSReturn => {
         FileSystem.deleteAsync(audioUri, { idempotent: true });
       }
 
-      // 临时使用普通API，测试基本功能
-      console.log('🔧 使用普通API并创建模拟段落');
-      
       // 使用普通API生成语音
       const newAudioUri = await generateSpeechFile(text, voiceId);
       
       // 创建模拟的段落数据用于测试
       const segments = createMockSegments(text);
-      console.log('📝 创建模拟段落:', segments);
       
       // 使用 replace 方法设置新的音频源
       audioPlayer.replace(newAudioUri);
@@ -295,30 +283,45 @@ export const useElevenLabsTTS = (): UseElevenLabsTTSReturn => {
         audioPlayer.play();
         setIsGenerating(false);
         
-        console.log('🎵 开始播放音频，段落数:', segments.length);
+        // 添加播放结束监听器
+        const checkPlaybackEnd = () => {
+          const currentTime = audioPlayer.currentTime;
+          const duration = audioPlayer.duration;
+          
+          if (duration > 0 && currentTime >= duration - 0.1) {
+            setCurrentSegment('');
+            setIsSpeaking(false);
+            if (playbackTimer) {
+              clearInterval(playbackTimer);
+              setPlaybackTimer(null);
+            }
+            return true;
+          }
+          return false;
+        };
         
         // 开始监控段落播放
         const segmentTimer = setInterval(() => {
           if (audioPlayer.playing) {
+            // 首先检查是否播放完成
+            if (checkPlaybackEnd()) {
+              return;
+            }
+            
             const currentTime = audioPlayer.currentTime;
             const currentSegmentData = segments.find(s => 
               currentTime >= s.start && currentTime < s.end
             );
             
             if (currentSegmentData) {
-              console.log('📝 更新当前段落:', currentSegmentData.text, `时间: ${currentTime}s`);
               setCurrentSegment(currentSegmentData.text);
-            } else if (currentTime >= segments[segments.length - 1]?.end) {
-              console.log('🎵 播放完成，清空段落');
-              setCurrentSegment('');
-              clearInterval(segmentTimer);
             }
           } else {
-            console.log('🎵 停止播放，清空段落');
             setCurrentSegment('');
+            setIsSpeaking(false);
             clearInterval(segmentTimer);
           }
-        }, 100);
+        }, 50); // 减少间隔时间以提高响应速度
         
         setPlaybackTimer(segmentTimer);
       }, 100);

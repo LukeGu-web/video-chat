@@ -267,14 +267,11 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         </View>
 
         {/* Current Speech Bubble - Only show when AI is speaking */}
-        {console.log('🔍 Speech Bubble状态:', {
-          isSpeaking,
-          currentSegment,
-          shouldShow: isSpeaking && currentSegment,
-        })}
-        {isSpeaking && currentSegment && (
-          <CurrentSpeechBubble currentMessage={currentSegment} />
-        )}
+        <View className='min-h-[100px] justify-end'>
+          {isSpeaking && currentSegment && (
+            <CurrentSpeechBubble currentMessage={currentSegment} />
+          )}
+        </View>
       </View>
 
       {/* Voice Control */}
@@ -285,7 +282,6 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         isSpeaking={isSpeaking}
         isGenerating={isGenerating}
         error={error}
-        transcript={transcript}
         onStartListening={startListening}
         onStopListening={stopListening}
         onStopSpeaking={stopSpeaking}

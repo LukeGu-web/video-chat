@@ -18,17 +18,17 @@ const Header: React.FC<HeaderProps> = ({
 }) => {
   return (
     <View className='px-4 py-3 bg-white border-b border-gray-200'>
-      <View className='flex-row justify-between items-center'>
+      <View className='flex-row items-center justify-between'>
         <TouchableOpacity onPress={onGoBack}>
-          <Text className='text-primary font-medium'>← 返回</Text>
+          <Text className='font-medium text-primary'>← 返回</Text>
         </TouchableOpacity>
-        <Text className='text-lg font-bold text-black'>
+        {/* <Text className='text-lg font-bold text-black'>
           与 {characterName} 对话
-        </Text>
+        </Text> */}
         <View className='flex-row items-center'>
           {onGoToChatHistory && (
             <TouchableOpacity onPress={onGoToChatHistory}>
-              <Text className='text-blue-500 text-sm font-medium'>
+              <Text className='text-sm font-medium text-blue-500'>
                 聊天记录
               </Text>
             </TouchableOpacity>
@@ -37,7 +37,7 @@ const Header: React.FC<HeaderProps> = ({
       </View>
 
       {/* TTS Status and Controls */}
-      <View className='flex-row justify-between items-center mt-2'>
+      {/* <View className='flex-row items-center justify-between mt-2'>
         <TouchableOpacity
           onPress={onSwitchTTS}
           className='flex-row items-center'
@@ -50,9 +50,9 @@ const Header: React.FC<HeaderProps> = ({
           >
             {ttsProvider === 'elevenlabs' ? 'ElevenLabs' : 'Expo'}
           </Text>
-          <Text className='text-xs text-gray-400 ml-1'>↻</Text>
+          <Text className='ml-1 text-xs text-gray-400'>↻</Text>
         </TouchableOpacity>
-      </View>
+      </View> */}
     </View>
   );
 };
