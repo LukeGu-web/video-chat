@@ -15,7 +15,7 @@ export interface UseHybridTTSReturn {
   isGenerating: boolean; // 新增：是否正在生成语音
   error: string | null;
   currentProvider: TTSProvider;
-  speak: (text: string, voiceId?: string) => Promise<void>;
+  speak: (text: string, voiceId?: string, userEmotion?: string) => Promise<void>;
   stop: () => Promise<void>;
   switchProvider: (provider: TTSProvider) => void;
   currentSegment: string; // 当前正在播放的语音片段
@@ -42,11 +42,11 @@ export const useHybridTTS = (config?: UseHybridTTSConfig): UseHybridTTSReturn =>
   const expoTTS = useTTS();
   const elevenLabsTTS = useElevenLabsTTS();
 
-  const speak = useCallback(async (text: string, voiceId?: string) => {
+  const speak = useCallback(async (text: string, voiceId?: string, userEmotion?: string) => {
     try {
       if (currentProvider === 'elevenlabs') {
-        // 尝试使用 ElevenLabs
-        await elevenLabsTTS.speak(text, voiceId);
+        // 尝试使用 ElevenLabs，传递情绪参数
+        await elevenLabsTTS.speak(text, voiceId, userEmotion);
       } else {
         // 使用 Expo Speech
         await expoTTS.speak(text);

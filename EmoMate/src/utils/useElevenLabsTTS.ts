@@ -1,13 +1,19 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useAudioPlayer } from 'expo-audio';
 import * as FileSystem from 'expo-file-system';
-import { ELEVENLABS_CONFIG, getElevenLabsApiKey } from '../constants/ai';
+import { 
+  ELEVENLABS_CONFIG, 
+  getElevenLabsApiKey, 
+  getEmotionalVoiceSettings, 
+  getLanLanVoiceId,
+  preprocessTextForNaturalSpeech
+} from '../constants/ai';
 
 export interface UseElevenLabsTTSReturn {
   isSpeaking: boolean;
   isGenerating: boolean; // 新增：是否正在生成语音
   error: string | null;
-  speak: (text: string, voiceId?: string) => Promise<void>;
+  speak: (text: string, voiceId?: string, userEmotion?: string) => Promise<void>;
   stop: () => Promise<void>;
   currentSegment: string; // 当前正在播放的语音片段
 }
@@ -43,14 +49,15 @@ export const useElevenLabsTTS = (): UseElevenLabsTTSReturn => {
     return segments;
   };
 
-  const generateSpeechFile = async (text: string, voiceId?: string): Promise<string> => {
+  const generateSpeechFile = async (text: string, voiceId?: string, userEmotion?: string): Promise<string> => {
     const apiKey = getElevenLabsApiKey();
     if (!apiKey) {
       throw new Error('ElevenLabs API密钥未配置。请在环境变量中设置ELEVENLABS_API_KEY。');
     }
 
-    const voice = voiceId || ELEVENLABS_CONFIG.voices[ELEVENLABS_CONFIG.defaultVoice];
+    const voice = voiceId || getLanLanVoiceId(); // 使用兰兰专用语音
     const url = `${ELEVENLABS_CONFIG.baseURL}/text-to-speech/${voice}`;
+    const voiceSettings = getEmotionalVoiceSettings(userEmotion); // 获取情感化语音设置
     
     // 创建临时文件路径
     const fileName = `elevenlabs_${Date.now()}.mp3`;
@@ -95,25 +102,27 @@ export const useElevenLabsTTS = (): UseElevenLabsTTSReturn => {
         reject(new Error('网络请求失败'));
       };
       
-      // 发送请求
+      // 发送请求 - 预处理文本以优化语音自然度
+      const processedText = preprocessTextForNaturalSpeech(text);
       const postData = JSON.stringify({
-        text: text,
+        text: processedText,
         model_id: ELEVENLABS_CONFIG.defaultModel,
-        voice_settings: ELEVENLABS_CONFIG.settings,
+        voice_settings: voiceSettings, // 使用情感化语音设置
       });
       
       xhr.send(postData);
     });
   };
 
-  const generateSpeechWithTimestamps = async (text: string, voiceId?: string): Promise<{audioUri: string, segments: {text: string, start: number, end: number}[]}> => {
+  const generateSpeechWithTimestamps = async (text: string, voiceId?: string, userEmotion?: string): Promise<{audioUri: string, segments: {text: string, start: number, end: number}[]}> => {
     const apiKey = getElevenLabsApiKey();
     if (!apiKey) {
       throw new Error('ElevenLabs API密钥未配置。请在环境变量中设置ELEVENLABS_API_KEY。');
     }
 
-    const voice = voiceId || ELEVENLABS_CONFIG.voices[ELEVENLABS_CONFIG.defaultVoice];
+    const voice = voiceId || getLanLanVoiceId(); // 使用兰兰专用语音
     const url = `${ELEVENLABS_CONFIG.baseURL}/text-to-speech/${voice}/stream/with-timestamps`;
+    const voiceSettings = getEmotionalVoiceSettings(userEmotion); // 获取情感化语音设置
     
     // 创建临时文件路径
     const fileName = `elevenlabs_${Date.now()}.mp3`;
@@ -212,11 +221,12 @@ export const useElevenLabsTTS = (): UseElevenLabsTTSReturn => {
         reject(new Error('网络请求失败'));
       };
       
-      // 发送请求
+      // 发送请求 - 预处理文本以优化语音自然度
+      const processedText = preprocessTextForNaturalSpeech(text);
       const postData = JSON.stringify({
-        text: text,
+        text: processedText,
         model_id: ELEVENLABS_CONFIG.defaultModel,
-        voice_settings: ELEVENLABS_CONFIG.settings,
+        voice_settings: voiceSettings, // 使用情感化语音设置
       });
       
       xhr.send(postData);
@@ -249,7 +259,7 @@ export const useElevenLabsTTS = (): UseElevenLabsTTSReturn => {
     }
   }, [audioPlayer.playing, audioPlayer.currentTime, audioPlayer.duration, isGenerating, audioUri, playbackTimer]);
 
-  const speak = useCallback(async (text: string, voiceId?: string) => {
+  const speak = useCallback(async (text: string, voiceId?: string, userEmotion?: string) => {
     if (!text.trim()) return;
 
     try {
@@ -268,8 +278,8 @@ export const useElevenLabsTTS = (): UseElevenLabsTTSReturn => {
         FileSystem.deleteAsync(audioUri, { idempotent: true });
       }
 
-      // 使用普通API生成语音
-      const newAudioUri = await generateSpeechFile(text, voiceId);
+      // 使用情感化语音生成
+      const newAudioUri = await generateSpeechFile(text, voiceId, userEmotion);
       
       // 创建模拟的段落数据用于测试
       const segments = createMockSegments(text);
