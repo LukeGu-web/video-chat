@@ -18,6 +18,7 @@ export interface UseHybridTTSReturn {
   speak: (text: string, voiceId?: string) => Promise<void>;
   stop: () => Promise<void>;
   switchProvider: (provider: TTSProvider) => void;
+  currentSegment: string; // 当前正在播放的语音片段
 }
 
 export const useHybridTTS = (config?: UseHybridTTSConfig): UseHybridTTSReturn => {
@@ -93,6 +94,10 @@ export const useHybridTTS = (config?: UseHybridTTSConfig): UseHybridTTSReturn =>
     ? elevenLabsTTS.error 
     : expoTTS.error;
 
+  const currentSegment = currentProvider === 'elevenlabs'
+    ? elevenLabsTTS.currentSegment
+    : ''; // Expo TTS 没有段落功能
+
   return {
     isSpeaking,
     isGenerating,
@@ -101,5 +106,6 @@ export const useHybridTTS = (config?: UseHybridTTSConfig): UseHybridTTSReturn =>
     speak,
     stop,
     switchProvider,
+    currentSegment,
   };
 };

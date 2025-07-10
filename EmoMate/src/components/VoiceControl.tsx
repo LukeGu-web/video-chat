@@ -24,78 +24,79 @@ const VoiceControl: React.FC<VoiceControlProps> = ({
   transcript,
   onStartListening,
   onStopListening,
-  onStopSpeaking
+  onStopSpeaking,
 }) => {
   const isDisabled = isAILoading || isSpeaking || isGenerating;
 
   return (
     <>
       {/* Status Display */}
-      <View className="px-4 py-2 bg-gray-50 border-t border-gray-200">
-        {/* TTS Status - 生成状态（无停止按钮） */}
-        {isGenerating && !isSpeaking && (
-          <View className="flex-row items-center py-3 px-2 bg-blue-50 rounded-lg mb-2">
-            <Text className="text-lg mr-2">⚙️</Text>
-            <Text className="text-sm text-blue-700 font-medium">AI 生成语音中...</Text>
-          </View>
-        )}
-        
+      <View className='px-4 py-2 border-t border-gray-200 bg-gray-50'>
         {/* TTS Status - 播放状态（有停止按钮） */}
         {isSpeaking && (
-          <View className="flex-row items-center justify-between py-3 px-2 bg-blue-50 rounded-lg mb-2">
-            <View className="flex-row items-center">
-              <Text className="text-lg mr-2">🗣️</Text>
-              <Text className="text-sm text-blue-700 font-medium">AI 正在说话...</Text>
+          <View className='flex-row items-center justify-between px-2 py-3 mb-2 rounded-lg bg-blue-50'>
+            <View className='flex-row items-center'>
+              <Text className='mr-2 text-lg'>🗣️</Text>
+              <Text className='text-sm font-medium text-blue-700'>
+                AI 正在说话...
+              </Text>
             </View>
-            <TouchableOpacity 
-              className="px-4 py-2 bg-red-500 rounded-full shadow-sm"
+            <TouchableOpacity
+              className='px-4 py-2 bg-red-500 rounded-full shadow-sm'
               onPress={onStopSpeaking}
             >
-              <Text className="text-white text-sm font-bold">停止语音</Text>
+              <Text className='text-sm font-bold text-white'>停止语音</Text>
             </TouchableOpacity>
           </View>
         )}
 
         {/* Transcript Display */}
         {transcript && (
-          <View className="py-2">
-            <Text className="text-sm text-gray-700 italic text-center">"{transcript}"</Text>
+          <View className='py-2'>
+            <Text className='text-sm italic text-center text-gray-700'>
+              "{transcript}"
+            </Text>
           </View>
         )}
       </View>
 
       {/* Voice Control Button */}
-      <View className="px-4 py-6 bg-white border-t border-gray-200">
+      <View className='px-4 py-6 bg-white border-t border-gray-200'>
         {!isSupported ? (
-          <View className="items-center">
-            <Text className="text-red-500 text-center mb-2">
+          <View className='items-center'>
+            <Text className='mb-2 text-center text-red-500'>
               设备不支持语音识别功能
             </Text>
-            <Text className="text-xs text-gray-500 text-center">
+            <Text className='text-xs text-center text-gray-500'>
               错误: {error || '检查中...'}
             </Text>
           </View>
         ) : (
           <Pressable
             className={`w-20 h-20 rounded-full items-center justify-center mx-auto ${
-              isListening 
-                ? 'bg-red-500' 
-                : isDisabled 
-                  ? 'bg-gray-400' 
-                  : 'bg-primary'
+              isListening
+                ? 'bg-red-500'
+                : isDisabled
+                ? 'bg-gray-400'
+                : 'bg-primary'
             }`}
             onPressIn={onStartListening}
             onPressOut={onStopListening}
             disabled={isDisabled}
           >
-            <Text className="text-white text-2xl mb-1">
+            <Text className='mb-1 text-2xl text-white'>
               {isListening ? '🎤' : '🎙️'}
             </Text>
-            <Text className="text-white text-xs text-center font-medium">
-              {isListening ? '松开结束' : 
-               isAILoading ? 'AI思考中' :
-               isGenerating ? '生成语音中' :
-               isSpeaking ? 'AI说话中' : '按住说话'}
+            <Text className='text-xs font-medium text-center text-white'>
+              {isListening
+                ? '松开结束'
+                : isAILoading
+                ? 'AI思考中'
+                : isGenerating
+                ? '生成语音中'
+                : isSpeaking
+                ? 'AI说话中'
+                : '按住说话'}
             </Text>
           </Pressable>
         )}

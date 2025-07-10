@@ -11,6 +11,7 @@ import {
   ErrorToast,
   LottieTest,
   AnimatedCharacter,
+  CurrentSpeechBubble,
 } from '../components';
 
 type RootStackParamList = {
@@ -55,6 +56,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     sendMessage,
     stopSpeaking,
     switchTTSProvider,
+    currentSegment,
   } = useChatAI({ personality: PERSONALITY_PROMPTS.gentle, enableTTS: true });
 
   // Error toast state
@@ -212,7 +214,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
             onPress={() => setIsTestMode(false)}
             className='px-4 py-2 bg-blue-500 rounded-lg'
           >
-            <Text className='text-white font-medium'>返回聊天</Text>
+            <Text className='font-medium text-white'>返回聊天</Text>
           </TouchableOpacity>
           <Text className='text-lg font-bold text-gray-800'>
             Lottie 动画测试
@@ -247,22 +249,32 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         />
 
         {/* Test Mode Button */}
-        {/* <View className='px-4 pb-3 flex-row justify-end'>
+        {/* <View className='flex-row justify-end px-4 pb-3'>
           <TouchableOpacity
             onPress={() => setIsTestMode(true)}
             className='px-3 py-1 bg-purple-500 rounded-full'
           >
-            <Text className='text-white text-sm font-medium'>测试动画</Text>
+            <Text className='text-sm font-medium text-white'>测试动画</Text>
           </TouchableOpacity>
         </View> */}
       </View>
 
       {/* Main Content Area */}
-      <View className='flex-1 justify-center'>
+      <View className='justify-center flex-1'>
         {/* Animated Character */}
         <View className='items-center'>
           <AnimatedCharacter size={280} loop={true} className='shadow-lg' />
         </View>
+
+        {/* Current Speech Bubble - Only show when AI is speaking */}
+        {console.log('🔍 Speech Bubble状态:', {
+          isSpeaking,
+          currentSegment,
+          shouldShow: isSpeaking && currentSegment,
+        })}
+        {isSpeaking && currentSegment && (
+          <CurrentSpeechBubble currentMessage={currentSegment} />
+        )}
       </View>
 
       {/* Voice Control */}

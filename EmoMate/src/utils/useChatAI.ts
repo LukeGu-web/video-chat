@@ -36,6 +36,7 @@ export interface UseChatAIReturn {
   setPersonality: (personality: string) => void;
   stopSpeaking: () => void; // 停止 TTS 播放
   switchTTSProvider: (provider: TTSProvider) => void; // 切换TTS提供商
+  currentSegment: string; // 当前正在播放的语音片段
 }
 
 // 预设人格模板和API配置现在从 constants/ai.ts 导入
@@ -56,7 +57,8 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     stop: stopTTS, 
     error: ttsError,
     currentProvider,
-    switchProvider
+    switchProvider,
+    currentSegment
   } = useHybridTTS({
     preferredProvider: initialConfig?.ttsProvider || 'elevenlabs',
     fallbackToExpo: true
@@ -176,7 +178,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
         setIsLoading(false);
       }
     },
-    [messages, currentPersonality]
+    [messages, currentPersonality, speak]
   );
 
   const clearMessages = useCallback(() => {
@@ -211,5 +213,6 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     setPersonality,
     stopSpeaking,
     switchTTSProvider,
+    currentSegment,
   };
 };
