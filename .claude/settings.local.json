@@ -8,7 +8,9 @@
       "Bash(mkdir:*)",
       "Bash(python3:*)",
       "Bash(rm:*)",
-      "Bash(npx create-next-app:*)"
+      "Bash(npx create-next-app:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(npx create-remix@latest:*)"
     ],
     "deny": []
   }
