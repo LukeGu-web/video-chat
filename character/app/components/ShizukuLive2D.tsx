@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react';
 
 interface ShizukuLive2DProps {
   width?: number;
@@ -6,15 +6,36 @@ interface ShizukuLive2DProps {
   className?: string;
 }
 
-export default function ShizukuLive2D({ 
+export interface ShizukuLive2DRef {
+  playMotion: (motionName: string) => void;
+  setParameter: (paramName: string, value: number) => void;
+}
+
+const ShizukuLive2D = forwardRef<ShizukuLive2DRef, ShizukuLive2DProps>(({ 
   width = 400, 
   height = 600, 
   className = '' 
-}: ShizukuLive2DProps) {
+}, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const appRef = useRef<any | null>(null);
+  const modelRef = useRef<any | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useImperativeHandle(ref, () => ({
+    playMotion: (motionName: string) => {
+      if (modelRef.current) {
+        modelRef.current.motion(motionName);
+        console.log('Playing motion:', motionName);
+      }
+    },
+    setParameter: (paramName: string, value: number) => {
+      if (modelRef.current?.internalModel?.coreModel) {
+        modelRef.current.internalModel.coreModel.setParameterValueById(paramName, value);
+        console.log('Set parameter:', paramName, '=', value);
+      }
+    }
+  }));
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -72,6 +93,7 @@ export default function ShizukuLive2D({
           model.y = height / 2;
           
           app.stage.addChild(model);
+          modelRef.current = model;
           console.log('Model positioned at:', model.x, model.y);
           console.log('Model scaled size:', model.width, model.height);
           
@@ -79,9 +101,17 @@ export default function ShizukuLive2D({
           model.on('hit', (hitAreas: string[]) => {
             console.log('Hit areas:', hitAreas);
             if (hitAreas.length > 0) {
-              model.motion('Tap');
+              // Randomly select a motion for variety
+              const motions = ['Tap', 'FlickUp', 'Flick3'];
+              const randomMotion = motions[Math.floor(Math.random() * motions.length)];
+              model.motion(randomMotion);
+              console.log('Playing motion:', randomMotion);
             }
           });
+          
+          // Make the entire model interactive
+          model.interactive = true;
+          model.buttonMode = true;
           
           // Start idle animation
           setTimeout(() => {
@@ -135,4 +165,8 @@ export default function ShizukuLive2D({
       )}
     </div>
   );
-}
+});
+
+ShizukuLive2D.displayName = 'ShizukuLive2D';
+
+export default ShizukuLive2D;
