@@ -34,34 +34,54 @@ const HiyoriScreen: React.FC = () => {
 
   const handleModelReady = () => {
     setIsModelReady(true);
-    Alert.alert('Hiyori Ready!', 'The Live2D model is loaded and ready for interaction.');
-    
+    // Alert.alert(
+    //   'Hiyori Ready!',
+    //   'The Live2D model is loaded and ready for interaction.'
+    // );
+
     // Play welcome animation
     setTimeout(() => {
       playMotion('Wave');
     }, 500);
   };
 
-  const handleMotionResult = (motion: string, success: boolean, error?: string) => {
+  const handleMotionResult = (
+    motion: string,
+    success: boolean,
+    error?: string
+  ) => {
     if (success) {
       setLastMotion(motion);
     } else {
-      Alert.alert('Motion Error', `Failed to play ${motion}: ${error}`);
+      // Alert.alert('Motion Error', `Failed to play ${motion}: ${error}`);
     }
   };
 
   const playMotion = (motionName: string) => {
+    console.log(`🎯 [HiyoriScreen] playMotion called with: "${motionName}"`);
+    console.log(`🎯 [HiyoriScreen] isModelReady: ${isModelReady}`);
+    console.log(`🎯 [HiyoriScreen] hiyoriRef.current:`, hiyoriRef.current);
+    console.log(
+      `🎯 [HiyoriScreen] hiyoriBridge:`,
+      hiyoriRef.current?.hiyoriBridge
+    );
+
     if (!isModelReady) {
-      Alert.alert('Not Ready', 'Hiyori model is still loading. Please wait...');
+      console.log(`🎯 [HiyoriScreen] Model not ready, showing alert`);
+      // Alert.alert('Not Ready', 'Hiyori model is still loading. Please wait...');
       return;
     }
 
+    console.log(
+      `🎯 [HiyoriScreen] Calling hiyoriRef.current.hiyoriBridge.playMotion("${motionName}")`
+    );
     hiyoriRef.current?.hiyoriBridge?.playMotion(motionName);
   };
 
   const playRandomMotion = () => {
     const allMotions = [...quickMotions, ...emotionMotions];
-    const randomMotion = allMotions[Math.floor(Math.random() * allMotions.length)];
+    const randomMotion =
+      allMotions[Math.floor(Math.random() * allMotions.length)];
     playMotion(randomMotion.name);
   };
 
@@ -73,11 +93,18 @@ const HiyoriScreen: React.FC = () => {
     hiyoriRef.current?.hiyoriBridge?.getAvailableMotions();
   };
 
-  const renderMotionButton = (motion: { name: string; label: string; color: string }) => (
+  const renderMotionButton = (motion: {
+    name: string;
+    label: string;
+    color: string;
+  }) => (
     <TouchableOpacity
       key={motion.name}
       style={[styles.motionButton, { backgroundColor: motion.color }]}
-      onPress={() => playMotion(motion.name)}
+      onPress={() => {
+        console.log(`🎮 [HiyoriScreen] Button pressed: ${motion.name}`);
+        playMotion(motion.name);
+      }}
       disabled={!isModelReady}
     >
       <Text style={styles.motionButtonText}>{motion.label}</Text>
@@ -105,7 +132,10 @@ const HiyoriScreen: React.FC = () => {
       </View>
 
       {/* Control Panel */}
-      <ScrollView style={styles.controlPanel} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.controlPanel}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Status */}
         {lastMotion ? (
           <View style={styles.statusCard}>

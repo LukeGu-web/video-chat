@@ -32,11 +32,11 @@ interface WebViewState {
 const TIMEOUT_MS = 10000; // 10 seconds timeout
 const MAX_LOAD_ATTEMPTS = 3;
 
-const HiyoriWebView: React.FC<HiyoriWebViewProps> = ({
+const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(({
   style,
   onModelReady,
   onMotionResult,
-}) => {
+}, ref) => {
   const webViewRef = useRef<WebView>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pendingMessages = useRef<PendingMessage[]>([]);
@@ -163,8 +163,7 @@ const HiyoriWebView: React.FC<HiyoriWebViewProps> = ({
         case 'webViewReady':
           console.log('WebView is ready for communication');
           setState(prev => ({ ...prev, isWebViewReady: true }));
-          // Start checking for model after WebView is ready
-          setTimeout(checkModelLoaded, 500);
+          // No need to check model status - new system will send modelReady when ready
           break;
 
         case 'domReady':
@@ -219,31 +218,16 @@ const HiyoriWebView: React.FC<HiyoriWebViewProps> = ({
           break;
 
         case 'modelStatus':
-          if (message.ready && !state.isModelReady) {
-            console.log('Hiyori model is ready!');
-            setState(prev => ({
-              ...prev,
-              isModelReady: true,
-              isLoading: false,
-              error: null,
-            }));
-            if (timeoutRef.current) {
-              clearTimeout(timeoutRef.current);
-            }
-            onModelReady?.();
-          } else if (!message.ready) {
-            // Keep checking if model is not ready
-            setTimeout(checkModelLoaded, 2000);
-          }
+          // Legacy modelStatus messages - ignore them in favor of the new system
+          console.log('Received legacy modelStatus:', message.ready);
           break;
 
         case 'bridgeStatus':
           if (message.available) {
             console.log('HiyoriBridge is available');
-            // Start checking model status when bridge becomes available
-            setTimeout(checkModelLoaded, 500);
+            // New system will automatically send modelReady when fully initialized
           } else {
-            console.warn('HiyoriBridge not available, will retry...');
+            console.warn('HiyoriBridge not available');
           }
           break;
 
@@ -310,23 +294,8 @@ const HiyoriWebView: React.FC<HiyoriWebViewProps> = ({
             }));
           }
           
-          // Set up periodic bridge availability check
-          const checkBridge = () => {
-            if (window.HiyoriBridge && window.ReactNativeWebView) {
-              window.ReactNativeWebView.postMessage(JSON.stringify({
-                type: 'bridgeStatus',
-                available: true,
-                timestamp: Date.now()
-              }));
-            }
-          };
-          
-          // Check immediately and then periodically
-          checkBridge();
-          const intervalId = setInterval(checkBridge, 2000);
-          
-          // Clear interval after 30 seconds to prevent memory leak
-          setTimeout(() => clearInterval(intervalId), 30000);
+          // New system: Live2D component will handle all status reporting via sendMessage
+          console.log('[WebView] Readiness detection script injected');
         })();
       `;
       
@@ -373,34 +342,65 @@ const HiyoriWebView: React.FC<HiyoriWebViewProps> = ({
   // Bridge interface for external use
   const bridge: HiyoriBridge = {
     playMotion: (motionName: string) => {
+      console.log(`🚀 [RN->WebView] Requesting motion: "${motionName}"`);
+      console.log(`🚀 [RN->WebView] Current state:`, {
+        isModelReady: state.isModelReady,
+        isWebViewReady: state.isWebViewReady,
+        isLoading: state.isLoading,
+        error: state.error
+      });
+
       if (!state.isModelReady) {
-        console.warn('Hiyori model not ready yet');
+        console.warn(`❌ [RN->WebView] Cannot play "${motionName}" - Hiyori model not ready yet`);
         onMotionResult?.(motionName, false, 'Model not ready');
         return;
       }
 
+      console.log(`📤 [RN->WebView] Injecting JavaScript to play motion: "${motionName}"`);
+
       const jsCode = `
         (function() {
+          console.log('📨 [WebView] Received motion request for: "${motionName}"');
           try {
-            if (window.HiyoriBridge && window.HiyoriBridge.isModelLoaded()) {
-              const result = window.HiyoriBridge.playMotion('${motionName}');
-              window.ReactNativeWebView.postMessage(JSON.stringify({
-                type: 'motionResult',
-                motion: '${motionName}',
-                success: true,
-                result: result,
-                timestamp: Date.now()
-              }));
+            if (window.HiyoriBridge) {
+              console.log('📨 [WebView] HiyoriBridge exists, checking if model is loaded...');
+              const isLoaded = window.HiyoriBridge.isModelLoaded();
+              console.log('📨 [WebView] Model loaded status:', isLoaded);
+              
+              if (isLoaded) {
+                console.log('📨 [WebView] Calling HiyoriBridge.playMotion("${motionName}")...');
+                const result = window.HiyoriBridge.playMotion('${motionName}');
+                console.log('📨 [WebView] Motion call result:', result);
+                
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                  type: 'motionResult',
+                  motion: '${motionName}',
+                  success: true,
+                  result: result,
+                  timestamp: Date.now()
+                }));
+              } else {
+                console.error('📨 [WebView] Model not loaded, cannot play motion');
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                  type: 'motionResult',
+                  motion: '${motionName}',
+                  success: false,
+                  error: 'Bridge reports model not loaded',
+                  timestamp: Date.now()
+                }));
+              }
             } else {
+              console.error('📨 [WebView] HiyoriBridge not available');
               window.ReactNativeWebView.postMessage(JSON.stringify({
                 type: 'motionResult',
                 motion: '${motionName}',
                 success: false,
-                error: 'Bridge or model not available',
+                error: 'HiyoriBridge not available',
                 timestamp: Date.now()
               }));
             }
           } catch (error) {
+            console.error('📨 [WebView] Error in motion execution:', error);
             window.ReactNativeWebView.postMessage(JSON.stringify({
               type: 'motionResult',
               motion: '${motionName}',
@@ -445,12 +445,9 @@ const HiyoriWebView: React.FC<HiyoriWebViewProps> = ({
     reload: reload,
   };
 
-  // Create a separate ref for the bridge to avoid TypeScript conflicts
-  const bridgeRef = useRef<any>(null);
-  
-  // Expose bridge methods via ref
+  // Expose bridge methods via the ref passed from parent
   React.useImperativeHandle(
-    bridgeRef,
+    ref,
     () => ({
       hiyoriBridge: bridge,
       reload: reload,
@@ -458,13 +455,6 @@ const HiyoriWebView: React.FC<HiyoriWebViewProps> = ({
     }),
     [bridge, reload]
   );
-  
-  // Attach bridge to webViewRef for backward compatibility
-  React.useEffect(() => {
-    if (webViewRef.current) {
-      (webViewRef.current as any).hiyoriBridge = bridge;
-    }
-  }, [bridge]);
 
   // Render error state with retry option
   if (state.error && state.loadAttempts < MAX_LOAD_ATTEMPTS) {
@@ -574,7 +564,9 @@ const HiyoriWebView: React.FC<HiyoriWebViewProps> = ({
       )}
     </View>
   );
-};
+});
+
+HiyoriWebView.displayName = 'HiyoriWebView';
 
 const styles = StyleSheet.create({
   container: {

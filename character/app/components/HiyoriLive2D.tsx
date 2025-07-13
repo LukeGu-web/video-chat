@@ -66,6 +66,7 @@ const HiyoriLive2D = forwardRef<HiyoriLive2DRef, HiyoriLive2DProps>(
     
     const [isLoaded, setIsLoaded] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const isLoadedRef = useRef<boolean>(false);
     const [readinessState, setReadinessState] = useState<ReadinessState>({
       domReady: false,
       live2dReady: false,
@@ -73,6 +74,8 @@ const HiyoriLive2D = forwardRef<HiyoriLive2DRef, HiyoriLive2DProps>(
       bridgeReady: false,
       allReady: false,
     });
+    
+    const readinessStateRef = useRef<ReadinessState>(readinessState);
     
     const performanceMetrics = useRef<PerformanceMetrics>({
       domLoadTime: 0,
@@ -82,6 +85,15 @@ const HiyoriLive2D = forwardRef<HiyoriLive2DRef, HiyoriLive2DProps>(
     });
 
     const startTime = useRef<number>(Date.now());
+
+    // Sync state with refs
+    useEffect(() => {
+      readinessStateRef.current = readinessState;
+    }, [readinessState]);
+    
+    useEffect(() => {
+      isLoadedRef.current = isLoaded;
+    }, [isLoaded]);
 
     // Debug logging utility
     const debugLog = (stage: string, message: string, data?: any) => {
@@ -120,6 +132,9 @@ const HiyoriLive2D = forwardRef<HiyoriLive2DRef, HiyoriLive2DProps>(
                            newState.modelReady && 
                            newState.bridgeReady;
         
+        // Update ref with latest state
+        readinessStateRef.current = newState;
+        
         debugLog('State', 'Readiness state updated', newState);
         
         // Send readiness update to React Native
@@ -153,10 +168,26 @@ const HiyoriLive2D = forwardRef<HiyoriLive2DRef, HiyoriLive2DProps>(
       }
       
       heartbeatInterval.current = setInterval(() => {
+        const modelLoaded = !!modelRef.current && isLoadedRef.current;
+        console.log('💓 [Heartbeat] Sending status update:', {
+          modelRef: !!modelRef.current,
+          isLoaded: isLoadedRef.current,
+          modelLoaded,
+          allReady: readinessStateRef.current.allReady,
+          bridgeAvailable: !!window.HiyoriBridge
+        });
+        
+        debugLog('Heartbeat', 'Sending heartbeat', {
+          modelRef: !!modelRef.current,
+          isLoaded: isLoadedRef.current,
+          modelLoaded,
+          state: readinessStateRef.current
+        });
+        
         sendMessage('heartbeat', {
           timestamp: Date.now(),
-          modelLoaded: !!modelRef.current && isLoaded,
-          state: readinessState,
+          modelLoaded,
+          state: readinessStateRef.current,
         });
       }, 5000); // Send heartbeat every 5 seconds
       
@@ -170,9 +201,20 @@ const HiyoriLive2D = forwardRef<HiyoriLive2DRef, HiyoriLive2DProps>(
       if (typeof window !== 'undefined') {
         window.HiyoriBridge = {
           playMotion: (motionName: string) => {
+            console.log(`🎭 [HiyoriBridge] playMotion called with: "${motionName}"`);
+            console.log(`🎭 [HiyoriBridge] Current state:`, {
+              modelRef: !!modelRef.current,
+              isLoaded: isLoadedRef.current,
+              allReady: readinessStateRef.current.allReady,
+              timestamp: new Date().toISOString()
+            });
+            
             try {
-              if (modelRef.current && isLoaded) {
+              if (modelRef.current && isLoadedRef.current) {
+                console.log(`🎭 [HiyoriBridge] Attempting to play motion "${motionName}"...`);
                 const result = modelRef.current.motion(motionName);
+                
+                console.log(`✅ [HiyoriBridge] Motion "${motionName}" executed successfully!`, result);
                 debugLog('Motion', `Playing motion "${motionName}"`, { success: true, result });
                 
                 sendMessage('motionResult', {
@@ -183,6 +225,8 @@ const HiyoriLive2D = forwardRef<HiyoriLive2DRef, HiyoriLive2DProps>(
                 
                 return result;
               } else {
+                const errorMsg = `Model not ready - modelRef: ${!!modelRef.current}, isLoaded: ${isLoadedRef.current}`;
+                console.error(`❌ [HiyoriBridge] Cannot play motion "${motionName}" - ${errorMsg}`);
                 debugLog('Motion', `Cannot play motion "${motionName}" - model not ready`);
                 
                 sendMessage('motionResult', {
@@ -194,6 +238,7 @@ const HiyoriLive2D = forwardRef<HiyoriLive2DRef, HiyoriLive2DProps>(
                 return false;
               }
             } catch (error) {
+              console.error(`💥 [HiyoriBridge] Error playing motion "${motionName}":`, error);
               debugLog('Motion', `Error playing motion "${motionName}"`, error);
               
               sendMessage('motionResult', {
@@ -213,6 +258,7 @@ const HiyoriLive2D = forwardRef<HiyoriLive2DRef, HiyoriLive2DProps>(
               'Excited', 'Sleepy'
             ];
             
+            console.log(`📋 [HiyoriBridge] getAvailableMotions called, returning:`, motions);
             debugLog('Bridge', 'Available motions requested', motions);
             sendMessage('availableMotions', { motions });
             
@@ -220,14 +266,25 @@ const HiyoriLive2D = forwardRef<HiyoriLive2DRef, HiyoriLive2DProps>(
           },
           
           isModelLoaded: () => {
-            const loaded = !!modelRef.current && isLoaded && readinessState.allReady;
-            debugLog('Bridge', 'Model loaded status checked', { loaded });
+            const loaded = !!modelRef.current && isLoadedRef.current && readinessStateRef.current.allReady;
+            console.log(`🔍 [HiyoriBridge] isModelLoaded called, checking status:`, { 
+              modelRef: !!modelRef.current,
+              isLoaded: isLoadedRef.current,
+              allReady: readinessStateRef.current.allReady,
+              result: loaded 
+            });
+            debugLog('Bridge', 'Model loaded status checked', { 
+              modelRef: !!modelRef.current,
+              isLoaded: isLoadedRef.current,
+              allReady: readinessStateRef.current.allReady,
+              loaded 
+            });
             return loaded;
           },
           
           getReadinessState: () => {
-            debugLog('Bridge', 'Readiness state requested', readinessState);
-            return readinessState;
+            debugLog('Bridge', 'Readiness state requested', readinessStateRef.current);
+            return readinessStateRef.current;
           },
           
           getPerformanceMetrics: () => {
@@ -236,10 +293,11 @@ const HiyoriLive2D = forwardRef<HiyoriLive2DRef, HiyoriLive2DProps>(
           },
           
           sendHeartbeat: () => {
+            const modelLoaded = !!modelRef.current && isLoadedRef.current;
             sendMessage('heartbeat', {
               timestamp: Date.now(),
-              modelLoaded: !!modelRef.current && isLoaded,
-              state: readinessState,
+              modelLoaded,
+              state: readinessStateRef.current,
               metrics: performanceMetrics.current,
             });
           }
@@ -247,6 +305,9 @@ const HiyoriLive2D = forwardRef<HiyoriLive2DRef, HiyoriLive2DProps>(
         
         updateReadinessState({ bridgeReady: true });
         debugLog('Bridge', 'HiyoriBridge initialized successfully');
+        
+        console.log('🌟 [HiyoriBridge] JavaScript Bridge fully initialized and ready for motion requests!');
+        console.log('🌟 [HiyoriBridge] Available methods:', Object.keys(window.HiyoriBridge));
       }
     };
 
@@ -376,15 +437,16 @@ const HiyoriLive2D = forwardRef<HiyoriLive2DRef, HiyoriLive2DProps>(
             // Set initial part visibility to fix multiple arms issue
             try {
               if (model.internalModel?.coreModel) {
-                const armBOpacityIndex = model.internalModel.coreModel.getPartIndex('PartArmB');
+                const coreModel = model.internalModel.coreModel as any;
+                const armBOpacityIndex = coreModel.getPartIndex?.('PartArmB');
                 if (armBOpacityIndex >= 0) {
-                  model.internalModel.coreModel.setPartOpacityById('PartArmB', 0);
+                  coreModel.setPartOpacityById?.('PartArmB', 0);
                   debugLog('Init', 'Hidden PartArmB to avoid duplicate arms');
                 }
                 
-                const armAOpacityIndex = model.internalModel.coreModel.getPartIndex('PartArmA');
+                const armAOpacityIndex = coreModel.getPartIndex?.('PartArmA');
                 if (armAOpacityIndex >= 0) {
-                  model.internalModel.coreModel.setPartOpacityById('PartArmA', 1);
+                  coreModel.setPartOpacityById?.('PartArmA', 1);
                   debugLog('Init', 'Set PartArmA visible');
                 }
               }
@@ -394,6 +456,7 @@ const HiyoriLive2D = forwardRef<HiyoriLive2DRef, HiyoriLive2DProps>(
             
             debugLog('Init', 'Model setup completed successfully');
             setIsLoaded(true);
+            isLoadedRef.current = true; // Immediately update ref to avoid timing issues
             updateReadinessState({ modelReady: true });
             
             // Initialize JavaScript Bridge after model is ready
@@ -514,6 +577,7 @@ const HiyoriLive2D = forwardRef<HiyoriLive2DRef, HiyoriLive2DProps>(
             <div>Model: {readinessState.modelReady ? '✓' : '⧗'}</div>
             <div>Bridge: {readinessState.bridgeReady ? '✓' : '⧗'}</div>
             <div>All Ready: {readinessState.allReady ? '✓' : '⧗'}</div>
+            <div>Loaded: {isLoaded ? '✓' : '⧗'}</div>
             <div className="mt-1 pt-1 border-t border-gray-600">
               <div>Load: {performanceMetrics.current.totalLoadTime}ms</div>
               <div>Model: {performanceMetrics.current.modelLoadTime}ms</div>
