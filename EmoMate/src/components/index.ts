@@ -11,3 +11,4 @@ export { default as VoiceWaveAnimation } from './VoiceWaveAnimation';
 export { default as AICapabilityStatus } from './AICapabilityStatus';
 export { default as AnimatedCharacter } from './AnimatedCharacter';
 export { default as CurrentSpeechBubble } from './CurrentSpeechBubble';
+export { default as HiyoriWebView } from './HiyoriWebView';
