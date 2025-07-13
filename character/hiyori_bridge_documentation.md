@@ -126,6 +126,192 @@ async function playMotionSequence(motions, delay = 3000) {
 playMotionSequence(['Wave', 'Happy', 'Thinking'], 2000);
 ```
 
+## Integration with React Native WebView
+
+The main page (`/`) is optimized for embedding in React Native WebView. It only displays the Hiyori model without any control panels, and all interactions are handled through the JavaScript Bridge.
+
+### React Native WebView Setup
+
+```javascript
+import { WebView } from 'react-native-webview';
+
+function HiyoriWebView() {
+  const webViewRef = useRef(null);
+
+  // Function to send commands to Hiyori
+  const playMotion = (motionName) => {
+    const jsCode = `
+      if (window.HiyoriBridge && window.HiyoriBridge.isModelLoaded()) {
+        window.HiyoriBridge.playMotion('${motionName}');
+      } else {
+        console.warn('Hiyori model not loaded yet');
+      }
+    `;
+    webViewRef.current?.injectJavaScript(jsCode);
+  };
+
+  // Function to check available motions
+  const getAvailableMotions = () => {
+    const jsCode = `
+      if (window.HiyoriBridge) {
+        const motions = window.HiyoriBridge.getAvailableMotions();
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'availableMotions',
+          data: motions
+        }));
+      }
+    `;
+    webViewRef.current?.injectJavaScript(jsCode);
+  };
+
+  // Handle messages from WebView
+  const handleMessage = (event) => {
+    try {
+      const message = JSON.parse(event.nativeEvent.data);
+      if (message.type === 'availableMotions') {
+        console.log('Available motions:', message.data);
+      }
+    } catch (error) {
+      console.error('Error parsing message:', error);
+    }
+  };
+
+  return (
+    <WebView
+      ref={webViewRef}
+      source={{ uri: 'YOUR_APP_URL' }} // Replace with your app URL
+      onMessage={handleMessage}
+      javaScriptEnabled={true}
+      domStorageEnabled={true}
+      startInLoadingState={true}
+      style={{ flex: 1 }}
+    />
+  );
+}
+
+// Usage examples:
+// playMotion('Happy');
+// playMotion('Speaking');
+// getAvailableMotions();
+```
+
+### React Native Command Examples
+
+```javascript
+// Play different motions
+playMotion('Happy');
+playMotion('Surprised');
+playMotion('Speaking');
+playMotion('Wave');
+
+// Check if model is loaded before sending commands
+const checkAndPlay = (motionName) => {
+  const jsCode = `
+    (function() {
+      if (window.HiyoriBridge) {
+        if (window.HiyoriBridge.isModelLoaded()) {
+          window.HiyoriBridge.playMotion('${motionName}');
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'motionResult',
+            motion: '${motionName}',
+            success: true
+          }));
+        } else {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'motionResult',
+            motion: '${motionName}',
+            success: false,
+            error: 'Model not loaded'
+          }));
+        }
+      } else {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'motionResult',
+          motion: '${motionName}',
+          success: false,
+          error: 'Bridge not available'
+        }));
+      }
+    })();
+  `;
+  webViewRef.current?.injectJavaScript(jsCode);
+};
+```
+
+### WebView Communication Pattern
+
+```javascript
+// Complete WebView component with error handling
+import React, { useRef, useEffect } from 'react';
+import { WebView } from 'react-native-webview';
+
+const HiyoriController = () => {
+  const webViewRef = useRef(null);
+
+  // Wait for model to load, then start interaction
+  useEffect(() => {
+    const checkModelLoaded = () => {
+      const jsCode = `
+        (function checkModel() {
+          if (window.HiyoriBridge && window.HiyoriBridge.isModelLoaded()) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'modelReady',
+              ready: true
+            }));
+          } else {
+            setTimeout(checkModel, 500);
+          }
+        })();
+      `;
+      webViewRef.current?.injectJavaScript(jsCode);
+    };
+
+    // Start checking after WebView loads
+    setTimeout(checkModelLoaded, 2000);
+  }, []);
+
+  const handleWebViewMessage = (event) => {
+    try {
+      const message = JSON.parse(event.nativeEvent.data);
+      
+      switch (message.type) {
+        case 'modelReady':
+          console.log('Hiyori model is ready!');
+          // Now you can safely send commands
+          playMotion('Wave'); // Welcome animation
+          break;
+          
+        case 'motionResult':
+          console.log(`Motion ${message.motion}:`, message.success ? 'Success' : message.error);
+          break;
+          
+        default:
+          console.log('Unknown message:', message);
+      }
+    } catch (error) {
+      console.error('Error parsing WebView message:', error);
+    }
+  };
+
+  const playMotion = (motionName) => {
+    const jsCode = `window.HiyoriBridge?.playMotion('${motionName}');`;
+    webViewRef.current?.injectJavaScript(jsCode);
+  };
+
+  return (
+    <WebView
+      ref={webViewRef}
+      source={{ uri: 'http://your-domain.com' }}
+      onMessage={handleWebViewMessage}
+      javaScriptEnabled={true}
+      domStorageEnabled={true}
+      mixedContentMode="compatibility"
+      style={{ flex: 1 }}
+    />
+  );
+};
+```
+
 ## Integration with External Applications
 
 ### Browser Extension
