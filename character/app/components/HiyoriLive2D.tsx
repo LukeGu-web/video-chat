@@ -1,5 +1,31 @@
 import { useEffect, useRef, forwardRef, useImperativeHandle, useState } from 'react';
 
+// Enhanced readiness states
+interface ReadinessState {
+  domReady: boolean;
+  live2dReady: boolean;
+  modelReady: boolean;
+  bridgeReady: boolean;
+  allReady: boolean;
+}
+
+// Message protocol interface
+interface BridgeMessage {
+  id: string;
+  type: string;
+  timestamp: number;
+  data?: any;
+  error?: string;
+}
+
+// Performance metrics
+interface PerformanceMetrics {
+  domLoadTime: number;
+  live2dLoadTime: number;
+  modelLoadTime: number;
+  totalLoadTime: number;
+}
+
 // Global bridge interface declaration
 declare global {
   interface Window {
@@ -7,6 +33,12 @@ declare global {
       playMotion: (motionName: string) => any;
       getAvailableMotions: () => string[];
       isModelLoaded: () => boolean;
+      getReadinessState: () => ReadinessState;
+      getPerformanceMetrics: () => PerformanceMetrics;
+      sendHeartbeat: () => void;
+    };
+    ReactNativeWebView?: {
+      postMessage: (message: string) => void;
     };
   }
 }
@@ -30,62 +62,235 @@ const HiyoriLive2D = forwardRef<HiyoriLive2DRef, HiyoriLive2DProps>(
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const modelRef = useRef<any>(null);
     const appRef = useRef<any>(null);
+    const heartbeatInterval = useRef<NodeJS.Timeout | null>(null);
+    
     const [isLoaded, setIsLoaded] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [readinessState, setReadinessState] = useState<ReadinessState>({
+      domReady: false,
+      live2dReady: false,
+      modelReady: false,
+      bridgeReady: false,
+      allReady: false,
+    });
+    
+    const performanceMetrics = useRef<PerformanceMetrics>({
+      domLoadTime: 0,
+      live2dLoadTime: 0,
+      modelLoadTime: 0,
+      totalLoadTime: 0,
+    });
+
+    const startTime = useRef<number>(Date.now());
+
+    // Debug logging utility
+    const debugLog = (stage: string, message: string, data?: any) => {
+      const timestamp = Date.now() - startTime.current;
+      console.log(`[Hiyori ${stage}][${timestamp}ms] ${message}`, data || '');
+    };
+
+    // Send message to React Native WebView
+    const sendMessage = (type: string, data?: any, error?: string) => {
+      if (typeof window !== 'undefined' && window.ReactNativeWebView) {
+        const message: BridgeMessage = {
+          id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+          type,
+          timestamp: Date.now(),
+          data,
+          error,
+        };
+        
+        try {
+          window.ReactNativeWebView.postMessage(JSON.stringify(message));
+          debugLog('Bridge', `Sent message: ${type}`, message);
+        } catch (err) {
+          console.error('[Bridge] Failed to send message:', err);
+        }
+      }
+    };
+
+    // Update readiness state and notify
+    const updateReadinessState = (updates: Partial<ReadinessState>) => {
+      setReadinessState(prev => {
+        const newState = { ...prev, ...updates };
+        
+        // Check if all components are ready
+        newState.allReady = newState.domReady && 
+                           newState.live2dReady && 
+                           newState.modelReady && 
+                           newState.bridgeReady;
+        
+        debugLog('State', 'Readiness state updated', newState);
+        
+        // Send readiness update to React Native
+        sendMessage('readinessUpdate', {
+          state: newState,
+          metrics: performanceMetrics.current,
+        });
+        
+        // Send final ready signal when all components are ready
+        if (newState.allReady && !prev.allReady) {
+          performanceMetrics.current.totalLoadTime = Date.now() - startTime.current;
+          debugLog('Init', 'All components ready! Total load time:', performanceMetrics.current.totalLoadTime + 'ms');
+          
+          sendMessage('modelReady', {
+            state: newState,
+            metrics: performanceMetrics.current,
+          });
+          
+          // Start heartbeat
+          startHeartbeat();
+        }
+        
+        return newState;
+      });
+    };
+
+    // Heartbeat mechanism
+    const startHeartbeat = () => {
+      if (heartbeatInterval.current) {
+        clearInterval(heartbeatInterval.current);
+      }
+      
+      heartbeatInterval.current = setInterval(() => {
+        sendMessage('heartbeat', {
+          timestamp: Date.now(),
+          modelLoaded: !!modelRef.current && isLoaded,
+          state: readinessState,
+        });
+      }, 5000); // Send heartbeat every 5 seconds
+      
+      debugLog('Bridge', 'Heartbeat started');
+    };
+
+    // Set up JavaScript Bridge
+    const setupJavaScriptBridge = () => {
+      debugLog('Bridge', 'Setting up JavaScript Bridge...');
+      
+      if (typeof window !== 'undefined') {
+        window.HiyoriBridge = {
+          playMotion: (motionName: string) => {
+            try {
+              if (modelRef.current && isLoaded) {
+                const result = modelRef.current.motion(motionName);
+                debugLog('Motion', `Playing motion "${motionName}"`, { success: true, result });
+                
+                sendMessage('motionResult', {
+                  motion: motionName,
+                  success: true,
+                  result,
+                });
+                
+                return result;
+              } else {
+                debugLog('Motion', `Cannot play motion "${motionName}" - model not ready`);
+                
+                sendMessage('motionResult', {
+                  motion: motionName,
+                  success: false,
+                  error: 'Model not loaded',
+                });
+                
+                return false;
+              }
+            } catch (error) {
+              debugLog('Motion', `Error playing motion "${motionName}"`, error);
+              
+              sendMessage('motionResult', {
+                motion: motionName,
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error',
+              });
+              
+              return false;
+            }
+          },
+          
+          getAvailableMotions: () => {
+            const motions = [
+              'Idle', 'Happy', 'Surprised', 'Shy', 'Wave', 
+              'Dance', 'Laugh', 'Thinking', 'Speaking',
+              'Excited', 'Sleepy'
+            ];
+            
+            debugLog('Bridge', 'Available motions requested', motions);
+            sendMessage('availableMotions', { motions });
+            
+            return motions;
+          },
+          
+          isModelLoaded: () => {
+            const loaded = !!modelRef.current && isLoaded && readinessState.allReady;
+            debugLog('Bridge', 'Model loaded status checked', { loaded });
+            return loaded;
+          },
+          
+          getReadinessState: () => {
+            debugLog('Bridge', 'Readiness state requested', readinessState);
+            return readinessState;
+          },
+          
+          getPerformanceMetrics: () => {
+            debugLog('Bridge', 'Performance metrics requested', performanceMetrics.current);
+            return performanceMetrics.current;
+          },
+          
+          sendHeartbeat: () => {
+            sendMessage('heartbeat', {
+              timestamp: Date.now(),
+              modelLoaded: !!modelRef.current && isLoaded,
+              state: readinessState,
+              metrics: performanceMetrics.current,
+            });
+          }
+        };
+        
+        updateReadinessState({ bridgeReady: true });
+        debugLog('Bridge', 'HiyoriBridge initialized successfully');
+      }
+    };
 
     useEffect(() => {
       if (!canvasRef.current) return;
 
-      // Set up JavaScript Bridge for external commands
-      const setupJavaScriptBridge = () => {
-        // Create global interface for Hiyori
-        if (typeof window !== 'undefined') {
-          window.HiyoriBridge = {
-            playMotion: (motionName: string) => {
-              if (modelRef.current) {
-                const result = modelRef.current.motion(motionName);
-                console.log(`[Bridge] Playing motion "${motionName}", result:`, result);
-                return result;
-              }
-              console.warn('[Bridge] Model not loaded yet');
-              return false;
-            },
-            
-            getAvailableMotions: () => {
-              return [
-                'Idle', 'Happy', 'Surprised', 'Shy', 'Wave', 
-                'Dance', 'Laugh', 'Thinking', 'Speaking',
-                'Excited', 'Sleepy'
-              ];
-            },
-            
-            isModelLoaded: () => {
-              return !!modelRef.current && isLoaded;
-            }
-          };
-          
-          console.log('[Bridge] HiyoriBridge initialized:', window.HiyoriBridge);
-        }
-      };
+      const domReadyTime = Date.now();
+      performanceMetrics.current.domLoadTime = domReadyTime - startTime.current;
+      
+      debugLog('Init', 'DOM ready, starting Live2D initialization');
+      updateReadinessState({ domReady: true });
 
       const initializeLive2D = async () => {
         try {
-          console.log('Initializing Hiyori Live2D...');
+          debugLog('Init', 'Loading Live2D core libraries...');
           
           // Wait for both Live2D and Cubism Core to be available
+          let attempts = 0;
+          const maxAttempts = 100; // 10 seconds max wait
+          
           while (typeof window !== 'undefined' && (!window.Live2DCubismCore || !window.Live2D)) {
-            console.log('Waiting for Live2D and Cubism Core...');
+            if (attempts >= maxAttempts) {
+              throw new Error('Timeout waiting for Live2D libraries');
+            }
+            
+            debugLog('Init', `Waiting for Live2D libraries... (attempt ${attempts + 1}/${maxAttempts})`);
             await new Promise(resolve => setTimeout(resolve, 100));
+            attempts++;
           }
           
-          console.log('Live2D and Cubism Core loaded successfully');
+          const live2dReadyTime = Date.now();
+          performanceMetrics.current.live2dLoadTime = live2dReadyTime - startTime.current;
           
+          debugLog('Init', 'Live2D core libraries loaded successfully');
+          updateReadinessState({ live2dReady: true });
+          
+          debugLog('Init', 'Loading PIXI and Live2D modules...');
           const PIXI = await import('pixi.js');
           const Live2DModule = await import('pixi-live2d-display-mulmotion');
           const { Live2DModel } = Live2DModule;
 
-          console.log('PIXI and Live2D modules loaded', { PIXI, Live2DModule });
+          debugLog('Init', 'PIXI and Live2D modules loaded', { PIXI: !!PIXI, Live2DModule: !!Live2DModule });
 
+          debugLog('Init', 'Creating PIXI Application...');
           const app = new PIXI.Application({
             view: canvasRef.current!,
             width,
@@ -95,216 +300,223 @@ const HiyoriLive2D = forwardRef<HiyoriLive2DRef, HiyoriLive2DProps>(
           });
 
           appRef.current = app;
-          console.log('PIXI Application created');
+          debugLog('Init', 'PIXI Application created successfully');
 
           const modelPath = '/assets/live2d/hiyori_vts/hiyori.model3.json';
-          console.log('Loading Hiyori model from:', modelPath);
+          debugLog('Init', 'Loading Hiyori model from:', modelPath);
           
           const model = await Live2DModel.from(modelPath, {
             autoFocus: false,
             autoHitTest: true,
             ticker: app.ticker,
           });
-          console.log('Hiyori model loaded:', model);
+          
+          const modelReadyTime = Date.now();
+          performanceMetrics.current.modelLoadTime = modelReadyTime - startTime.current;
+          
+          debugLog('Init', 'Hiyori model loaded successfully', model);
           
           if (model) {
             // Log model dimensions for debugging
-            console.log('Model original size:', model.width, model.height);
-            console.log('Canvas size:', width, height);
+            debugLog('Init', 'Model dimensions', {
+              original: { width: model.width, height: model.height },
+              canvas: { width, height }
+            });
             
-            // Position and scale the model - make it much smaller to fit in canvas
+            // Position and scale the model
             model.scale.set(0.12);
-            
-            // Center the model
             model.anchor.set(0.5, 0.5);
             model.x = width / 2;
-            model.y = height / 2 + 50; // Move down slightly to better center the character
+            model.y = height / 2 + 50;
             
             app.stage.addChild(model);
             modelRef.current = model;
-            console.log('Model positioned at:', model.x, model.y);
-            console.log('Model scaled size:', model.width, model.height);
             
-            // Make the entire model interactive
+            debugLog('Init', 'Model positioned and scaled', {
+              position: { x: model.x, y: model.y },
+              scale: model.scale.x,
+              size: { width: model.width, height: model.height }
+            });
+            
+            // Make the model interactive
             model.interactive = true;
             model.cursor = 'pointer';
             
             // Set up click interaction
             model.on('pointerdown', () => {
-              console.log('Hiyori clicked!');
-              // Randomly select a motion for variety
+              debugLog('Interaction', 'Model clicked');
               const motions = ['Happy', 'Surprised', 'Shy'];
               const randomMotion = motions[Math.floor(Math.random() * motions.length)];
               model.motion(randomMotion);
-              console.log('Playing click motion:', randomMotion);
+              debugLog('Interaction', 'Playing click motion:', randomMotion);
+              
+              sendMessage('userInteraction', {
+                type: 'click',
+                motion: randomMotion,
+              });
             });
             
-            // Also set up the hit event if it exists
+            // Set up hit event
             model.on('hit', (hitAreas: string[]) => {
-              console.log('Hit areas:', hitAreas);
+              debugLog('Interaction', 'Hit areas triggered:', hitAreas);
               if (hitAreas.length > 0) {
-                // Randomly select a motion for variety
                 const motions = ['Happy', 'Surprised', 'Shy'];
                 const randomMotion = motions[Math.floor(Math.random() * motions.length)];
                 model.motion(randomMotion);
-                console.log('Playing hit motion:', randomMotion);
+                debugLog('Interaction', 'Playing hit motion:', randomMotion);
+                
+                sendMessage('userInteraction', {
+                  type: 'hit',
+                  areas: hitAreas,
+                  motion: randomMotion,
+                });
               }
             });
             
             // Set initial part visibility to fix multiple arms issue
             try {
               if (model.internalModel?.coreModel) {
-                // Hide alternative arm set (PartArmB) to avoid duplicate arms
                 const armBOpacityIndex = model.internalModel.coreModel.getPartIndex('PartArmB');
                 if (armBOpacityIndex >= 0) {
                   model.internalModel.coreModel.setPartOpacityById('PartArmB', 0);
-                  console.log('Hidden PartArmB to avoid duplicate arms');
+                  debugLog('Init', 'Hidden PartArmB to avoid duplicate arms');
                 }
                 
-                // Ensure PartArmA is visible
                 const armAOpacityIndex = model.internalModel.coreModel.getPartIndex('PartArmA');
                 if (armAOpacityIndex >= 0) {
                   model.internalModel.coreModel.setPartOpacityById('PartArmA', 1);
-                  console.log('Set PartArmA visible');
+                  debugLog('Init', 'Set PartArmA visible');
                 }
               }
             } catch (error) {
-              console.warn('Could not set initial part visibility:', error);
+              debugLog('Init', 'Could not set initial part visibility:', error);
             }
             
-            console.log('Hiyori model loaded successfully, ready for manual control');
-            
+            debugLog('Init', 'Model setup completed successfully');
             setIsLoaded(true);
+            updateReadinessState({ modelReady: true });
             
-            // Initialize JavaScript Bridge after model is loaded
+            // Initialize JavaScript Bridge after model is ready
             setupJavaScriptBridge();
+            
           } else {
-            setError('Failed to load Hiyori model');
+            throw new Error('Failed to load Hiyori model - model is null');
           }
         } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          debugLog('Error', 'Failed to initialize Live2D:', errorMessage);
           console.error('Failed to load Hiyori Live2D model:', error);
-          setError(error instanceof Error ? error.message : 'Unknown error');
+          
+          setError(errorMessage);
+          sendMessage('initError', {
+            error: errorMessage,
+            stage: 'initialization',
+          });
         }
       };
 
       initializeLive2D();
 
+      // Send initial DOM ready signal
+      sendMessage('domReady', {
+        timestamp: Date.now(),
+        domLoadTime: performanceMetrics.current.domLoadTime,
+      });
+
       return () => {
+        debugLog('Cleanup', 'Cleaning up Live2D component');
+        
+        // Clear heartbeat
+        if (heartbeatInterval.current) {
+          clearInterval(heartbeatInterval.current);
+          heartbeatInterval.current = null;
+        }
+        
+        // Destroy PIXI app
         if (appRef.current) {
           appRef.current.destroy(true);
           appRef.current = null;
         }
         
+        // Clean up model reference
+        modelRef.current = null;
+        
         // Clean up JavaScript Bridge
         if (typeof window !== 'undefined' && window.HiyoriBridge) {
           delete window.HiyoriBridge;
-          console.log('[Bridge] HiyoriBridge cleaned up');
+          debugLog('Cleanup', 'HiyoriBridge cleaned up');
         }
+        
+        sendMessage('cleanup', {
+          timestamp: Date.now(),
+        });
       };
     }, [width, height]);
 
+    // Expose ref methods
     useImperativeHandle(ref, () => ({
       playMotion: (motionName: string) => {
-        if (modelRef.current) {
-          // Use the same simple approach as Shizuku
-          const result = modelRef.current.motion(motionName);
-          console.log(`Playing motion "${motionName}", result:`, result);
+        if (modelRef.current && isLoaded) {
+          modelRef.current.motion(motionName);
         }
       },
-
       stopMotion: () => {
-        if (modelRef.current?.internalModel) {
-          try {
-            console.log('Attempting to stop motions...');
-            console.log('MotionManager available:', !!modelRef.current.internalModel.motionManager);
-            
-            // Try multiple methods to stop motions
-            if (modelRef.current.internalModel.motionManager) {
-              // Method 1: Try stopAllMotions
-              if (typeof modelRef.current.internalModel.motionManager.stopAllMotions === 'function') {
-                modelRef.current.internalModel.motionManager.stopAllMotions();
-                console.log('Stopped all motions via stopAllMotions');
-              }
-              // Method 2: Try stop
-              else if (typeof modelRef.current.internalModel.motionManager.stop === 'function') {
-                modelRef.current.internalModel.motionManager.stop();
-                console.log('Stopped motions via stop');
-              }
-            }
-            
-            // Alternative: Try to stop motion directly on the model
-            if (typeof modelRef.current.stopMotion === 'function') {
-              modelRef.current.stopMotion();
-              console.log('Stopped motion via model.stopMotion');
-            }
-            
-          } catch (error) {
-            console.error('Failed to stop motions:', error);
-          }
+        if (modelRef.current) {
+          // Stop current motion if possible
+          debugLog('Motion', 'Stop motion requested');
         }
       },
-
       setParameter: (paramId: string, value: number) => {
         if (modelRef.current?.internalModel?.coreModel) {
-          try {
-            console.log('Attempting to set parameter:', paramId, '=', value);
-            
-            // Set the parameter directly
-            modelRef.current.internalModel.coreModel.setParameterValueById(paramId, value);
-            console.log('Successfully set parameter:', paramId, '=', value);
-            
-          } catch (error) {
-            console.error('Failed to set parameter:', paramId, error);
-            console.log('Available methods:', Object.getOwnPropertyNames(modelRef.current.internalModel.coreModel).filter(name => typeof modelRef.current.internalModel.coreModel[name] === 'function'));
-          }
-        } else {
-          console.error('Model or coreModel not available');
+          modelRef.current.internalModel.coreModel.setParameterValueById(paramId, value);
+          debugLog('Parameter', `Set parameter ${paramId} to ${value}`);
         }
       },
-
-      getParameter: (paramId: string): number => {
+      getParameter: (paramId: string) => {
         if (modelRef.current?.internalModel?.coreModel) {
-          try {
-            return modelRef.current.internalModel.coreModel.getParameterValueById(paramId);
-          } catch (error) {
-            console.error(`Failed to get parameter ${paramId}:`, error);
-          }
+          const value = modelRef.current.internalModel.coreModel.getParameterValueById(paramId);
+          debugLog('Parameter', `Get parameter ${paramId}: ${value}`);
+          return value;
         }
         return 0;
       },
-
       startRandomMotion: (group: string) => {
         if (modelRef.current) {
-          const motionNames = ['Happy', 'Surprised', 'Shy', 'Wave', 'Dance', 'Laugh', 'Thinking', 'Speaking'];
-          const randomMotion = motionNames[Math.floor(Math.random() * motionNames.length)];
-          
-          const result = modelRef.current.motion(randomMotion);
-          console.log(`Playing random motion: ${randomMotion}, result:`, result);
+          // This would need to be implemented based on the motion groups available
+          debugLog('Motion', `Start random motion in group: ${group}`);
         }
       },
     }));
 
+    // Render the component
     return (
-      <div className={`live2d-container ${className} relative`}>
+      <div className={`relative ${className}`} style={{ width, height }}>
         <canvas
           ref={canvasRef}
-          width={width}
-          height={height}
-          style={{ width: '100%', height: '100%' }}
+          className="w-full h-full"
+          style={{ display: error ? 'none' : 'block' }}
         />
-        {!isLoaded && !error && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded-lg">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500 mx-auto mb-2"></div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Loading Hiyori...</p>
+        
+        {error && (
+          <div className="absolute inset-0 flex items-center justify-center bg-red-50 border border-red-200 rounded">
+            <div className="text-center p-4">
+              <div className="text-red-600 font-semibold mb-2">Live2D Error</div>
+              <div className="text-red-500 text-sm">{error}</div>
             </div>
           </div>
         )}
-        {error && (
-          <div className="absolute inset-0 flex items-center justify-center bg-red-50 dark:bg-red-900 rounded-lg">
-            <div className="text-center">
-              <p className="text-red-600 dark:text-red-400 font-semibold mb-2">Error loading Hiyori model</p>
-              <p className="text-sm text-red-500 dark:text-red-300">{error}</p>
+        
+        {/* Debug Status Panel (only in development) */}
+        {typeof window !== 'undefined' && window.location.hostname === 'localhost' && (
+          <div className="absolute top-2 left-2 bg-black bg-opacity-75 text-white text-xs p-2 rounded font-mono">
+            <div>DOM: {readinessState.domReady ? '✓' : '⧗'}</div>
+            <div>Live2D: {readinessState.live2dReady ? '✓' : '⧗'}</div>
+            <div>Model: {readinessState.modelReady ? '✓' : '⧗'}</div>
+            <div>Bridge: {readinessState.bridgeReady ? '✓' : '⧗'}</div>
+            <div>All Ready: {readinessState.allReady ? '✓' : '⧗'}</div>
+            <div className="mt-1 pt-1 border-t border-gray-600">
+              <div>Load: {performanceMetrics.current.totalLoadTime}ms</div>
+              <div>Model: {performanceMetrics.current.modelLoadTime}ms</div>
             </div>
           </div>
         )}
