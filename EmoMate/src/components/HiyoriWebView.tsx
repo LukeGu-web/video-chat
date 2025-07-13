@@ -40,6 +40,11 @@ const HiyoriWebView: React.FC<HiyoriWebViewProps> = ({
 
   // Check if model is loaded periodically
   const checkModelLoaded = useCallback(() => {
+    if (!webViewRef.current || !webViewRef.current.injectJavaScript) {
+      console.warn('WebView not ready for JavaScript injection');
+      return;
+    }
+    
     const jsCode = `
       (function checkModel() {
         if (window.HiyoriBridge && window.HiyoriBridge.isModelLoaded()) {
@@ -64,7 +69,7 @@ const HiyoriWebView: React.FC<HiyoriWebViewProps> = ({
         }
       })();
     `;
-    webViewRef.current?.injectJavaScript(jsCode);
+    webViewRef.current.injectJavaScript(jsCode);
   }, []);
 
   // Start checking for model after WebView loads
@@ -133,6 +138,12 @@ const HiyoriWebView: React.FC<HiyoriWebViewProps> = ({
         return;
       }
 
+      if (!webViewRef.current || !webViewRef.current.injectJavaScript) {
+        console.warn('WebView not ready for JavaScript injection');
+        onMotionResult?.(motionName, false, 'WebView not ready');
+        return;
+      }
+
       const jsCode = `
         (function() {
           try {
@@ -162,10 +173,15 @@ const HiyoriWebView: React.FC<HiyoriWebViewProps> = ({
           }
         })();
       `;
-      webViewRef.current?.injectJavaScript(jsCode);
+      webViewRef.current.injectJavaScript(jsCode);
     },
 
     getAvailableMotions: () => {
+      if (!webViewRef.current || !webViewRef.current.injectJavaScript) {
+        console.warn('WebView not ready for JavaScript injection');
+        return;
+      }
+      
       const jsCode = `
         if (window.HiyoriBridge) {
           const motions = window.HiyoriBridge.getAvailableMotions();
@@ -175,7 +191,7 @@ const HiyoriWebView: React.FC<HiyoriWebViewProps> = ({
           }));
         }
       `;
-      webViewRef.current?.injectJavaScript(jsCode);
+      webViewRef.current.injectJavaScript(jsCode);
     },
 
     checkModelStatus: () => {
@@ -208,7 +224,7 @@ const HiyoriWebView: React.FC<HiyoriWebViewProps> = ({
     <View style={[styles.container, style]}>
       <WebView
         ref={webViewRef}
-        source={{ uri: 'http://localhost:5173/' }}
+        source={{ uri: 'http://192.168.31.28:5174/' }}
         onMessage={handleWebViewMessage}
         onLoadEnd={handleLoadEnd}
         onError={handleError}

@@ -18,6 +18,7 @@ type RootStackParamList = {
   Welcome: undefined;
   Home: undefined;
   ChatHistory: undefined;
+  Hiyori: undefined;
 };
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Home'>;
@@ -118,6 +119,10 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
   const handleGoToChatHistory = () => {
     navigation.navigate('ChatHistory');
+  };
+
+  const handleGoToHiyoriTest = () => {
+    navigation.navigate('Hiyori');
   };
 
   const handleSwitchTTS = useCallback(() => {
@@ -245,6 +250,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           onGoBack={handleGoBack}
           onSwitchTTS={handleSwitchTTS}
           onGoToChatHistory={handleGoToChatHistory}
+          onGoToHiyoriTest={handleGoToHiyoriTest}
           ttsProvider={currentTTSProvider}
         />
 

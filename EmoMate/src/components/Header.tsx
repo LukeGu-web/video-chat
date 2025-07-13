@@ -6,6 +6,7 @@ interface HeaderProps {
   onGoBack?: () => void;
   onSwitchTTS?: () => void;
   onGoToChatHistory?: () => void;
+  onGoToHiyoriTest?: () => void;
   ttsProvider?: string;
 }
 
@@ -14,6 +15,7 @@ const Header: React.FC<HeaderProps> = ({
   onGoBack,
   onSwitchTTS,
   onGoToChatHistory,
+  onGoToHiyoriTest,
   ttsProvider,
 }) => {
   return (
@@ -27,9 +29,16 @@ const Header: React.FC<HeaderProps> = ({
         </Text> */}
         <View className='flex-row items-center'>
           {onGoToChatHistory && (
-            <TouchableOpacity onPress={onGoToChatHistory}>
+            <TouchableOpacity onPress={onGoToChatHistory} className='mr-4'>
               <Text className='text-sm font-medium text-blue-500'>
                 聊天记录
+              </Text>
+            </TouchableOpacity>
+          )}
+          {onGoToHiyoriTest && (
+            <TouchableOpacity onPress={onGoToHiyoriTest}>
+              <Text className='text-sm font-medium text-green-500'>
+                Hiyori测试
               </Text>
             </TouchableOpacity>
           )}
