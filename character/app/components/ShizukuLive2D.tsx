@@ -9,6 +9,7 @@ interface ShizukuLive2DProps {
 export interface ShizukuLive2DRef {
   playMotion: (motionName: string) => void;
   setParameter: (paramName: string, value: number) => void;
+  stopMotion: () => void;
 }
 
 const ShizukuLive2D = forwardRef<ShizukuLive2DRef, ShizukuLive2DProps>(({ 
@@ -29,10 +30,56 @@ const ShizukuLive2D = forwardRef<ShizukuLive2DRef, ShizukuLive2DProps>(({
         console.log('Playing motion:', motionName);
       }
     },
+    stopMotion: () => {
+      if (modelRef.current?.internalModel) {
+        try {
+          console.log('Attempting to stop motions...');
+          console.log('MotionManager available:', !!modelRef.current.internalModel.motionManager);
+          
+          // Try multiple methods to stop motions
+          if (modelRef.current.internalModel.motionManager) {
+            // Method 1: Try stopAllMotions
+            if (typeof modelRef.current.internalModel.motionManager.stopAllMotions === 'function') {
+              modelRef.current.internalModel.motionManager.stopAllMotions();
+              console.log('Stopped all motions via stopAllMotions');
+            }
+            // Method 2: Try stop
+            else if (typeof modelRef.current.internalModel.motionManager.stop === 'function') {
+              modelRef.current.internalModel.motionManager.stop();
+              console.log('Stopped motions via stop');
+            }
+            // Method 3: List available methods
+            else {
+              console.log('Available motionManager methods:', Object.getOwnPropertyNames(modelRef.current.internalModel.motionManager).filter(name => typeof modelRef.current.internalModel.motionManager[name] === 'function'));
+            }
+          }
+          
+          // Alternative: Try to stop motion directly on the model
+          if (typeof modelRef.current.stopMotion === 'function') {
+            modelRef.current.stopMotion();
+            console.log('Stopped motion via model.stopMotion');
+          }
+          
+        } catch (error) {
+          console.error('Failed to stop motions:', error);
+        }
+      }
+    },
     setParameter: (paramName: string, value: number) => {
       if (modelRef.current?.internalModel?.coreModel) {
-        modelRef.current.internalModel.coreModel.setParameterValueById(paramName, value);
-        console.log('Set parameter:', paramName, '=', value);
+        try {
+          console.log('Attempting to set parameter:', paramName, '=', value);
+          
+          // Set the parameter directly
+          modelRef.current.internalModel.coreModel.setParameterValueById(paramName, value);
+          console.log('Successfully set parameter:', paramName, '=', value);
+          
+        } catch (error) {
+          console.error('Failed to set parameter:', paramName, error);
+          console.log('Available methods:', Object.getOwnPropertyNames(modelRef.current.internalModel.coreModel).filter(name => typeof modelRef.current.internalModel.coreModel[name] === 'function'));
+        }
+      } else {
+        console.error('Model or coreModel not available');
       }
     }
   }));
@@ -97,7 +144,21 @@ const ShizukuLive2D = forwardRef<ShizukuLive2DRef, ShizukuLive2DProps>(({
           console.log('Model positioned at:', model.x, model.y);
           console.log('Model scaled size:', model.width, model.height);
           
-          // Set up interaction
+          // Make the entire model interactive
+          model.interactive = true;
+          model.cursor = 'pointer';
+          
+          // Set up click interaction
+          model.on('pointerdown', () => {
+            console.log('Model clicked!');
+            // Randomly select a motion for variety
+            const motions = ['Tap', 'FlickUp', 'Flick3'];
+            const randomMotion = motions[Math.floor(Math.random() * motions.length)];
+            model.motion(randomMotion);
+            console.log('Playing motion:', randomMotion);
+          });
+          
+          // Also set up the hit event if it exists
           model.on('hit', (hitAreas: string[]) => {
             console.log('Hit areas:', hitAreas);
             if (hitAreas.length > 0) {
@@ -109,15 +170,42 @@ const ShizukuLive2D = forwardRef<ShizukuLive2DRef, ShizukuLive2DProps>(({
             }
           });
           
-          // Make the entire model interactive
-          model.interactive = true;
-          model.buttonMode = true;
+          // Debug: Log available parameters and methods
+          if (model.internalModel?.coreModel) {
+            console.log('CoreModel object:', model.internalModel.coreModel);
+            console.log('CoreModel methods:', Object.getOwnPropertyNames(model.internalModel.coreModel).filter(name => typeof model.internalModel.coreModel[name] === 'function'));
+            
+            // Try different ways to get parameter info
+            try {
+              const parameterCount = model.internalModel.coreModel.getParameterCount();
+              console.log('Available parameters count:', parameterCount);
+              
+              // Try different method names
+              for (let i = 0; i < Math.min(parameterCount, 10); i++) {
+                try {
+                  let paramId = '';
+                  if (typeof model.internalModel.coreModel.getParameterId === 'function') {
+                    paramId = model.internalModel.coreModel.getParameterId(i);
+                  } else if (typeof model.internalModel.coreModel.getParameterIds === 'function') {
+                    const ids = model.internalModel.coreModel.getParameterIds();
+                    paramId = ids[i];
+                  }
+                  
+                  if (paramId) {
+                    const paramValue = model.internalModel.coreModel.getParameterValueById(paramId);
+                    console.log(`Parameter ${i}: ${paramId} = ${paramValue}`);
+                  }
+                } catch (paramError) {
+                  console.log(`Error getting parameter ${i}:`, paramError);
+                }
+              }
+            } catch (error) {
+              console.error('Error getting parameter count:', error);
+            }
+          }
           
-          // Start idle animation
-          setTimeout(() => {
-            model.motion('Idle');
-            console.log('Idle motion started');
-          }, 1000);
+          // Don't start idle animation automatically - let user control manually
+          console.log('Model loaded successfully, ready for manual control');
           
           setIsLoaded(true);
         } else {
