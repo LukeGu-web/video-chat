@@ -3,6 +3,17 @@ import { ClientOnly } from "remix-utils/client-only";
 import { useRef } from "react";
 import HiyoriLive2D, { type HiyoriLive2DRef } from "~/components/HiyoriLive2D";
 
+// Global bridge interface declaration
+declare global {
+  interface Window {
+    HiyoriBridge?: {
+      playMotion: (motionName: string) => any;
+      getAvailableMotions: () => string[];
+      isModelLoaded: () => boolean;
+    };
+  }
+}
+
 export const meta: MetaFunction = () => {
   return [
     { title: "Hiyori Character App" },
@@ -22,6 +33,7 @@ export default function Index() {
     { name: 'Dance', label: '💃 Dance', description: 'Dancing motion' },
     { name: 'Laugh', label: '😄 Laugh', description: 'Laughing animation' },
     { name: 'Thinking', label: '🤔 Thinking', description: 'Thoughtful pose' },
+    { name: 'Speaking', label: '🗣️ Speaking', description: 'Speaking animation' },
   ];
 
   const expressions = [
@@ -49,7 +61,7 @@ export default function Index() {
             <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-4">
               🎭 Motions
             </h3>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {motions.map((motion) => (
                 <button
                   key={motion.name}
@@ -85,6 +97,45 @@ export default function Index() {
                   />
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* JavaScript Bridge Demo */}
+          <div className="mb-8">
+            <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-4">
+              🌉 JavaScript Bridge
+            </h3>
+            <div className="space-y-3">
+              <button
+                onClick={() => {
+                  if (window.HiyoriBridge) {
+                    console.log('Available motions:', window.HiyoriBridge.getAvailableMotions());
+                    console.log('Model loaded:', window.HiyoriBridge.isModelLoaded());
+                  } else {
+                    console.warn('HiyoriBridge not available');
+                  }
+                }}
+                className="w-full px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors"
+              >
+                📋 Log Bridge Info
+              </button>
+              
+              <button
+                onClick={() => {
+                  if (window.HiyoriBridge) {
+                    window.HiyoriBridge.playMotion('Happy');
+                  } else {
+                    console.warn('HiyoriBridge not available');
+                  }
+                }}
+                className="w-full px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium transition-colors"
+              >
+                🌉 Bridge: Play Happy
+              </button>
+              
+              <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                Open console to see bridge commands. Use window.HiyoriBridge in browser console.
+              </div>
             </div>
           </div>
 

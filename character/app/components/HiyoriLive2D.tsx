@@ -1,5 +1,16 @@
 import { useEffect, useRef, forwardRef, useImperativeHandle, useState } from 'react';
 
+// Global bridge interface declaration
+declare global {
+  interface Window {
+    HiyoriBridge?: {
+      playMotion: (motionName: string) => any;
+      getAvailableMotions: () => string[];
+      isModelLoaded: () => boolean;
+    };
+  }
+}
+
 export interface HiyoriLive2DRef {
   playMotion: (motionName: string) => void;
   stopMotion: () => void;
@@ -24,6 +35,38 @@ const HiyoriLive2D = forwardRef<HiyoriLive2DRef, HiyoriLive2DProps>(
 
     useEffect(() => {
       if (!canvasRef.current) return;
+
+      // Set up JavaScript Bridge for external commands
+      const setupJavaScriptBridge = () => {
+        // Create global interface for Hiyori
+        if (typeof window !== 'undefined') {
+          window.HiyoriBridge = {
+            playMotion: (motionName: string) => {
+              if (modelRef.current) {
+                const result = modelRef.current.motion(motionName);
+                console.log(`[Bridge] Playing motion "${motionName}", result:`, result);
+                return result;
+              }
+              console.warn('[Bridge] Model not loaded yet');
+              return false;
+            },
+            
+            getAvailableMotions: () => {
+              return [
+                'Idle', 'Happy', 'Surprised', 'Shy', 'Wave', 
+                'Dance', 'Laugh', 'Thinking', 'Speaking',
+                'Excited', 'Sleepy'
+              ];
+            },
+            
+            isModelLoaded: () => {
+              return !!modelRef.current && isLoaded;
+            }
+          };
+          
+          console.log('[Bridge] HiyoriBridge initialized:', window.HiyoriBridge);
+        }
+      };
 
       const initializeLive2D = async () => {
         try {
@@ -132,6 +175,9 @@ const HiyoriLive2D = forwardRef<HiyoriLive2DRef, HiyoriLive2DProps>(
             console.log('Hiyori model loaded successfully, ready for manual control');
             
             setIsLoaded(true);
+            
+            // Initialize JavaScript Bridge after model is loaded
+            setupJavaScriptBridge();
           } else {
             setError('Failed to load Hiyori model');
           }
@@ -147,6 +193,12 @@ const HiyoriLive2D = forwardRef<HiyoriLive2DRef, HiyoriLive2DProps>(
         if (appRef.current) {
           appRef.current.destroy(true);
           appRef.current = null;
+        }
+        
+        // Clean up JavaScript Bridge
+        if (typeof window !== 'undefined' && window.HiyoriBridge) {
+          delete window.HiyoriBridge;
+          console.log('[Bridge] HiyoriBridge cleaned up');
         }
       };
     }, [width, height]);
@@ -223,7 +275,7 @@ const HiyoriLive2D = forwardRef<HiyoriLive2DRef, HiyoriLive2DProps>(
 
       startRandomMotion: (group: string) => {
         if (modelRef.current) {
-          const motionNames = ['Happy', 'Surprised', 'Shy', 'Wave', 'Dance', 'Laugh', 'Thinking'];
+          const motionNames = ['Happy', 'Surprised', 'Shy', 'Wave', 'Dance', 'Laugh', 'Thinking', 'Speaking'];
           const randomMotion = motionNames[Math.floor(Math.random() * motionNames.length)];
           
           const result = modelRef.current.motion(randomMotion);

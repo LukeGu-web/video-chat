@@ -58,6 +58,11 @@
 				{
 					"File": "animations/hiyori_m09.motion3.json"
 				}
+			],
+			"Speaking": [
+				{
+					"File": "animations/speaking.motion3.json"
+				}
 			]
 		}
 	},
