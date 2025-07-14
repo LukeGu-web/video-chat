@@ -23,6 +23,10 @@ export default defineConfig({
   ],
   server: {
     host: '0.0.0.0',
-    port: 5173,
+    port: 5174,
+  },
+  define: {
+    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
+    'process.env.SHOW_TEST_COMPONENTS': JSON.stringify(process.env.SHOW_TEST_COMPONENTS || 'false'),
   },
 });
