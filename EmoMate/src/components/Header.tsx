@@ -29,19 +29,19 @@ const Header: React.FC<HeaderProps> = ({
         </Text> */}
         <View className='flex-row items-center'>
           {onGoToChatHistory && (
-            <TouchableOpacity onPress={onGoToChatHistory} className='mr-4'>
+            <TouchableOpacity onPress={onGoToChatHistory}>
               <Text className='text-sm font-medium text-blue-500'>
                 聊天记录
               </Text>
             </TouchableOpacity>
           )}
-          {onGoToHiyoriTest && (
+          {/* {onGoToHiyoriTest && (
             <TouchableOpacity onPress={onGoToHiyoriTest}>
               <Text className='text-sm font-medium text-green-500'>
                 Hiyori测试
               </Text>
             </TouchableOpacity>
-          )}
+          )} */}
         </View>
       </View>
 

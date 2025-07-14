@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import Live2DCharacter, { AnimationState, stateMapping, extendedMapping } from './Live2DCharacter';
 import AnimatedCharacter from './AnimatedCharacter';
+import { isDebugMode, debugLog, debugError } from '../utils/debug';
 
 const Live2DTest: React.FC = () => {
   const [currentState, setCurrentState] = useState<string>('idle');
@@ -54,7 +55,7 @@ const Live2DTest: React.FC = () => {
     
     setMotionHistory(prev => [newEntry, ...prev.slice(0, 9)]); // 保留最近10条记录
     
-    console.log(`Motion completed: ${motion} - ${success ? 'Success' : `Failed: ${error}`}`);
+    debugLog('Live2DTest', `Motion completed: ${motion} - ${success ? 'Success' : `Failed: ${error}`}`);
   }, [currentState]);
 
   // 渲染状态按钮

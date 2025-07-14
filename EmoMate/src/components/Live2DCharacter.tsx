@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { View, StyleSheet, Text } from 'react-native';
 import HiyoriWebView, { HiyoriBridge } from './HiyoriWebView';
 import { useAIStatus } from '../store';
+import { isDebugMode, debugLog, debugError, debugWarn } from '../utils/debug';
 
 type AnimationState = 'idle' | 'speaking' | 'listening' | 'thinking' | 'happy' | 'angry' | 'love' | 'sad';
 
@@ -56,7 +57,7 @@ const getLive2DMotion = (status: string): string => {
   }
   
   // 默认返回Idle
-  console.warn(`Unknown animation status: ${status}, falling back to Idle`);
+  debugWarn('Live2DCharacter', `Unknown animation status: ${status}, falling back to Idle`);
   return 'Idle';
 };
 
@@ -86,17 +87,17 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
 
   // 播放Live2D动作
   const playLive2DMotion = useCallback((motionName: string) => {
-    console.log(`[Live2DCharacter] Attempting to play motion: ${motionName}`);
+    debugLog('Live2DCharacter', `Attempting to play motion: ${motionName}`);
     
     if (!isModelReady || !webViewRef.current?.hiyoriBridge) {
-      console.warn(`[Live2DCharacter] Cannot play motion ${motionName} - model not ready`);
+      debugWarn('Live2DCharacter', `Cannot play motion ${motionName} - model not ready`);
       onMotionComplete?.(motionName, false);
       return;
     }
 
     // 防止重复播放相同动作
     if (lastMotionRef.current === motionName && isPlaying) {
-      console.log(`[Live2DCharacter] Motion ${motionName} already playing, skipping`);
+      debugLog('Live2DCharacter', `Motion ${motionName} already playing, skipping`);
       return;
     }
 
@@ -121,7 +122,7 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
   // 当状态改变时播放对应动作
   useEffect(() => {
     if (isModelReady && targetMotion) {
-      console.log(`[Live2DCharacter] Status changed to: ${currentStatus} → Motion: ${targetMotion}`);
+      debugLog('Live2DCharacter', `Status changed to: ${currentStatus} → Motion: ${targetMotion}`);
       
       // 延迟一下确保模型完全准备好
       const timer = setTimeout(() => {
@@ -134,7 +135,7 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
 
   // 处理模型准备就绪
   const handleModelReady = useCallback(() => {
-    console.log('[Live2DCharacter] Hiyori model is ready!');
+    debugLog('Live2DCharacter', 'Hiyori model is ready!');
     setIsModelReady(true);
     
     // 模型准备好后立即播放当前状态对应的动作
@@ -145,7 +146,7 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
 
   // 处理动作结果
   const handleMotionResult = useCallback((motion: string, success: boolean, error?: string) => {
-    console.log(`[Live2DCharacter] Motion result - ${motion}: ${success ? 'Success' : `Failed: ${error}`}`);
+    debugLog('Live2DCharacter', `Motion result - ${motion}: ${success ? 'Success' : `Failed: ${error}`}`);
     
     setIsPlaying(false);
     
@@ -190,7 +191,7 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
       />
       
       {/* 状态指示器 */}
-      {__DEV__ && (
+      {isDebugMode() && (
         <View style={styles.debugOverlay}>
           <View style={[
             styles.statusDot,

@@ -9,6 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import HiyoriWebView, { type HiyoriBridge } from '../components/HiyoriWebView';
+import { debugLog, debugWarn } from '../utils/debug';
 
 const HiyoriScreen: React.FC = () => {
   const hiyoriRef = useRef<any>(null);
@@ -58,22 +59,22 @@ const HiyoriScreen: React.FC = () => {
   };
 
   const playMotion = (motionName: string) => {
-    console.log(`🎯 [HiyoriScreen] playMotion called with: "${motionName}"`);
-    console.log(`🎯 [HiyoriScreen] isModelReady: ${isModelReady}`);
-    console.log(`🎯 [HiyoriScreen] hiyoriRef.current:`, hiyoriRef.current);
-    console.log(
-      `🎯 [HiyoriScreen] hiyoriBridge:`,
+    debugLog('HiyoriScreen', `playMotion called with: "${motionName}"`);
+    debugLog('HiyoriScreen', `isModelReady: ${isModelReady}`);
+    debugLog('HiyoriScreen', `hiyoriRef.current:`, hiyoriRef.current);
+    debugLog('HiyoriScreen', 
+      `hiyoriBridge:`,
       hiyoriRef.current?.hiyoriBridge
     );
 
     if (!isModelReady) {
-      console.log(`🎯 [HiyoriScreen] Model not ready, showing alert`);
+      debugWarn('HiyoriScreen', `Model not ready, showing alert`);
       // Alert.alert('Not Ready', 'Hiyori model is still loading. Please wait...');
       return;
     }
 
-    console.log(
-      `🎯 [HiyoriScreen] Calling hiyoriRef.current.hiyoriBridge.playMotion("${motionName}")`
+    debugLog('HiyoriScreen', 
+      `Calling hiyoriRef.current.hiyoriBridge.playMotion("${motionName}")`
     );
     hiyoriRef.current?.hiyoriBridge?.playMotion(motionName);
   };

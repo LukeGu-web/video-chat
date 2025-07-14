@@ -4,3 +4,4 @@ export * from './useChatAI';
 export * from './useTTS';
 export * from './useElevenLabsTTS';
 export * from './useHybridTTS';
+export * from './debug';
