@@ -114,17 +114,6 @@ export const AI_PERSONALITY = {
         'Excited',   // 高能量
         'Sleepy'     // 疲惫状态
       ],
-      // 兼容旧的expressions接口(映射到Hiyori动作)
-      expressions: [
-        'idle',     // 待机 → Idle
-        'happy',    // 开心 → Happy
-        'sad',      // 难过 → Sleepy
-        'thinking', // 思考 → Thinking
-        'speaking', // 说话 → Speaking
-        'listening',// 倾听 → Idle
-        'love',     // 爱心 → Excited
-        'angry'     // 生气 → Surprised
-      ]
     },
 
     interaction: {
@@ -139,7 +128,6 @@ export const AI_PERSONALITY = {
     happy: {
       expressions: ['太好了呢！', '真开心！', '好棒哦！'],
       hiyoriMotion: 'Happy' as HiyoriMotion,
-      animation: 'happy',  // 兼容旧接口
       tone: 'excited'
     },
 
@@ -147,7 +135,6 @@ export const AI_PERSONALITY = {
     sad: {
       expressions: ['没事吧…', '好担心', '要紧吗'],
       hiyoriMotion: 'Sleepy' as HiyoriMotion,
-      animation: 'sad',    // 兼容旧接口
       tone: 'concerned'
     },
 
@@ -155,7 +142,6 @@ export const AI_PERSONALITY = {
     thinking: {
       expressions: ['嗯…', '让我想想', '这样啊'],
       hiyoriMotion: 'Thinking' as HiyoriMotion,
-      animation: 'thinking', // 兼容旧接口
       tone: 'thoughtful'
     },
 
@@ -163,7 +149,6 @@ export const AI_PERSONALITY = {
     shy: {
       expressions: ['诶嘿嘿', '有点不好意思', '那个…'],
       hiyoriMotion: 'Shy' as HiyoriMotion,
-      animation: 'idle',   // 兼容旧接口
       tone: 'shy'
     },
 
@@ -171,7 +156,6 @@ export const AI_PERSONALITY = {
     caring: {
       expressions: ['怎么了？', '要不要紧', '别担心哦'],
       hiyoriMotion: 'Idle' as HiyoriMotion,  // listening状态使用Idle动作
-      animation: 'listening', // 兼容旧接口
       tone: 'gentle'
     },
 
@@ -179,7 +163,6 @@ export const AI_PERSONALITY = {
     surprised: {
       expressions: ['诶？', '真的吗！', '好意外！'],
       hiyoriMotion: 'Surprised' as HiyoriMotion,
-      animation: 'angry',  // 映射到旧的angry状态
       tone: 'surprised'
     },
 
@@ -187,7 +170,6 @@ export const AI_PERSONALITY = {
     excited: {
       expressions: ['好棒啊！', '太兴奋了！', '哇哇！'],
       hiyoriMotion: 'Excited' as HiyoriMotion,
-      animation: 'love',   // 映射到旧的love状态
       tone: 'excited'
     },
 
@@ -195,7 +177,6 @@ export const AI_PERSONALITY = {
     laughing: {
       expressions: ['哈哈哈！', '好好笑！', '太有趣了！'],
       hiyoriMotion: 'Laugh' as HiyoriMotion,
-      animation: 'happy',  // 映射到happy状态
       tone: 'joyful'
     },
 
@@ -203,7 +184,6 @@ export const AI_PERSONALITY = {
     greeting: {
       expressions: ['你好！', '大家好！', '嗨嗨！'],
       hiyoriMotion: 'Wave' as HiyoriMotion,
-      animation: 'idle',   // 映射到idle状态
       tone: 'friendly'
     },
 
@@ -211,7 +191,6 @@ export const AI_PERSONALITY = {
     celebrating: {
       expressions: ['太好了！', '我们成功了！', '值得庆祝！'],
       hiyoriMotion: 'Dance' as HiyoriMotion,
-      animation: 'happy',  // 映射到happy状态
       tone: 'celebratory'
     },
 
@@ -219,7 +198,6 @@ export const AI_PERSONALITY = {
     speaking: {
       expressions: ['嗯嗯', '我说呢', '你听我说'],
       hiyoriMotion: 'Speaking' as HiyoriMotion,
-      animation: 'speaking', // 映射到speaking状态
       tone: 'conversational'
     },
 
@@ -227,7 +205,6 @@ export const AI_PERSONALITY = {
     idle: {
       expressions: ['嗯...', '呼...', '在想什么呢'],
       hiyoriMotion: 'Idle' as HiyoriMotion,
-      animation: 'idle',   // 映射到idle状态
       tone: 'calm'
     }
   }
