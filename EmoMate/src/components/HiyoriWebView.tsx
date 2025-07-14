@@ -507,7 +507,7 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(({
         originWhitelist={['*']}
         allowsFullscreenVideo={true}
         allowsBackForwardNavigationGestures={false}
-        style={styles.webview}
+        style={[styles.webview, { backgroundColor: 'transparent' }]}
         renderLoading={() => (
           <View style={styles.loadingContainer}>
             <Text style={styles.loadingText}>Loading Hiyori...</Text>

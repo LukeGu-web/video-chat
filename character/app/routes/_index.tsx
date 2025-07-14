@@ -16,11 +16,11 @@ export default function Index() {
   const hiyoriRef = useRef<HiyoriLive2DRef>(null);
 
   return (
-    <div className='flex h-screen items-center justify-center bg-gradient-to-br from-purple-50 to-pink-50 dark:from-gray-900 dark:to-gray-800'>
+    <div className='flex h-screen items-center justify-center'>
       <div className='flex flex-col items-center gap-4'>
         <ClientOnly
           fallback={
-            <div className='w-96 h-96 bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center'>
+            <div className='w-96 h-96 rounded-lg flex items-center justify-center'>
               Loading Hiyori...
             </div>
           }
