@@ -2,14 +2,19 @@ import React, { useRef, useEffect } from 'react';
 import { View } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { useAIStatus } from '../store';
+import Live2DCharacter from './Live2DCharacter';
 
 type AnimationState = 'idle' | 'speaking' | 'listening' | 'thinking' | 'happy' | 'angry' | 'love' | 'sad';
+
+type AnimationMode = 'lottie' | 'live2d';
 
 interface AnimatedCharacterProps {
   status?: string; // 可选，如果不传则使用全局 AI 状态
   size?: number;
   loop?: boolean;
   className?: string;
+  mode?: AnimationMode; // 新增：动画模式选择
+  onMotionComplete?: (motion: string, success: boolean) => void;
 }
 
 // 动画文件映射
@@ -42,6 +47,8 @@ const AnimatedCharacter: React.FC<AnimatedCharacterProps> = ({
   size = 240,
   loop = true,
   className = '',
+  mode = 'live2d', // 默认使用Live2D模式
+  onMotionComplete,
 }) => {
   const animationRef = useRef<LottieView>(null);
   
@@ -51,7 +58,20 @@ const AnimatedCharacter: React.FC<AnimatedCharacterProps> = ({
   // 确定要使用的状态：优先使用传入的 status，否则使用全局 aiStatus
   const currentStatus = status || aiStatus;
   
-  // 获取动画源文件
+  // 根据模式选择渲染方式
+  if (mode === 'live2d') {
+    return (
+      <Live2DCharacter
+        status={currentStatus}
+        size={size}
+        loop={loop}
+        className={className}
+        onMotionComplete={onMotionComplete}
+      />
+    );
+  }
+  
+  // Lottie模式（原有实现）
   const animationSource = getAnimationSource(currentStatus);
 
   // 当状态改变时重新播放动画

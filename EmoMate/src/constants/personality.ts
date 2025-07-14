@@ -1,3 +1,20 @@
+// Hiyori Live2D动作常量
+export const HIYORI_MOTIONS = [
+  'Idle',      // 默认状态
+  'Happy',     // 积极情绪  
+  'Surprised', // 反应
+  'Shy',       // 情绪
+  'Wave',      // 问候
+  'Dance',     // 庆祝
+  'Laugh',     // 欢乐
+  'Thinking',  // 沉思
+  'Speaking',  // 交流
+  'Excited',   // 高能量
+  'Sleepy'     // 疲惫状态
+] as const;
+
+export type HiyoriMotion = typeof HIYORI_MOTIONS[number];
+
 export const AI_PERSONALITY = {
   // 基础人设
   character: {
@@ -82,16 +99,31 @@ export const AI_PERSONALITY = {
     },
     
     visual: {
-      animations: true,     // 表情动画
+      animations: true,     // Live2D Hiyori动作系统
+      // Hiyori模型支持的11个动作
+      hiyoriMotions: [
+        'Idle',      // 默认状态
+        'Happy',     // 积极情绪
+        'Surprised', // 反应
+        'Shy',       // 情绪
+        'Wave',      // 问候
+        'Dance',     // 庆祝
+        'Laugh',     // 欢乐
+        'Thinking',  // 沉思
+        'Speaking',  // 交流
+        'Excited',   // 高能量
+        'Sleepy'     // 疲惫状态
+      ],
+      // 兼容旧的expressions接口(映射到Hiyori动作)
       expressions: [
-        'idle',     // 待机
-        'happy',    // 开心
-        'sad',      // 难过
-        'thinking', // 思考
-        'speaking', // 说话
-        'listening',// 倾听
-        'love',     // 爱心
-        'angry'     // 生气
+        'idle',     // 待机 → Idle
+        'happy',    // 开心 → Happy
+        'sad',      // 难过 → Sleepy
+        'thinking', // 思考 → Thinking
+        'speaking', // 说话 → Speaking
+        'listening',// 倾听 → Idle
+        'love',     // 爱心 → Excited
+        'angry'     // 生气 → Surprised
       ]
     },
 
@@ -101,41 +133,102 @@ export const AI_PERSONALITY = {
     }
   },
 
-  // 情感表达映射
+  // Hiyori Live2D情感表达映射
   emotionMapping: {
     // 开心时的表达
     happy: {
       expressions: ['太好了呢！', '真开心！', '好棒哦！'],
-      animation: 'happy',
+      hiyoriMotion: 'Happy' as HiyoriMotion,
+      animation: 'happy',  // 兼容旧接口
       tone: 'excited'
     },
 
     // 难过时的表达
     sad: {
       expressions: ['没事吧…', '好担心', '要紧吗'],
-      animation: 'sad',
+      hiyoriMotion: 'Sleepy' as HiyoriMotion,
+      animation: 'sad',    // 兼容旧接口
       tone: 'concerned'
     },
 
     // 思考时的表达
     thinking: {
       expressions: ['嗯…', '让我想想', '这样啊'],
-      animation: 'thinking',
+      hiyoriMotion: 'Thinking' as HiyoriMotion,
+      animation: 'thinking', // 兼容旧接口
       tone: 'thoughtful'
     },
 
     // 害羞时的表达
     shy: {
       expressions: ['诶嘿嘿', '有点不好意思', '那个…'],
-      animation: 'idle',
+      hiyoriMotion: 'Shy' as HiyoriMotion,
+      animation: 'idle',   // 兼容旧接口
       tone: 'shy'
     },
 
-    // 关心时的表达
+    // 关心/倾听时的表达
     caring: {
       expressions: ['怎么了？', '要不要紧', '别担心哦'],
-      animation: 'listening',
+      hiyoriMotion: 'Idle' as HiyoriMotion,  // listening状态使用Idle动作
+      animation: 'listening', // 兼容旧接口
       tone: 'gentle'
+    },
+
+    // 新增: 惊讶时的表达
+    surprised: {
+      expressions: ['诶？', '真的吗！', '好意外！'],
+      hiyoriMotion: 'Surprised' as HiyoriMotion,
+      animation: 'angry',  // 映射到旧的angry状态
+      tone: 'surprised'
+    },
+
+    // 新增: 兴奋时的表达
+    excited: {
+      expressions: ['好棒啊！', '太兴奋了！', '哇哇！'],
+      hiyoriMotion: 'Excited' as HiyoriMotion,
+      animation: 'love',   // 映射到旧的love状态
+      tone: 'excited'
+    },
+
+    // 新增: 欢笑时的表达
+    laughing: {
+      expressions: ['哈哈哈！', '好好笑！', '太有趣了！'],
+      hiyoriMotion: 'Laugh' as HiyoriMotion,
+      animation: 'happy',  // 映射到happy状态
+      tone: 'joyful'
+    },
+
+    // 新增: 打招呼时的表达
+    greeting: {
+      expressions: ['你好！', '大家好！', '嗨嗨！'],
+      hiyoriMotion: 'Wave' as HiyoriMotion,
+      animation: 'idle',   // 映射到idle状态
+      tone: 'friendly'
+    },
+
+    // 新增: 庆祝时的表达
+    celebrating: {
+      expressions: ['太好了！', '我们成功了！', '值得庆祝！'],
+      hiyoriMotion: 'Dance' as HiyoriMotion,
+      animation: 'happy',  // 映射到happy状态
+      tone: 'celebratory'
+    },
+
+    // 新增: 说话时的表达
+    speaking: {
+      expressions: ['嗯嗯', '我说呢', '你听我说'],
+      hiyoriMotion: 'Speaking' as HiyoriMotion,
+      animation: 'speaking', // 映射到speaking状态
+      tone: 'conversational'
+    },
+
+    // 新增: 待机时的表达
+    idle: {
+      expressions: ['嗯...', '呼...', '在想什么呢'],
+      hiyoriMotion: 'Idle' as HiyoriMotion,
+      animation: 'idle',   // 映射到idle状态
+      tone: 'calm'
     }
   }
 };
