@@ -26,8 +26,11 @@ EmoMate is a React Native mobile application built with Expo that serves as an e
 ## Development Commands
 
 ```bash
-# Start development server
+# Start development server (production mode)
 npm start
+
+# Start development server with debug mode
+SHOW_TEST_COMPONENTS=true npm start
 
 # Run on specific platforms
 npm run android
@@ -40,6 +43,190 @@ npx expo install <package-name>  # For Expo-compatible packages
 ```
 
 Note: No testing or linting commands are currently configured in the project.
+
+## Debug Mode System
+
+### Overview
+EmoMate implements a comprehensive debug mode system that provides detailed logging, status indicators, and debugging panels for Hiyori Live2D integration while maintaining a clean production interface.
+
+### Environment Variable Configuration
+Debug mode is controlled via the `SHOW_TEST_COMPONENTS` environment variable:
+
+```bash
+# Production mode (default) - Clean UI without debug elements
+npm start
+
+# Debug mode - Shows all debug information and status indicators
+SHOW_TEST_COMPONENTS=true npm start
+```
+
+### Configuration Files
+- **`app.config.ts`**: Defines environment variables for Expo configuration
+- **`src/utils/debug.ts`**: Central debug utilities and logging functions
+- **Hiyori Components**: HiyoriWebView, Live2DCharacter, HiyoriScreen, etc.
+
+### Debug Features
+
+#### 1. Debug Logging System
+Comprehensive logging with component-specific prefixes:
+- **[HiyoriWebView]**: WebView lifecycle, bridge communication, connection status
+- **[Live2DCharacter]**: Motion mapping, state transitions, model readiness
+- **[HiyoriScreen]**: User interactions, motion requests, model status
+- **[AnimatedCharacter]**: Status forwarding and integration
+
+#### 2. Visual Status Indicators
+Enhanced status panels showing:
+- **Connection Status**: WebView ↔ Character server connection
+- **Model Readiness**: Live2D model loading progress
+- **Motion Queue**: Pending motion commands
+- **Bridge Status**: JavaScript bridge availability
+- **Performance Metrics**: Load times and response latency
+
+#### 3. Debug Panels
+Multiple debug overlays:
+- **HiyoriWebView Status Panel**: Connection, model ready, queue status
+- **Live2DCharacter Debug Overlay**: Current status, motion, ready state, playing indicator
+- **Motion History**: Recent motion executions with success/failure tracking
+
+#### 4. Performance Monitoring
+Real-time performance tracking:
+- WebView initialization time
+- Model loading duration
+- Motion execution latency
+- Bridge communication response time
+
+### Debug Mode Implementation
+
+#### Environment Variable Setup
+```typescript
+// app.config.ts
+export default ({ config }: ConfigContext): ExpoConfig => ({
+  // ... other config
+  extra: {
+    // ... other extra config
+    showTestComponents: process.env.SHOW_TEST_COMPONENTS === 'true'
+  }
+});
+```
+
+#### Debug Utilities
+```typescript
+// src/utils/debug.ts
+export const isDebugMode = (): boolean => {
+  const showTestComponents = Constants.expoConfig?.extra?.showTestComponents;
+  return showTestComponents === true;
+};
+
+export const debugLog = (component: string, message: string, data?: any) => {
+  if (!isDebugMode()) return;
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] [${component}] ${message}`, data);
+};
+```
+
+#### Component Debug Integration
+```typescript
+// Example: HiyoriWebView.tsx
+import { isDebugMode, debugLog, debugError } from '../utils/debug';
+
+// Replace console.log with debugLog
+debugLog('HiyoriWebView', 'Model ready for interaction');
+
+// Conditional UI rendering
+{isDebugMode() && (
+  <View style={styles.statusContainer}>
+    {/* Debug status indicators */}
+  </View>
+)}
+```
+
+### Debug Components Coverage
+
+#### Core Hiyori Components
+1. **HiyoriWebView.tsx**: Main WebView component with full debug integration
+2. **Live2DCharacter.tsx**: Motion mapping and state management debugging
+3. **AnimatedCharacter.tsx**: Status forwarding debug information
+4. **HiyoriScreen.tsx**: Testing interface with motion controls
+5. **Live2DTest.tsx**: Comprehensive testing component
+
+#### Debug Features per Component
+- **HiyoriWebView**: Connection status, message logging, performance metrics
+- **Live2DCharacter**: Motion mapping, state transitions, model readiness
+- **HiyoriScreen**: Motion request debugging, model status tracking
+- **Live2DTest**: Motion history, state mapping validation
+
+### Usage Guidelines
+
+#### For Development
+1. **Regular Development**: Use `npm start` for normal app development
+2. **Debug Mode**: Use `SHOW_TEST_COMPONENTS=true npm start` when:
+   - Debugging Hiyori integration issues
+   - Monitoring WebView communication
+   - Testing motion execution
+   - Investigating performance problems
+
+#### For Production
+- Production builds automatically exclude all debug code
+- Clean user interface without debug panels
+- No performance impact from debug logging
+
+### Network Configuration with Debug
+When debugging connection issues between EmoMate and character server:
+
+```bash
+# Start EmoMate with debug mode
+SHOW_TEST_COMPONENTS=true npm start
+
+# Start character server with debug mode
+cd ../character
+SHOW_TEST_COMPONENTS=true npm run dev
+```
+
+Debug logs will show:
+- WebView connection attempts to character server
+- Bridge initialization progress
+- Motion command transmission
+- Server response handling
+
+### Debugging Common Issues
+
+#### 1. WebView Connection Problems
+Enable debug mode and check:
+- Network connectivity status
+- Character server availability (192.168.31.28:5174)
+- Bridge initialization progress
+- WebView ready state
+
+#### 2. Motion Execution Issues
+Debug information includes:
+- Motion request parameters
+- Model readiness status
+- Motion mapping validation
+- Execution success/failure results
+
+#### 3. Performance Problems
+Performance metrics show:
+- WebView initialization time
+- Model loading duration
+- Motion execution latency
+- Bridge communication delays
+
+### Best Practices
+
+1. **Development Workflow**:
+   - Use regular mode for normal development
+   - Enable debug mode for Live2D integration work
+   - Monitor logs for detailed operation information
+
+2. **Cross-Project Debugging**:
+   - Enable debug mode in both EmoMate and character projects
+   - Monitor logs from both sides for communication issues
+   - Use network IP address for mobile testing
+
+3. **Performance Testing**:
+   - Check initialization times in debug mode
+   - Monitor motion execution performance
+   - Verify bridge communication efficiency
 
 ## Architecture Overview
 

@@ -16,8 +16,11 @@ The **Character** project is a Remix-based web application that displays Live2D 
 ## Development Commands
 
 ```bash
-# Start development server
+# Start development server (production mode)
 npm run dev
+
+# Start development server with debug mode
+SHOW_TEST_COMPONENTS=true npm run dev
 
 # Build for production
 npm run build
@@ -31,6 +34,138 @@ npm run typecheck
 # Linting
 npm run lint
 ```
+
+## Debug Mode System
+
+### Overview
+The character project implements a comprehensive debug mode system that allows developers to view detailed logs, performance metrics, and status panels during development while keeping the production build clean.
+
+### Environment Variable Configuration
+Debug mode is controlled via the `SHOW_TEST_COMPONENTS` environment variable:
+
+```bash
+# Production mode (default) - No debug output
+npm run dev
+
+# Debug mode - Shows all debug information
+SHOW_TEST_COMPONENTS=true npm run dev
+```
+
+### Configuration Files
+- **`vite.config.ts`**: Defines environment variables and injects them into the build
+- **`app/components/HiyoriLive2D.tsx`**: Main component with debug logic
+
+### Debug Features
+
+#### 1. Debug Status Panel
+Visual status panel showing initialization progress:
+- **DOM Ready**: ✓/⧗
+- **Live2D Ready**: ✓/⧗  
+- **Model Ready**: ✓/⧗
+- **Bridge Ready**: ✓/⧗
+- **All Ready**: ✓/⧗
+- **Load Times**: Performance metrics in milliseconds
+
+#### 2. Console Logging
+Comprehensive logging system with component prefixes:
+- **🌟 [HiyoriBridge]**: Bridge initialization and API calls
+- **🎭 [HiyoriBridge]**: Motion execution and results
+- **💓 [Heartbeat]**: Connection health monitoring
+- **📋 [HiyoriBridge]**: Status checks and information
+- **🔍 [HiyoriBridge]**: Detailed debugging information
+
+#### 3. Performance Monitoring
+Detailed timing metrics:
+- DOM load time
+- Live2D core load time
+- Model load time
+- Total initialization time
+- Motion execution response time
+
+#### 4. Error Reporting
+Enhanced error reporting with:
+- Detailed error messages
+- Component stack traces
+- Initialization stage identification
+- Recovery suggestions
+
+### Debug Mode Implementation
+
+#### Environment Variable Setup
+```typescript
+// vite.config.ts
+export default defineConfig({
+  // ... other config
+  define: {
+    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
+    'process.env.SHOW_TEST_COMPONENTS': JSON.stringify(process.env.SHOW_TEST_COMPONENTS || 'false'),
+  },
+});
+```
+
+#### Component Debug Logic
+```typescript
+// HiyoriLive2D.tsx
+const isDebugMode = process.env.SHOW_TEST_COMPONENTS === 'true';
+
+const debugLog = (stage: string, message: string, data?: any) => {
+  if (!isDebugMode) return;
+  const timestamp = Date.now() - startTime.current;
+  console.log(`[Hiyori ${stage}][${timestamp}ms] ${message}`, data || '');
+};
+
+// Debug panel rendering
+{isDebugMode && (
+  <div className="debug-status-panel">
+    {/* Status indicators */}
+  </div>
+)}
+```
+
+### Usage Guidelines
+
+#### For Development
+1. **Regular Development**: Use `npm run dev` for normal development
+2. **Debug Mode**: Use `SHOW_TEST_COMPONENTS=true npm run dev` when:
+   - Debugging initialization issues
+   - Monitoring performance
+   - Investigating bridge communication
+   - Testing motion execution
+
+#### For Production
+- Production builds automatically exclude all debug code
+- Environment variables are not included in production bundles
+- Clean user interface without debug elements
+
+### Network Configuration with Debug
+When debugging network issues:
+```bash
+# Start with debug mode and check console for connection details
+SHOW_TEST_COMPONENTS=true npm run dev
+```
+
+Debug logs will show:
+- Server binding status (0.0.0.0:5174)
+- WebView connection attempts
+- Bridge initialization progress
+- Motion command execution
+
+### Best Practices
+
+1. **Development Workflow**:
+   - Use regular mode for normal development
+   - Enable debug mode only when investigating issues
+   - Monitor console for detailed operation logs
+
+2. **Performance Testing**:
+   - Check initialization times in debug mode
+   - Monitor motion execution latency
+   - Verify bridge communication efficiency
+
+3. **Error Debugging**:
+   - Enable debug mode when errors occur
+   - Check both browser console and status panel
+   - Use performance metrics to identify bottlenecks
 
 ## Architecture Overview
 
