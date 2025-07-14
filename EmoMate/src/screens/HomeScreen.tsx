@@ -75,20 +75,20 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     }
   }, [error, aiError]);
 
-  // 统一的 AI 状态管理
+  // 统一的 AI 状态管理 - 直接使用Hiyori动作
   useEffect(() => {
     if (isListening) {
-      // 1. 开始语音识别时：listening 状态
-      setAIStatus('listening');
+      // 1. 开始语音识别时：使用Thinking动作（倾听思考状态）
+      setAIStatus('Thinking');
     } else if (isGenerating) {
-      // 2. 正在生成回复：thinking 状态
-      setAIStatus('thinking');
+      // 2. 正在生成回复：Thinking 动作
+      setAIStatus('Thinking');
     } else if (isSpeaking) {
-      // 3. 正在播放 TTS：speaking 状态
-      setAIStatus('speaking');
+      // 3. 正在播放 TTS：Speaking 动作
+      setAIStatus('Speaking');
     } else {
-      // 4. 其他情况：idle 状态
-      setAIStatus('idle');
+      // 4. 其他情况：Idle 动作
+      setAIStatus('Idle');
     }
   }, [isListening, isGenerating, isSpeaking, setAIStatus]);
 

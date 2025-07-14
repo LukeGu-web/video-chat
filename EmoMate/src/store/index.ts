@@ -1,2 +1,2 @@
 export * from './userStore';
-export { useAIStatus } from './useAIStatus';
+export { useAIStatus, type HiyoriMotion } from './useAIStatus';

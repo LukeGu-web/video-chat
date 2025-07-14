@@ -1,21 +1,11 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { View, StyleSheet, Text } from 'react-native';
 import HiyoriWebView, { HiyoriBridge } from './HiyoriWebView';
-import { useAIStatus } from '../store';
+import { useAIStatus, HiyoriMotion } from '../store';
 import { isDebugMode, debugLog, debugError, debugWarn } from '../utils/debug';
 
-type AnimationState =
-  | 'idle'
-  | 'speaking'
-  | 'listening'
-  | 'thinking'
-  | 'happy'
-  | 'angry'
-  | 'love'
-  | 'sad';
-
 interface Live2DCharacterProps {
-  status?: string;
+  status?: HiyoriMotion; // 直接使用HiyoriMotion类型
   size?: number;
   loop?: boolean;
   className?: string;
@@ -28,57 +18,33 @@ interface WebViewRef {
   webView: any;
 }
 
-// 状态映射：8种lottie状态 → 11种Live2D motions
-// 完全使用Live2D的真实动作，确保所有动作都存在
-const stateMapping: Record<AnimationState, string> = {
-  idle: 'Idle', // 空闲状态 → 默认动作
-  speaking: 'Speaking', // 说话状态 → 说话动作
-  listening: 'Idle', // 听话状态 → 空闲动作（Live2D没有listening，使用idle）
-  thinking: 'Thinking', // 思考状态 → 思考动作
-  happy: 'Happy', // 开心状态 → 开心表情
-  angry: 'Surprised', // 愤怒状态 → 惊讶表情（更温和，Live2D没有angry）
-  love: 'Excited', // 爱意状态 → 兴奋表情
-  sad: 'Sleepy', // 伤心状态 → 困倦表情（Live2D用sleepy表示伤心）
-};
+// Hiyori可用的所有动作
+const HIYORI_MOTIONS: HiyoriMotion[] = [
+  'Idle',
+  'Speaking',
+  'Thinking',
+  'Happy',
+  'Surprised',
+  'Shy',
+  'Wave',
+  'Dance',
+  'Laugh',
+  'Excited',
+  'Sleepy',
+];
 
-// 扩展映射（未来可用）
-const extendedMapping: Record<string, string> = {
-  greeting: 'Wave', // 打招呼
-  celebration: 'Dance', // 庆祝
-  joy: 'Laugh', // 欢乐
-  surprise: 'Surprised', // 惊讶
-  sleepy: 'Sleepy', // 困倦
-};
-
-// 获取对应的Live2D motion名称
-const getLive2DMotion = (status: string): string => {
-  const validStates: AnimationState[] = [
-    'idle',
-    'speaking',
-    'listening',
-    'thinking',
-    'happy',
-    'angry',
-    'love',
-    'sad',
-  ];
-
-  // 首先检查是否是标准状态
-  if (validStates.includes(status as AnimationState)) {
-    return stateMapping[status as AnimationState];
+// 验证动作是否有效
+const validateHiyoriMotion = (
+  motion: HiyoriMotion | undefined
+): HiyoriMotion => {
+  if (!motion || !HIYORI_MOTIONS.includes(motion)) {
+    debugWarn(
+      'Live2DCharacter',
+      `Invalid motion: ${motion}, falling back to Idle`
+    );
+    return 'Idle';
   }
-
-  // 检查扩展映射
-  if (extendedMapping[status]) {
-    return extendedMapping[status];
-  }
-
-  // 默认返回Idle
-  debugWarn(
-    'Live2DCharacter',
-    `Unknown animation status: ${status}, falling back to Idle`
-  );
-  return 'Idle';
+  return motion;
 };
 
 const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
@@ -95,15 +61,12 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
   // 获取全局 AI 状态
   const { aiStatus } = useAIStatus();
 
-  // 确定要使用的状态：优先使用传入的 status，否则使用全局 aiStatus
-  const currentStatus = status || aiStatus;
+  // 确定要使用的动作：优先使用传入的 status，否则使用全局 aiStatus
+  const currentMotion = validateHiyoriMotion(status || aiStatus);
 
   // 组件状态
   const [isModelReady, setIsModelReady] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-
-  // 获取对应的Live2D motion
-  const targetMotion = getLive2DMotion(currentStatus);
 
   // 播放Live2D动作
   const playLive2DMotion = useCallback(
@@ -147,33 +110,30 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
     [isModelReady, isPlaying, onMotionComplete]
   );
 
-  // 当状态改变时播放对应动作
+  // 当动作改变时播放对应动作
   useEffect(() => {
-    if (isModelReady && targetMotion) {
-      debugLog(
-        'Live2DCharacter',
-        `Status changed to: ${currentStatus} → Motion: ${targetMotion}`
-      );
+    if (isModelReady && currentMotion) {
+      debugLog('Live2DCharacter', `Motion changed to: ${currentMotion}`);
 
       // 延迟一下确保模型完全准备好
       const timer = setTimeout(() => {
-        playLive2DMotion(targetMotion);
+        playLive2DMotion(currentMotion);
       }, 200);
 
       return () => clearTimeout(timer);
     }
-  }, [currentStatus, targetMotion, isModelReady, playLive2DMotion]);
+  }, [currentMotion, isModelReady, playLive2DMotion]);
 
   // 处理模型准备就绪
   const handleModelReady = useCallback(() => {
     debugLog('Live2DCharacter', 'Hiyori model is ready!');
     setIsModelReady(true);
 
-    // 模型准备好后立即播放当前状态对应的动作
+    // 模型准备好后立即播放当前动作
     setTimeout(() => {
-      playLive2DMotion(targetMotion);
+      playLive2DMotion(currentMotion);
     }, 500);
-  }, [targetMotion, playLive2DMotion]);
+  }, [currentMotion, playLive2DMotion]);
 
   // 处理动作结果
   const handleMotionResult = useCallback(
@@ -192,15 +152,15 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
       onMotionComplete?.(motion, success);
 
       // 如果是非idle动作且成功播放，在动作完成后返回idle状态
-      if (success && motion !== 'Idle' && motion !== stateMapping.idle) {
+      if (success && motion !== 'Idle') {
         setTimeout(() => {
-          if (currentStatus === 'idle' || !currentStatus) {
+          if (currentMotion === 'Idle') {
             playLive2DMotion('Idle');
           }
         }, 1000);
       }
     },
-    [currentStatus, onMotionComplete, playLive2DMotion]
+    [currentMotion, onMotionComplete, playLive2DMotion]
   );
 
   // 清理定时器
@@ -239,12 +199,8 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
           <View style={styles.debugInfo}>
             <View style={styles.debugText}>
               <View style={styles.debugLine}>
-                <Text style={styles.debugLabel}>Status:</Text>
-                <Text style={styles.debugValue}>{currentStatus}</Text>
-              </View>
-              <View style={styles.debugLine}>
                 <Text style={styles.debugLabel}>Motion:</Text>
-                <Text style={styles.debugValue}>{targetMotion}</Text>
+                <Text style={styles.debugValue}>{currentMotion}</Text>
               </View>
               <View style={styles.debugLine}>
                 <Text style={styles.debugLabel}>Ready:</Text>
@@ -316,6 +272,6 @@ const styles = StyleSheet.create({
 
 export default Live2DCharacter;
 
-// 导出类型和映射供外部使用
-export type { AnimationState, Live2DCharacterProps };
-export { stateMapping, extendedMapping, getLive2DMotion };
+// 导出类型和常量供外部使用
+export type { Live2DCharacterProps };
+export { HIYORI_MOTIONS, validateHiyoriMotion };

@@ -7,46 +7,38 @@ import {
   ScrollView,
   Switch,
 } from 'react-native';
-import Live2DCharacter, { AnimationState, stateMapping, extendedMapping } from './Live2DCharacter';
+import Live2DCharacter, { HIYORI_MOTIONS } from './Live2DCharacter';
+import { HiyoriMotion } from '../store/useAIStatus';
 import { isDebugMode, debugLog, debugError } from '../utils/debug';
 
 const Live2DTest: React.FC = () => {
-  const [currentState, setCurrentState] = useState<string>('idle');
-  const [isLive2DMode, setIsLive2DMode] = useState(true);
+  const [currentMotion, setCurrentMotion] = useState<HiyoriMotion>('Idle');
   const [motionHistory, setMotionHistory] = useState<Array<{
     timestamp: Date;
-    state: string;
     motion: string;
     success: boolean;
     error?: string;
   }>>([]);
 
-  // 标准状态列表（对应lottie的8种状态）
-  const standardStates: Array<{ state: AnimationState; label: string; color: string }> = [
-    { state: 'idle', label: '空闲', color: '#64748B' },
-    { state: 'speaking', label: '说话', color: '#3B82F6' },
-    { state: 'listening', label: '聆听', color: '#10B981' },
-    { state: 'thinking', label: '思考', color: '#F59E0B' },
-    { state: 'happy', label: '开心', color: '#EF4444' },
-    { state: 'angry', label: '愤怒', color: '#DC2626' },
-    { state: 'love', label: '喜爱', color: '#EC4899' },
-    { state: 'sad', label: '伤心', color: '#6366F1' },
-  ];
-
-  // 扩展状态列表（Live2D特有）
-  const extendedStates: Array<{ state: string; label: string; color: string }> = [
-    { state: 'greeting', label: '打招呼', color: '#8B5CF6' },
-    { state: 'celebration', label: '庆祝', color: '#F97316' },
-    { state: 'joy', label: '欢乐', color: '#06B6D4' },
-    { state: 'surprise', label: '惊讶', color: '#84CC16' },
-    { state: 'sleepy', label: '困倦', color: '#6B7280' },
+  // Hiyori所有可用动作 - 直接使用真实的Live2D动作
+  const hiyoriMotions: Array<{ motion: HiyoriMotion; label: string; color: string }> = [
+    { motion: 'Idle', label: '空闲', color: '#64748B' },
+    { motion: 'Speaking', label: '说话', color: '#3B82F6' },
+    { motion: 'Thinking', label: '思考', color: '#F59E0B' },
+    { motion: 'Happy', label: '开心', color: '#10B981' },
+    { motion: 'Surprised', label: '惊讶', color: '#EF4444' },
+    { motion: 'Shy', label: '害羞', color: '#EC4899' },
+    { motion: 'Wave', label: '打招呼', color: '#8B5CF6' },
+    { motion: 'Dance', label: '舞蹈', color: '#F97316' },
+    { motion: 'Laugh', label: '大笑', color: '#06B6D4' },
+    { motion: 'Excited', label: '兴奋', color: '#84CC16' },
+    { motion: 'Sleepy', label: '困倦', color: '#6B7280' },
   ];
 
   // 处理动作完成回调
   const handleMotionComplete = useCallback((motion: string, success: boolean, error?: string) => {
     const newEntry = {
       timestamp: new Date(),
-      state: currentState,
       motion,
       success,
       error,
@@ -55,26 +47,21 @@ const Live2DTest: React.FC = () => {
     setMotionHistory(prev => [newEntry, ...prev.slice(0, 9)]); // 保留最近10条记录
     
     debugLog('Live2DTest', `Motion completed: ${motion} - ${success ? 'Success' : `Failed: ${error}`}`);
-  }, [currentState]);
+  }, []);
 
-  // 渲染状态按钮
-  const renderStateButton = (state: string, label: string, color: string) => (
+  // 渲染动作按钮
+  const renderMotionButton = (motion: HiyoriMotion, label: string, color: string) => (
     <TouchableOpacity
-      key={state}
+      key={motion}
       style={[
         styles.stateButton,
         { backgroundColor: color },
-        currentState === state && styles.activeButton,
+        currentMotion === motion && styles.activeButton,
       ]}
-      onPress={() => setCurrentState(state)}
+      onPress={() => setCurrentMotion(motion)}
     >
       <Text style={styles.buttonText}>{label}</Text>
-      <Text style={styles.buttonSubtext}>
-        {isLive2DMode 
-          ? (stateMapping[state as AnimationState] || extendedMapping[state] || 'Unknown')
-          : state
-        }
-      </Text>
+      <Text style={styles.buttonSubtext}>{motion}</Text>
     </TouchableOpacity>
   );
 
@@ -408,6 +395,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#1E293B',
     fontWeight: '500',
+  },
+  mappingNote: {
+    paddingTop: 8,
+    marginTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  mappingNoteText: {
+    fontSize: 12,
+    color: '#64748B',
+    marginBottom: 4,
   },
 });
 
