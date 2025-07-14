@@ -5,9 +5,8 @@ import {
   TouchableOpacity,
   ScrollView,
   SafeAreaView,
-  Alert,
 } from 'react-native';
-import HiyoriWebView, { type HiyoriBridge } from '../components/HiyoriWebView';
+import HiyoriWebView from '../components/HiyoriWebView';
 import { debugLog, debugWarn } from '../utils/debug';
 
 const HiyoriScreen: React.FC = () => {
@@ -47,13 +46,10 @@ const HiyoriScreen: React.FC = () => {
 
   const handleMotionResult = (
     motion: string,
-    success: boolean,
-    error?: string
+    success: boolean
   ) => {
     if (success) {
       setLastMotion(motion);
-    } else {
-      // Alert.alert('Motion Error', `Failed to play ${motion}: ${error}`);
     }
   };
 

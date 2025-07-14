@@ -296,7 +296,7 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(({
           }
           
           // New system: Live2D component will handle all status reporting via sendMessage
-          debugLog('HiyoriWebView', '[WebView] Readiness detection script injected');
+          console.log('[WebView] Readiness detection script injected');
         })();
       `;
       
