@@ -8,7 +8,6 @@ import {
   Switch,
 } from 'react-native';
 import Live2DCharacter, { AnimationState, stateMapping, extendedMapping } from './Live2DCharacter';
-import AnimatedCharacter from './AnimatedCharacter';
 import { isDebugMode, debugLog, debugError } from '../utils/debug';
 
 const Live2DTest: React.FC = () => {
@@ -147,10 +146,9 @@ const Live2DTest: React.FC = () => {
 
       {/* 角色显示区域 */}
       <View style={styles.characterContainer}>
-        <AnimatedCharacter
+        <Live2DCharacter
           status={currentState}
           size={240}
-          mode={isLive2DMode ? 'live2d' : 'lottie'}
           onMotionComplete={handleMotionComplete}
         />
       </View>

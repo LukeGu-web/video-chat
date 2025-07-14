@@ -9,8 +9,7 @@ import {
   Header,
   VoiceControl,
   ErrorToast,
-  LottieTest,
-  AnimatedCharacter,
+  Live2DCharacter,
   CurrentSpeechBubble,
 } from '../components';
 
@@ -221,14 +220,8 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           >
             <Text className='font-medium text-white'>返回聊天</Text>
           </TouchableOpacity>
-          <Text className='text-lg font-bold text-gray-800'>
-            Lottie 动画测试
-          </Text>
           <View className='w-20' />
         </View>
-
-        {/* Lottie Test Component */}
-        <LottieTest />
       </SafeAreaViewRN>
     );
   }
@@ -253,23 +246,13 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           onGoToHiyoriTest={handleGoToHiyoriTest}
           ttsProvider={currentTTSProvider}
         />
-
-        {/* Test Mode Button */}
-        {/* <View className='flex-row justify-end px-4 pb-3'>
-          <TouchableOpacity
-            onPress={() => setIsTestMode(true)}
-            className='px-3 py-1 bg-purple-500 rounded-full'
-          >
-            <Text className='text-sm font-medium text-white'>测试动画</Text>
-          </TouchableOpacity>
-        </View> */}
       </View>
 
       {/* Main Content Area */}
       <View className='justify-center flex-1'>
-        {/* Animated Character */}
+        {/* Live2D Character */}
         <View className='items-center'>
-          <AnimatedCharacter size={280} loop={true} className='shadow-lg' />
+          <Live2DCharacter size={280} loop={true} className='shadow-lg' />
         </View>
 
         {/* Current Speech Bubble - Only show when AI is speaking */}
