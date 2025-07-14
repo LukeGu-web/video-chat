@@ -252,7 +252,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       <View className='justify-center flex-1'>
         {/* Live2D Character */}
         <View className='items-center'>
-          <Live2DCharacter size={280} loop={true} className='shadow-lg' />
+          <Live2DCharacter size={300} loop={true} className='shadow-lg' />
         </View>
 
         {/* Current Speech Bubble - Only show when AI is speaking */}

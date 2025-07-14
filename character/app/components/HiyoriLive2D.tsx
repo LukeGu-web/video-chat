@@ -476,7 +476,7 @@ const HiyoriLive2D = forwardRef<HiyoriLive2DRef, HiyoriLive2DProps>(
             model.scale.set(0.12);
             model.anchor.set(0.5, 0.5);
             model.x = width / 2;
-            model.y = height / 2 + 50;
+            model.y = height / 2 - 10; // Adjust Y position for better centering
 
             app.stage.addChild(model);
             modelRef.current = model;

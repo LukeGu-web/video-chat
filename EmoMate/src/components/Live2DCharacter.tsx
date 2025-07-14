@@ -4,7 +4,15 @@ import HiyoriWebView, { HiyoriBridge } from './HiyoriWebView';
 import { useAIStatus } from '../store';
 import { isDebugMode, debugLog, debugError, debugWarn } from '../utils/debug';
 
-type AnimationState = 'idle' | 'speaking' | 'listening' | 'thinking' | 'happy' | 'angry' | 'love' | 'sad';
+type AnimationState =
+  | 'idle'
+  | 'speaking'
+  | 'listening'
+  | 'thinking'
+  | 'happy'
+  | 'angry'
+  | 'love'
+  | 'sad';
 
 interface Live2DCharacterProps {
   status?: string;
@@ -23,41 +31,53 @@ interface WebViewRef {
 // 状态映射：8种lottie状态 → 11种Live2D motions
 // 完全使用Live2D的真实动作，确保所有动作都存在
 const stateMapping: Record<AnimationState, string> = {
-  idle: 'Idle',           // 空闲状态 → 默认动作
-  speaking: 'Speaking',   // 说话状态 → 说话动作
-  listening: 'Idle',      // 听话状态 → 空闲动作（Live2D没有listening，使用idle）
-  thinking: 'Thinking',   // 思考状态 → 思考动作
-  happy: 'Happy',         // 开心状态 → 开心表情
-  angry: 'Surprised',     // 愤怒状态 → 惊讶表情（更温和，Live2D没有angry）
-  love: 'Excited',        // 爱意状态 → 兴奋表情
-  sad: 'Sleepy'          // 伤心状态 → 困倦表情（Live2D用sleepy表示伤心）
+  idle: 'Idle', // 空闲状态 → 默认动作
+  speaking: 'Speaking', // 说话状态 → 说话动作
+  listening: 'Idle', // 听话状态 → 空闲动作（Live2D没有listening，使用idle）
+  thinking: 'Thinking', // 思考状态 → 思考动作
+  happy: 'Happy', // 开心状态 → 开心表情
+  angry: 'Surprised', // 愤怒状态 → 惊讶表情（更温和，Live2D没有angry）
+  love: 'Excited', // 爱意状态 → 兴奋表情
+  sad: 'Sleepy', // 伤心状态 → 困倦表情（Live2D用sleepy表示伤心）
 };
 
 // 扩展映射（未来可用）
 const extendedMapping: Record<string, string> = {
-  greeting: 'Wave',       // 打招呼
-  celebration: 'Dance',   // 庆祝
-  joy: 'Laugh',          // 欢乐
+  greeting: 'Wave', // 打招呼
+  celebration: 'Dance', // 庆祝
+  joy: 'Laugh', // 欢乐
   surprise: 'Surprised', // 惊讶
-  sleepy: 'Sleepy'       // 困倦
+  sleepy: 'Sleepy', // 困倦
 };
 
 // 获取对应的Live2D motion名称
 const getLive2DMotion = (status: string): string => {
-  const validStates: AnimationState[] = ['idle', 'speaking', 'listening', 'thinking', 'happy', 'angry', 'love', 'sad'];
-  
+  const validStates: AnimationState[] = [
+    'idle',
+    'speaking',
+    'listening',
+    'thinking',
+    'happy',
+    'angry',
+    'love',
+    'sad',
+  ];
+
   // 首先检查是否是标准状态
   if (validStates.includes(status as AnimationState)) {
     return stateMapping[status as AnimationState];
   }
-  
+
   // 检查扩展映射
   if (extendedMapping[status]) {
     return extendedMapping[status];
   }
-  
+
   // 默认返回Idle
-  debugWarn('Live2DCharacter', `Unknown animation status: ${status}, falling back to Idle`);
+  debugWarn(
+    'Live2DCharacter',
+    `Unknown animation status: ${status}, falling back to Idle`
+  );
   return 'Idle';
 };
 
@@ -71,59 +91,70 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
   const webViewRef = useRef<WebViewRef>(null);
   const lastMotionRef = useRef<string | null>(null);
   const motionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   // 获取全局 AI 状态
   const { aiStatus } = useAIStatus();
-  
+
   // 确定要使用的状态：优先使用传入的 status，否则使用全局 aiStatus
   const currentStatus = status || aiStatus;
-  
+
   // 组件状态
   const [isModelReady, setIsModelReady] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-  
+
   // 获取对应的Live2D motion
   const targetMotion = getLive2DMotion(currentStatus);
 
   // 播放Live2D动作
-  const playLive2DMotion = useCallback((motionName: string) => {
-    debugLog('Live2DCharacter', `Attempting to play motion: ${motionName}`);
-    
-    if (!isModelReady || !webViewRef.current?.hiyoriBridge) {
-      debugWarn('Live2DCharacter', `Cannot play motion ${motionName} - model not ready`);
-      onMotionComplete?.(motionName, false);
-      return;
-    }
+  const playLive2DMotion = useCallback(
+    (motionName: string) => {
+      debugLog('Live2DCharacter', `Attempting to play motion: ${motionName}`);
 
-    // 防止重复播放相同动作
-    if (lastMotionRef.current === motionName && isPlaying) {
-      debugLog('Live2DCharacter', `Motion ${motionName} already playing, skipping`);
-      return;
-    }
+      if (!isModelReady || !webViewRef.current?.hiyoriBridge) {
+        debugWarn(
+          'Live2DCharacter',
+          `Cannot play motion ${motionName} - model not ready`
+        );
+        onMotionComplete?.(motionName, false);
+        return;
+      }
 
-    setIsPlaying(true);
-    lastMotionRef.current = motionName;
-    
-    // 播放动作
-    webViewRef.current.hiyoriBridge.playMotion(motionName);
-    
-    // 设置超时，确保动作完成回调
-    if (motionTimeoutRef.current) {
-      clearTimeout(motionTimeoutRef.current);
-    }
-    
-    motionTimeoutRef.current = setTimeout(() => {
-      setIsPlaying(false);
-      onMotionComplete?.(motionName, true);
-    }, 3000); // 3秒后认为动作完成
-    
-  }, [isModelReady, isPlaying, onMotionComplete]);
+      // 防止重复播放相同动作
+      if (lastMotionRef.current === motionName && isPlaying) {
+        debugLog(
+          'Live2DCharacter',
+          `Motion ${motionName} already playing, skipping`
+        );
+        return;
+      }
+
+      setIsPlaying(true);
+      lastMotionRef.current = motionName;
+
+      // 播放动作
+      webViewRef.current.hiyoriBridge.playMotion(motionName);
+
+      // 设置超时，确保动作完成回调
+      if (motionTimeoutRef.current) {
+        clearTimeout(motionTimeoutRef.current);
+      }
+
+      motionTimeoutRef.current = setTimeout(() => {
+        setIsPlaying(false);
+        onMotionComplete?.(motionName, true);
+      }, 3000); // 3秒后认为动作完成
+    },
+    [isModelReady, isPlaying, onMotionComplete]
+  );
 
   // 当状态改变时播放对应动作
   useEffect(() => {
     if (isModelReady && targetMotion) {
-      debugLog('Live2DCharacter', `Status changed to: ${currentStatus} → Motion: ${targetMotion}`);
-      
+      debugLog(
+        'Live2DCharacter',
+        `Status changed to: ${currentStatus} → Motion: ${targetMotion}`
+      );
+
       // 延迟一下确保模型完全准备好
       const timer = setTimeout(() => {
         playLive2DMotion(targetMotion);
@@ -137,7 +168,7 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
   const handleModelReady = useCallback(() => {
     debugLog('Live2DCharacter', 'Hiyori model is ready!');
     setIsModelReady(true);
-    
+
     // 模型准备好后立即播放当前状态对应的动作
     setTimeout(() => {
       playLive2DMotion(targetMotion);
@@ -145,26 +176,32 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
   }, [targetMotion, playLive2DMotion]);
 
   // 处理动作结果
-  const handleMotionResult = useCallback((motion: string, success: boolean, error?: string) => {
-    debugLog('Live2DCharacter', `Motion result - ${motion}: ${success ? 'Success' : `Failed: ${error}`}`);
-    
-    setIsPlaying(false);
-    
-    if (motionTimeoutRef.current) {
-      clearTimeout(motionTimeoutRef.current);
-    }
-    
-    onMotionComplete?.(motion, success);
-    
-    // 如果是非idle动作且成功播放，在动作完成后返回idle状态
-    if (success && motion !== 'Idle' && motion !== stateMapping.idle) {
-      setTimeout(() => {
-        if (currentStatus === 'idle' || !currentStatus) {
-          playLive2DMotion('Idle');
-        }
-      }, 1000);
-    }
-  }, [currentStatus, onMotionComplete, playLive2DMotion]);
+  const handleMotionResult = useCallback(
+    (motion: string, success: boolean, error?: string) => {
+      debugLog(
+        'Live2DCharacter',
+        `Motion result - ${motion}: ${success ? 'Success' : `Failed: ${error}`}`
+      );
+
+      setIsPlaying(false);
+
+      if (motionTimeoutRef.current) {
+        clearTimeout(motionTimeoutRef.current);
+      }
+
+      onMotionComplete?.(motion, success);
+
+      // 如果是非idle动作且成功播放，在动作完成后返回idle状态
+      if (success && motion !== 'Idle' && motion !== stateMapping.idle) {
+        setTimeout(() => {
+          if (currentStatus === 'idle' || !currentStatus) {
+            playLive2DMotion('Idle');
+          }
+        }, 1000);
+      }
+    },
+    [currentStatus, onMotionComplete, playLive2DMotion]
+  );
 
   // 清理定时器
   useEffect(() => {
@@ -178,7 +215,7 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
   // 计算容器样式
   const containerStyle = {
     width: size,
-    height: size,
+    height: size * 1.6,
   };
 
   return (
@@ -189,14 +226,16 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
         onModelReady={handleModelReady}
         onMotionResult={handleMotionResult}
       />
-      
+
       {/* 状态指示器 */}
       {isDebugMode() && (
         <View style={styles.debugOverlay}>
-          <View style={[
-            styles.statusDot,
-            { backgroundColor: isModelReady ? '#10B981' : '#EF4444' }
-          ]} />
+          <View
+            style={[
+              styles.statusDot,
+              { backgroundColor: isModelReady ? '#10B981' : '#EF4444' },
+            ]}
+          />
           <View style={styles.debugInfo}>
             <View style={styles.debugText}>
               <View style={styles.debugLine}>
@@ -209,7 +248,9 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
               </View>
               <View style={styles.debugLine}>
                 <Text style={styles.debugLabel}>Ready:</Text>
-                <Text style={styles.debugValue}>{isModelReady ? '✓' : '✗'}</Text>
+                <Text style={styles.debugValue}>
+                  {isModelReady ? '✓' : '✗'}
+                </Text>
               </View>
               <View style={styles.debugLine}>
                 <Text style={styles.debugLabel}>Playing:</Text>
