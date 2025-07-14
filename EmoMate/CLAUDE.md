@@ -147,13 +147,11 @@ debugLog('HiyoriWebView', 'Model ready for interaction');
 2. **Live2DCharacter.tsx**: Motion mapping and state management debugging
 3. **AnimatedCharacter.tsx**: Status forwarding debug information
 4. **HiyoriScreen.tsx**: Testing interface with motion controls
-5. **Live2DTest.tsx**: Comprehensive testing component
 
 #### Debug Features per Component
 - **HiyoriWebView**: Connection status, message logging, performance metrics
 - **Live2DCharacter**: Motion mapping, state transitions, model readiness
 - **HiyoriScreen**: Motion request debugging, model status tracking
-- **Live2DTest**: Motion history, state mapping validation
 
 ### Usage Guidelines
 

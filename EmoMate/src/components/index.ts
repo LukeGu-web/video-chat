@@ -11,4 +11,3 @@ export { default as AICapabilityStatus } from './AICapabilityStatus';
 export { default as CurrentSpeechBubble } from './CurrentSpeechBubble';
 export { default as HiyoriWebView } from './HiyoriWebView';
 export { default as Live2DCharacter } from './Live2DCharacter';
-export { default as Live2DTest } from './Live2DTest';

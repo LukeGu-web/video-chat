@@ -574,7 +574,6 @@ HiyoriWebView.displayName = 'HiyoriWebView';
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F3F4F6',
   },
   webview: {
     flex: 1,
@@ -583,7 +582,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F3F4F6',
   },
   loadingText: {
     fontSize: 16,
@@ -599,7 +597,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#F3F4F6',
   },
   errorTitle: {
     fontSize: 18,
@@ -618,7 +615,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#F3F4F6',
   },
   fallbackTitle: {
     fontSize: 18,
