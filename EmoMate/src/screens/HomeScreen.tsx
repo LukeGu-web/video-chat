@@ -52,10 +52,8 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     isSpeaking,
     isGenerating,
     error: aiError,
-    currentTTSProvider,
     sendMessage,
     stopSpeaking,
-    switchTTSProvider,
     currentSegment,
   } = useChatAI({ personality: PERSONALITY_PROMPTS.gentle, enableTTS: true });
 
@@ -119,16 +117,6 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const handleGoToChatHistory = () => {
     navigation.navigate('ChatHistory');
   };
-
-  const handleGoToHiyoriTest = () => {
-    navigation.navigate('Hiyori');
-  };
-
-  const handleSwitchTTS = useCallback(() => {
-    const newProvider =
-      currentTTSProvider === 'elevenlabs' ? 'expo' : 'elevenlabs';
-    switchTTSProvider(newProvider);
-  }, [currentTTSProvider, switchTTSProvider]);
 
   // 生成唯一消息ID
   const generateMessageId = () => {
@@ -236,17 +224,11 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         duration={4000}
       />
 
-      {/* Header with Test Mode Button */}
-      <View className='bg-white border-b border-gray-200'>
-        <Header
-          characterName={selectedCharacter || 'AI伴侣'}
-          onGoBack={handleGoBack}
-          onSwitchTTS={handleSwitchTTS}
-          onGoToChatHistory={handleGoToChatHistory}
-          onGoToHiyoriTest={handleGoToHiyoriTest}
-          ttsProvider={currentTTSProvider}
-        />
-      </View>
+      <Header
+        characterName={selectedCharacter || 'AI伴侣'}
+        onGoBack={handleGoBack}
+        onGoToChatHistory={handleGoToChatHistory}
+      />
 
       {/* Main Content Area */}
       <View className='justify-center flex-1'>
