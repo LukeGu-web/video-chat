@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { View, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { isDebugMode, debugLog, debugError, debugWarn, DebugTimer } from '../utils/debug';
 
@@ -460,12 +460,12 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(({
   // Render error state with retry option
   if (state.error && state.loadAttempts < MAX_LOAD_ATTEMPTS) {
     return (
-      <View style={[styles.container, style]}>
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorTitle}>连接失败</Text>
-          <Text style={styles.errorMessage}>{state.error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={reload}>
-            <Text style={styles.retryButtonText}>重试 ({state.loadAttempts}/{MAX_LOAD_ATTEMPTS})</Text>
+      <View className="flex-1" style={style}>
+        <View className="flex-1 justify-center items-center p-5">
+          <Text className="text-lg font-bold text-red-500 mb-2">连接失败</Text>
+          <Text className="text-sm text-gray-500 text-center mb-5">{state.error}</Text>
+          <TouchableOpacity className="bg-blue-500 px-5 py-2.5 rounded-lg" onPress={reload}>
+            <Text className="text-white text-sm font-medium">重试 ({state.loadAttempts}/{MAX_LOAD_ATTEMPTS})</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -475,14 +475,14 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(({
   // Render fallback if max attempts reached
   if (state.error && state.loadAttempts >= MAX_LOAD_ATTEMPTS) {
     return (
-      <View style={[styles.container, style]}>
-        <View style={styles.fallbackContainer}>
-          <Text style={styles.fallbackTitle}>无法连接到Hiyori</Text>
-          <Text style={styles.fallbackMessage}>
+      <View className="flex-1" style={style}>
+        <View className="flex-1 justify-center items-center p-5">
+          <Text className="text-lg font-bold text-gray-700 mb-2">无法连接到Hiyori</Text>
+          <Text className="text-sm text-gray-500 text-center mb-5">
             请检查网络连接和服务器状态
           </Text>
-          <TouchableOpacity style={styles.retryButton} onPress={reload}>
-            <Text style={styles.retryButtonText}>重新开始</Text>
+          <TouchableOpacity className="bg-blue-500 px-5 py-2.5 rounded-lg" onPress={reload}>
+            <Text className="text-white text-sm font-medium">重新开始</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -490,7 +490,7 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(({
   }
 
   return (
-    <View style={[styles.container, style]}>
+    <View className="flex-1" style={style}>
       <WebView
         ref={webViewRef}
         source={{ uri: 'http://192.168.31.28:5174/' }}
@@ -507,11 +507,11 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(({
         originWhitelist={['*']}
         allowsFullscreenVideo={true}
         allowsBackForwardNavigationGestures={false}
-        style={[styles.webview, { backgroundColor: 'transparent' }]}
+        style={{ flex: 1, backgroundColor: 'transparent' }}
         renderLoading={() => (
-          <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>Loading Hiyori...</Text>
-            <Text style={styles.loadingSubtext}>
+          <View className="flex-1 justify-center items-center">
+            <Text className="text-base text-gray-500 mb-2">Loading Hiyori...</Text>
+            <Text className="text-sm text-gray-400">
               {state.isWebViewReady ? '等待模型加载...' : '连接中...'}
             </Text>
           </View>
@@ -520,20 +520,27 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(({
       
       {/* Enhanced Status Indicator (debug mode only) */}
       {isDebugMode() && (
-        <View style={styles.statusContainer}>
+        <View 
+          className="absolute top-2.5 right-2.5 flex-row items-center bg-white/95 px-3 py-1.5 rounded-2xl"
+          style={{
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 4,
+            elevation: 3,
+          }}
+        >
           <View
-            style={[
-              styles.statusIndicator,
-              { 
-                backgroundColor: state.isModelReady 
-                  ? '#10B981' 
-                  : state.isWebViewReady 
-                    ? '#F59E0B' 
-                    : '#EF4444' 
-              },
-            ]}
+            className="w-2 h-2 rounded-full mr-2"
+            style={{
+              backgroundColor: state.isModelReady 
+                ? '#10B981' 
+                : state.isWebViewReady 
+                  ? '#F59E0B' 
+                  : '#EF4444' 
+            }}
           />
-          <Text style={styles.statusText}>
+          <Text className="text-xs text-gray-700 font-medium">
             {state.isModelReady 
               ? 'Hiyori Ready' 
               : state.isWebViewReady 
@@ -546,8 +553,8 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(({
           
           {/* Pending messages indicator */}
           {pendingMessages.current.length > 0 && (
-            <View style={styles.pendingIndicator}>
-              <Text style={styles.pendingText}>
+            <View className="ml-2 bg-red-500 w-5 h-5 rounded-full items-center justify-center">
+              <Text className="text-white text-xs font-bold">
                 {pendingMessages.current.length}
               </Text>
             </View>
@@ -557,8 +564,8 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(({
 
       {/* Debug info (debug mode only) */}
       {isDebugMode() && (
-        <View style={styles.debugContainer}>
-          <Text style={styles.debugText}>
+        <View className="absolute bottom-2 left-2 bg-black/80 px-2 py-1 rounded">
+          <Text className="text-white text-xs font-mono">
             WebView: {state.isWebViewReady ? '✓' : '✗'} | 
             Model: {state.isModelReady ? '✓' : '✗'} | 
             Queue: {pendingMessages.current.length}
@@ -570,130 +577,6 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(({
 });
 
 HiyoriWebView.displayName = 'HiyoriWebView';
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  webview: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#6B7280',
-    marginBottom: 8,
-  },
-  loadingSubtext: {
-    fontSize: 14,
-    color: '#9CA3AF',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  errorTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#EF4444',
-    marginBottom: 8,
-  },
-  errorMessage: {
-    fontSize: 14,
-    color: '#6B7280',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  fallbackContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  fallbackTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  fallbackMessage: {
-    fontSize: 14,
-    color: '#6B7280',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  retryButton: {
-    backgroundColor: '#3B82F6',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  statusContainer: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  statusIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 8,
-  },
-  statusText: {
-    fontSize: 12,
-    color: '#374151',
-    fontWeight: '500',
-  },
-  pendingIndicator: {
-    backgroundColor: '#F59E0B',
-    borderRadius: 8,
-    width: 16,
-    height: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 8,
-  },
-  pendingText: {
-    color: 'white',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  debugContainer: {
-    position: 'absolute',
-    bottom: 10,
-    left: 10,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    padding: 8,
-    borderRadius: 6,
-  },
-  debugText: {
-    color: 'white',
-    fontSize: 10,
-    fontFamily: 'monospace',
-  },
-});
 
 export default HiyoriWebView;
 

@@ -1,7 +1,6 @@
 import React, { useRef, useState } from 'react';
 import {
   View,
-  StyleSheet,
   Text,
   TouchableOpacity,
   ScrollView,
@@ -101,32 +100,42 @@ const HiyoriScreen: React.FC = () => {
   }) => (
     <TouchableOpacity
       key={motion.name}
-      style={[styles.motionButton, { backgroundColor: motion.color }]}
+      className="px-3 py-2 rounded-[20px] mr-2 mb-2"
+      style={{ backgroundColor: motion.color }}
       onPress={() => {
         console.log(`🎮 [HiyoriScreen] Button pressed: ${motion.name}`);
         playMotion(motion.name);
       }}
       disabled={!isModelReady}
     >
-      <Text style={styles.motionButtonText}>{motion.label}</Text>
+      <Text className="text-white text-xs font-semibold">{motion.label}</Text>
     </TouchableOpacity>
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView className="flex-1 bg-gray-50">
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>Hiyori Live2D</Text>
-        <Text style={styles.subtitle}>
+      <View className="p-4 bg-white border-b border-gray-200">
+        <Text className="text-2xl font-bold text-gray-900 text-center">Hiyori Live2D</Text>
+        <Text className="text-sm text-gray-500 text-center mt-1">
           {isModelReady ? 'Ready for interaction' : 'Loading model...'}
         </Text>
       </View>
 
       {/* WebView Container */}
-      <View style={styles.webviewContainer}>
+      <View 
+        className="flex-1 m-4 rounded-xl overflow-hidden bg-white"
+        style={{
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 8,
+          elevation: 4,
+        }}
+      >
         <HiyoriWebView
           ref={hiyoriRef}
-          style={styles.webview}
+          style={{ flex: 1 }}
           onModelReady={handleModelReady}
           onMotionResult={handleMotionResult}
         />
@@ -134,58 +143,58 @@ const HiyoriScreen: React.FC = () => {
 
       {/* Control Panel */}
       <ScrollView
-        style={styles.controlPanel}
+        className="max-h-[280px] bg-white rounded-t-[20px] px-4 pt-4"
         showsVerticalScrollIndicator={false}
       >
         {/* Status */}
         {lastMotion ? (
-          <View style={styles.statusCard}>
-            <Text style={styles.statusText}>Last Motion: {lastMotion}</Text>
+          <View className="bg-blue-50 p-3 rounded-lg mb-4 border-l-4 border-blue-500">
+            <Text className="text-sm text-blue-800 font-medium">Last Motion: {lastMotion}</Text>
           </View>
         ) : null}
 
         {/* Quick Motions */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <View style={styles.motionGrid}>
+        <View className="mb-5">
+          <Text className="text-base font-semibold text-gray-700 mb-3">Quick Actions</Text>
+          <View className="flex-row flex-wrap gap-2">
             {quickMotions.map(renderMotionButton)}
           </View>
         </View>
 
         {/* Emotion Motions */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Emotions</Text>
-          <View style={styles.motionGrid}>
+        <View className="mb-5">
+          <Text className="text-base font-semibold text-gray-700 mb-3">Emotions</Text>
+          <View className="flex-row flex-wrap gap-2">
             {emotionMotions.map(renderMotionButton)}
           </View>
         </View>
 
         {/* Control Buttons */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Controls</Text>
-          <View style={styles.controlButtons}>
+        <View className="mb-5">
+          <Text className="text-base font-semibold text-gray-700 mb-3">Controls</Text>
+          <View className="gap-2">
             <TouchableOpacity
-              style={[styles.controlButton, styles.primaryButton]}
+              className="py-3 px-4 rounded-lg items-center bg-purple-500"
               onPress={playRandomMotion}
               disabled={!isModelReady}
             >
-              <Text style={styles.controlButtonText}>🎲 Random Motion</Text>
+              <Text className="text-white text-sm font-semibold">🎲 Random Motion</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.controlButton, styles.secondaryButton]}
+              className="py-3 px-4 rounded-lg items-center bg-gray-500"
               onPress={resetToIdle}
               disabled={!isModelReady}
             >
-              <Text style={styles.controlButtonText}>🔄 Reset to Idle</Text>
+              <Text className="text-white text-sm font-semibold">🔄 Reset to Idle</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.controlButton, styles.infoButton]}
+              className="py-3 px-4 rounded-lg items-center bg-green-500"
               onPress={checkAvailableMotions}
               disabled={!isModelReady}
             >
-              <Text style={styles.controlButtonText}>📋 List Motions</Text>
+              <Text className="text-white text-sm font-semibold">📋 List Motions</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -193,115 +202,5 @@ const HiyoriScreen: React.FC = () => {
     </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
-  header: {
-    padding: 16,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111827',
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    textAlign: 'center',
-    marginTop: 4,
-  },
-  webviewContainer: {
-    flex: 1,
-    margin: 16,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: 'white',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  webview: {
-    flex: 1,
-  },
-  controlPanel: {
-    maxHeight: 280,
-    backgroundColor: 'white',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-  },
-  statusCard: {
-    backgroundColor: '#EFF6FF',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: '#3B82F6',
-  },
-  statusText: {
-    fontSize: 14,
-    color: '#1E40AF',
-    fontWeight: '500',
-  },
-  section: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 12,
-  },
-  motionGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  motionButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  motionButtonText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  controlButtons: {
-    gap: 8,
-  },
-  controlButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  primaryButton: {
-    backgroundColor: '#8B5CF6',
-  },
-  secondaryButton: {
-    backgroundColor: '#6B7280',
-  },
-  infoButton: {
-    backgroundColor: '#10B981',
-  },
-  controlButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-});
 
 export default HiyoriScreen;

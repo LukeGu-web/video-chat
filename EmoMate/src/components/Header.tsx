@@ -73,14 +73,12 @@ const Header: React.FC<HeaderProps> = ({
 
   return (
     <>
-      {/* Header */}
-
       <View className='flex-row items-center justify-end'>
         {/* 右侧设置按钮 */}
         <View ref={settingsButtonRef} collapsable={false}>
           <TouchableOpacity
             onPress={handleSettingsPress}
-            className='items-center justify-center w-10 h-10 mr-6 rounded-full'
+            className='items-center justify-center w-10 h-10 mr-4 rounded-full opacity-60'
           >
             <Text className='text-3xl'>⚙️</Text>
           </TouchableOpacity>

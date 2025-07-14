@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { View, StyleSheet, Text } from 'react-native';
+import { View, Text } from 'react-native';
 import HiyoriWebView, { HiyoriBridge } from './HiyoriWebView';
 import { useAIStatus, HiyoriMotion } from '../store';
 import { isDebugMode, debugLog, debugError, debugWarn } from '../utils/debug';
@@ -179,38 +179,41 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
   };
 
   return (
-    <View style={[styles.container, containerStyle]}>
+    <View 
+      className="relative justify-center items-center"
+      style={containerStyle}
+    >
       <HiyoriWebView
         ref={webViewRef}
-        style={styles.webView}
+        style={{ width: '100%', height: '100%' }}
         onModelReady={handleModelReady}
         onMotionResult={handleMotionResult}
       />
 
       {/* 状态指示器 */}
       {isDebugMode() && (
-        <View style={styles.debugOverlay}>
+        <View className="absolute top-2 left-2 flex-row items-center bg-black/80 rounded-md p-2">
           <View
-            style={[
-              styles.statusDot,
-              { backgroundColor: isModelReady ? '#10B981' : '#EF4444' },
-            ]}
+            className="w-2 h-2 rounded-full mr-2"
+            style={{
+              backgroundColor: isModelReady ? '#10B981' : '#EF4444',
+            }}
           />
-          <View style={styles.debugInfo}>
-            <View style={styles.debugText}>
-              <View style={styles.debugLine}>
-                <Text style={styles.debugLabel}>Motion:</Text>
-                <Text style={styles.debugValue}>{currentMotion}</Text>
+          <View className="flex-1">
+            <View className="gap-0.5">
+              <View className="flex-row items-center">
+                <Text className="text-gray-400 text-xs font-mono w-12">Motion:</Text>
+                <Text className="text-gray-100 text-xs font-mono font-bold">{currentMotion}</Text>
               </View>
-              <View style={styles.debugLine}>
-                <Text style={styles.debugLabel}>Ready:</Text>
-                <Text style={styles.debugValue}>
+              <View className="flex-row items-center">
+                <Text className="text-gray-400 text-xs font-mono w-12">Ready:</Text>
+                <Text className="text-gray-100 text-xs font-mono font-bold">
                   {isModelReady ? '✓' : '✗'}
                 </Text>
               </View>
-              <View style={styles.debugLine}>
-                <Text style={styles.debugLabel}>Playing:</Text>
-                <Text style={styles.debugValue}>{isPlaying ? '▶' : '⏸'}</Text>
+              <View className="flex-row items-center">
+                <Text className="text-gray-400 text-xs font-mono w-12">Playing:</Text>
+                <Text className="text-gray-100 text-xs font-mono font-bold">{isPlaying ? '▶' : '⏸'}</Text>
               </View>
             </View>
           </View>
@@ -220,55 +223,6 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    position: 'relative',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  webView: {
-    width: '100%',
-    height: '100%',
-  },
-  debugOverlay: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    borderRadius: 6,
-    padding: 8,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 8,
-  },
-  debugInfo: {
-    flex: 1,
-  },
-  debugText: {
-    gap: 2,
-  },
-  debugLine: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  debugLabel: {
-    color: '#9CA3AF',
-    fontSize: 10,
-    fontFamily: 'monospace',
-    width: 50,
-  },
-  debugValue: {
-    color: '#F3F4F6',
-    fontSize: 10,
-    fontFamily: 'monospace',
-    fontWeight: 'bold',
-  },
-});
 
 export default Live2DCharacter;
 

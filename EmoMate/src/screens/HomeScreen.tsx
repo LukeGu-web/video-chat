@@ -215,7 +215,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   }
 
   return (
-    <SafeAreaViewRN className='flex-1 bg-background'>
+    <SafeAreaViewRN className='flex-1 bg-blue-100'>
       {/* Error Toast */}
       <ErrorToast
         message={errorMessage}
@@ -231,7 +231,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       />
 
       {/* Main Content Area */}
-      <View className='justify-center flex-1'>
+      <View className='justify-center flex-1 '>
         {/* Live2D Character */}
         <View className='items-center'>
           <Live2DCharacter size={300} loop={true} className='shadow-lg' />
