@@ -7,11 +7,13 @@ import {
   Pressable,
   Animated,
 } from 'react-native';
+import { isDebugMode } from '../utils/debug';
 
 interface HeaderProps {
   characterName?: string;
   onGoBack?: () => void;
   onGoToChatHistory?: () => void;
+  onGoToEmotionTest?: () => void;
 }
 
 interface DropdownOption {
@@ -25,6 +27,7 @@ const Header: React.FC<HeaderProps> = ({
   characterName = 'AI伴侣',
   onGoBack,
   onGoToChatHistory,
+  onGoToEmotionTest,
 }) => {
   const [isDropdownVisible, setIsDropdownVisible] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ x: 0, y: 0 });
@@ -41,6 +44,17 @@ const Header: React.FC<HeaderProps> = ({
         onGoToChatHistory?.();
       },
     },
+    ...(isDebugMode() && onGoToEmotionTest ? [
+      {
+        id: 'emotionTest',
+        label: '情绪测试',
+        icon: '🧪',
+        onPress: () => {
+          setIsDropdownVisible(false);
+          onGoToEmotionTest?.();
+        },
+      },
+    ] : []),
   ];
 
   const handleSettingsPress = () => {

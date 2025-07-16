@@ -15,6 +15,8 @@ import {
   EmotionProvider,
   useEmotionContext,
   EmotionAwareCharacter,
+  DraggableFacialEmotionDetector,
+  SimpleDraggableEmotionDetector,
 } from '../components';
 
 type RootStackParamList = {
@@ -22,6 +24,7 @@ type RootStackParamList = {
   Home: undefined;
   ChatHistory: undefined;
   Hiyori: undefined;
+  EmotionTest: undefined;
 };
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Home'>;
@@ -122,6 +125,10 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
 
   const handleGoToChatHistory = () => {
     navigation.navigate('ChatHistory');
+  };
+
+  const handleGoToEmotionTest = () => {
+    navigation.navigate('EmotionTest');
   };
 
   // 生成唯一消息ID
@@ -234,6 +241,7 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
         characterName={selectedCharacter || 'AI伴侣'}
         onGoBack={handleGoBack}
         onGoToChatHistory={handleGoToChatHistory}
+        onGoToEmotionTest={handleGoToEmotionTest}
       />
 
       {/* Main Content Area */}
@@ -264,8 +272,8 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
         onStopSpeaking={stopSpeaking}
       />
 
-      {/* Facial Emotion Detection - positioned in top right */}
-      <FacialEmotionDetector
+      {/* Facial Emotion Detection - draggable, positioned in top left */}
+      <SimpleDraggableEmotionDetector
         onEmotionDetected={setFacialEmotion}
         isActive={true}
         detectionInterval={2000}
