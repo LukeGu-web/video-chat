@@ -10,7 +10,8 @@
       "Bash(rm:*)",
       "Bash(npx create-next-app:*)",
       "Bash(npm uninstall:*)",
-      "Bash(npx create-remix@latest:*)"
+      "Bash(npx create-remix@latest:*)",
+      "Bash(npm install:*)"
     ],
     "deny": []
   }

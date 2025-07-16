@@ -5,3 +5,6 @@ export * from './useTTS';
 export * from './useElevenLabsTTS';
 export * from './useHybridTTS';
 export * from './debug';
+export * from './emotionAnalysis';
+export * from './useEmotionState';
+export * from './useExpoCameraPermission';

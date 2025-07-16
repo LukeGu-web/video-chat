@@ -11,6 +11,10 @@ import {
   ErrorToast,
   Live2DCharacter,
   CurrentSpeechBubble,
+  FacialEmotionDetector,
+  EmotionProvider,
+  useEmotionContext,
+  EmotionAwareCharacter,
 } from '../components';
 
 type RootStackParamList = {
@@ -26,7 +30,9 @@ interface Props {
   navigation: HomeScreenNavigationProp;
 }
 
-const HomeScreen: React.FC<Props> = ({ navigation }) => {
+// HomeScreen内容组件
+const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
+  const { setFacialEmotion } = useEmotionContext();
   const {
     selectedCharacter,
     setSelectedCharacter,
@@ -232,9 +238,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
       {/* Main Content Area */}
       <View className='justify-center flex-1 '>
-        {/* Live2D Character */}
+        {/* Live2D Character with Emotion Awareness */}
         <View className='items-center'>
-          <Live2DCharacter size={300} loop={true} className='shadow-lg' />
+          <EmotionAwareCharacter size={300} loop={true} className='shadow-lg' enableEmotionMapping={true} />
         </View>
 
         {/* Current Speech Bubble - Only show when AI is speaking */}
@@ -257,7 +263,23 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         onStopListening={stopListening}
         onStopSpeaking={stopSpeaking}
       />
+
+      {/* Facial Emotion Detection - positioned in top right */}
+      <FacialEmotionDetector
+        onEmotionDetected={setFacialEmotion}
+        isActive={true}
+        detectionInterval={2000}
+      />
     </SafeAreaViewRN>
+  );
+};
+
+// 带情绪提供器的HomeScreen包装器
+const HomeScreen: React.FC<Props> = ({ navigation }) => {
+  return (
+    <EmotionProvider>
+      <HomeScreenContent navigation={navigation} />
+    </EmotionProvider>
   );
 };
 

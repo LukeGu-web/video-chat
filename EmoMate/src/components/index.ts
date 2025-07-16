@@ -11,3 +11,7 @@ export { default as AICapabilityStatus } from './AICapabilityStatus';
 export { default as CurrentSpeechBubble } from './CurrentSpeechBubble';
 export { default as HiyoriWebView } from './HiyoriWebView';
 export { default as Live2DCharacter } from './Live2DCharacter';
+export { SimpleFacialEmotionDetector as FacialEmotionDetector } from './SimpleFacialEmotionDetector';
+export { ChatEmotionAnalyzer } from './ChatEmotionAnalyzer';
+export { EmotionProvider, useEmotionContext } from './EmotionProvider';
+export { EmotionAwareCharacter } from './EmotionAwareCharacter';
