@@ -9,13 +9,10 @@ import {
   Header,
   VoiceControl,
   ErrorToast,
-  Live2DCharacter,
   CurrentSpeechBubble,
-  FacialEmotionDetector,
   EmotionProvider,
   useEmotionContext,
   EmotionAwareCharacter,
-  DraggableFacialEmotionDetector,
   SimpleDraggableEmotionDetector,
 } from '../components';
 
@@ -248,7 +245,12 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
       <View className='justify-center flex-1 '>
         {/* Live2D Character with Emotion Awareness */}
         <View className='items-center'>
-          <EmotionAwareCharacter size={300} loop={true} className='shadow-lg' enableEmotionMapping={true} />
+          <EmotionAwareCharacter
+            size={300}
+            loop={true}
+            className='shadow-lg'
+            enableEmotionMapping={true}
+          />
         </View>
 
         {/* Current Speech Bubble - Only show when AI is speaking */}
