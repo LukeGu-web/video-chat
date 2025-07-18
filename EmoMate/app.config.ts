@@ -56,6 +56,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
           '$(PRODUCT_NAME) needs access to your Microphone.',
       },
     ],
+    [
+      'expo-build-properties',
+      {
+        ios: {
+          deploymentTarget: '15.5'
+        }
+      }
+    ],
   ],
   extra: {
     eas: {

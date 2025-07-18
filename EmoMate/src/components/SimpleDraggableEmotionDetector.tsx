@@ -1,12 +1,21 @@
 import React, { useRef, useCallback, useEffect, useState } from 'react';
 import { View, StyleSheet, Text, TouchableOpacity, PanResponder, Dimensions } from 'react-native';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import {
+  Frame,
+  useCameraDevice,
+  useCameraPermission
+} from 'react-native-vision-camera';
+import {
+  Face,
+  Camera,
+  FaceDetectionOptions
+} from 'react-native-vision-camera-face-detector';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
-import { EmotionDetectorProps, EmotionType } from '../types/emotion';
+import { EmotionDetectorProps, EmotionType, FaceData } from '../types/emotion';
 import { isDebugMode, debugLog } from '../utils/debug';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -20,10 +29,20 @@ export const SimpleDraggableEmotionDetector: React.FC<EmotionDetectorProps> = ({
   isActive = true,
   detectionInterval = 1000
 }) => {
-  const [permission, requestPermission] = useCameraPermissions();
+  const { hasPermission, requestPermission } = useCameraPermission();
+  const device = useCameraDevice('front');
   const [currentEmotion, setCurrentEmotion] = useState<EmotionType>('neutral');
   const [position, setPosition] = useState({ x: 20, y: 80 });
+  const [isDetecting, setIsDetecting] = useState(false);
   const lastDetectionTime = useRef(0);
+  const faceDetectionOptions = useRef<FaceDetectionOptions>({
+    performanceMode: 'fast',
+    landmarkMode: 'none',
+    contourMode: 'none',
+    classificationMode: 'all',
+    minFaceSize: 0.15,
+    trackingEnabled: false
+  }).current;
 
   // 动画值
   const scale = useSharedValue(1);
@@ -34,14 +53,14 @@ export const SimpleDraggableEmotionDetector: React.FC<EmotionDetectorProps> = ({
     onPanResponderGrant: () => {
       scale.value = withSpring(0.95);
     },
-    onPanResponderMove: (evt, gestureState) => {
+    onPanResponderMove: (_evt, gestureState) => {
       // 限制拖拽范围在屏幕内
       const newX = Math.max(0, Math.min(SCREEN_WIDTH - CONTAINER_WIDTH, position.x + gestureState.dx));
       const newY = Math.max(0, Math.min(SCREEN_HEIGHT - CONTAINER_HEIGHT, position.y + gestureState.dy));
       
       setPosition({ x: newX, y: newY });
     },
-    onPanResponderRelease: (evt, gestureState) => {
+    onPanResponderRelease: (_evt, gestureState) => {
       scale.value = withSpring(1);
       
       // 最终位置限制
@@ -54,32 +73,103 @@ export const SimpleDraggableEmotionDetector: React.FC<EmotionDetectorProps> = ({
     }
   });
 
-  // 模拟情绪检测
-  const handleEmotionSelection = useCallback((emotion: EmotionType) => {
+  // 实际表情检测
+  const analyzeEmotion = useCallback((faceData: FaceData): EmotionType => {
+    const { smilingProbability, leftEyeOpenProbability, rightEyeOpenProbability } = faceData;
+    
+    // 基于面部特征概率分析情绪
+    if (smilingProbability && smilingProbability > 0.7) {
+      return 'happy';
+    }
+    
+    if (leftEyeOpenProbability && rightEyeOpenProbability &&
+        leftEyeOpenProbability < 0.3 && rightEyeOpenProbability < 0.3) {
+      // 双眼几乎闭合可能表示疲劳或悲伤
+      return 'sad';
+    }
+    
+    if (smilingProbability && smilingProbability < 0.2) {
+      // 很少笑容可能表示中性或悲伤
+      return smilingProbability < 0.1 ? 'sad' : 'neutral';
+    }
+    
+    // 检测惊讶表情 (眼睛大开但没有笑容)
+    if (leftEyeOpenProbability && rightEyeOpenProbability &&
+        leftEyeOpenProbability > 0.9 && rightEyeOpenProbability > 0.9 &&
+        smilingProbability && smilingProbability < 0.3) {
+      return 'surprised';
+    }
+    
+    return 'neutral';
+  }, []);
+
+  // 面部检测回调
+  const handleFacesDetection = useCallback((faces: Face[], _frame: Frame) => {
+    if (!isActive || faces.length === 0) {
+      setIsDetecting(false);
+      return;
+    }
+
     const now = Date.now();
     if (now - lastDetectionTime.current < detectionInterval) return;
 
-    lastDetectionTime.current = now;
-    setCurrentEmotion(emotion);
+    setIsDetecting(true);
+    const face = faces[0]; // 使用第一个检测到的面部
     
-    debugLog('SimpleDraggableEmotionDetector', `Emotion selected: ${emotion}`);
-    onEmotionDetected(emotion);
-  }, [detectionInterval, onEmotionDetected]);
+    const faceData: FaceData = {
+      smilingProbability: face.smilingProbability,
+      leftEyeOpenProbability: face.leftEyeOpenProbability,
+      rightEyeOpenProbability: face.rightEyeOpenProbability,
+      faceID: undefined, // Face tracking ID not available in this version
+      bounds: face.bounds ? {
+        x: face.bounds.x,
+        y: face.bounds.y,
+        width: face.bounds.width,
+        height: face.bounds.height
+      } : undefined
+    };
+
+    const detectedEmotion = analyzeEmotion(faceData);
+    
+    if (detectedEmotion !== currentEmotion) {
+      lastDetectionTime.current = now;
+      setCurrentEmotion(detectedEmotion);
+      
+      debugLog('SimpleDraggableEmotionDetector', `Face detected emotion: ${detectedEmotion}`, {
+        smilingProbability: face.smilingProbability,
+        leftEyeOpen: face.leftEyeOpenProbability,
+        rightEyeOpen: face.rightEyeOpenProbability,
+        faces: faces.length
+      });
+      
+      onEmotionDetected(detectedEmotion);
+    }
+  }, [isActive, detectionInterval, currentEmotion, analyzeEmotion, onEmotionDetected]);
+
+  // 请求摄像头权限
+  useEffect(() => {
+    (async () => {
+      if (!hasPermission) {
+        const permission = await requestPermission();
+        debugLog('SimpleDraggableEmotionDetector', `Camera permission: ${permission}`);
+      }
+    })();
+  }, [hasPermission, requestPermission]);
 
   // 自动返回neutral状态
   useEffect(() => {
     if (!isActive) return;
 
-    const interval = setInterval(() => {
-      if (currentEmotion !== 'neutral') {
-        setTimeout(() => {
-          handleEmotionSelection('neutral');
-        }, 5000);
+    const neutralTimeout = setTimeout(() => {
+      if (currentEmotion !== 'neutral' && !isDetecting) {
+        setCurrentEmotion('neutral');
+        onEmotionDetected('neutral');
+        debugLog('SimpleDraggableEmotionDetector', 'Auto reset to neutral');
       }
-    }, detectionInterval);
+    }, 5000);
 
-    return () => clearInterval(interval);
-  }, [isActive, detectionInterval, currentEmotion, handleEmotionSelection]);
+    return () => clearTimeout(neutralTimeout);
+  }, [isActive, currentEmotion, isDetecting, onEmotionDetected]);
 
   // 动画样式
   const animatedStyle = useAnimatedStyle(() => {
@@ -102,15 +192,15 @@ export const SimpleDraggableEmotionDetector: React.FC<EmotionDetectorProps> = ({
     debugLog('SimpleDraggableEmotionDetector', `Detector ${isActive ? 'activated' : 'deactivated'}`);
   }, [isActive]);
 
-  if (!permission) {
+  if (!device) {
     return (
       <AnimatedView style={containerStyle}>
-        <Text style={styles.statusText}>Loading camera...</Text>
+        <Text style={styles.statusText}>No camera device found</Text>
       </AnimatedView>
     );
   }
 
-  if (!permission.granted) {
+  if (!hasPermission) {
     return (
       <AnimatedView style={containerStyle}>
         <Text style={styles.errorText}>Camera permission required</Text>
@@ -133,9 +223,12 @@ export const SimpleDraggableEmotionDetector: React.FC<EmotionDetectorProps> = ({
 
   return (
     <AnimatedView style={containerStyle} {...panResponder.panHandlers}>
-      <CameraView
+      <Camera
         style={styles.camera}
-        facing="front"
+        device={device}
+        isActive={isActive}
+        faceDetectionCallback={handleFacesDetection}
+        faceDetectionOptions={faceDetectionOptions}
       />
       
       {/* 拖拽指示器 */}
@@ -143,32 +236,28 @@ export const SimpleDraggableEmotionDetector: React.FC<EmotionDetectorProps> = ({
         <View style={styles.dragHandle} />
       </View>
 
-      {/* 情绪控制按钮 */}
-      <View style={styles.emotionControls}>
-        <TouchableOpacity 
-          style={[styles.emotionButton, currentEmotion === 'happy' && styles.activeButton]}
-          onPress={() => handleEmotionSelection('happy')}
-        >
-          <Text style={styles.emotionText}>😊</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.emotionButton, currentEmotion === 'sad' && styles.activeButton]}
-          onPress={() => handleEmotionSelection('sad')}
-        >
-          <Text style={styles.emotionText}>😢</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.emotionButton, currentEmotion === 'surprised' && styles.activeButton]}
-          onPress={() => handleEmotionSelection('surprised')}
-        >
-          <Text style={styles.emotionText}>😲</Text>
-        </TouchableOpacity>
+      {/* 情绪显示指示器 */}
+      <View style={styles.emotionDisplay}>
+        <View style={[styles.emotionIndicator, currentEmotion !== 'neutral' && styles.activeIndicator]}>
+          <Text style={styles.emotionText}>
+            {currentEmotion === 'happy' && '😊'}
+            {currentEmotion === 'sad' && '😢'}
+            {currentEmotion === 'surprised' && '😲'}
+            {currentEmotion === 'angry' && '😠'}
+            {currentEmotion === 'neutral' && '😐'}
+          </Text>
+        </View>
+        {isDetecting && (
+          <View style={styles.detectingIndicator}>
+            <Text style={styles.detectingText}>●</Text>
+          </View>
+        )}
       </View>
 
       {isDebugMode() && (
         <View style={styles.debugOverlay}>
           <Text style={styles.debugText}>Emotion: {currentEmotion}</Text>
-          <Text style={styles.debugText}>Draggable</Text>
+          <Text style={styles.debugText}>Detecting: {isDetecting ? 'Yes' : 'No'}</Text>
           <Text style={styles.debugText}>X: {position.x.toFixed(0)}, Y: {position.y.toFixed(0)}</Text>
         </View>
       )}
@@ -210,22 +299,35 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.3)',
     borderRadius: 1.5,
   },
-  emotionControls: {
+  emotionDisplay: {
+    position: 'absolute',
+    bottom: 6,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'center',
+    alignItems: 'center',
     paddingVertical: 6,
     backgroundColor: 'rgba(255,255,255,0.9)',
   },
-  emotionButton: {
+  emotionIndicator: {
     padding: 4,
     borderRadius: 4,
     backgroundColor: 'rgba(0,0,0,0.05)',
   },
-  activeButton: {
+  activeIndicator: {
     backgroundColor: 'rgba(59, 130, 246, 0.2)',
   },
+  detectingIndicator: {
+    marginLeft: 6,
+  },
+  detectingText: {
+    color: '#22c55e',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
   emotionText: {
-    fontSize: 14
+    fontSize: 16
   },
   statusText: {
     fontSize: 10,

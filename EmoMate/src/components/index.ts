@@ -7,7 +7,6 @@ export { default as VoiceControl } from './VoiceControl';
 export { default as CurrentSpeechBubble } from './CurrentSpeechBubble';
 export { default as HiyoriWebView } from './HiyoriWebView';
 export { default as Live2DCharacter } from './Live2DCharacter';
-export { DraggableFacialEmotionDetector } from './DraggableFacialEmotionDetector';
 export { SimpleDraggableEmotionDetector } from './SimpleDraggableEmotionDetector';
 export { ChatEmotionAnalyzer } from './ChatEmotionAnalyzer';
 export { EmotionProvider, useEmotionContext } from './EmotionProvider';
