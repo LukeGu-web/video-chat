@@ -33,6 +33,8 @@
     "react-native-safe-area-context": "5.4.0",
     "react-native-screens": "~4.11.1",
     "react-native-svg": "15.11.2",
+    "react-native-vision-camera": "^4.7.1",
+    "react-native-vision-camera-face-detector": "^1.8.6",
     "react-native-webview": "13.13.5",
     "tailwindcss": "^3.4.17",
     "zustand": "^5.0.6"
