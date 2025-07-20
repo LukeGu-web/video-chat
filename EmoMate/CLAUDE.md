@@ -530,3 +530,53 @@ User: "今天心情不好"
 - **Architecture**: Clean, modular, and scalable
 
 The codebase follows modern React Native best practices and is well-structured for scaling into a full-featured emotional AI companion application. **The project is currently in a beta-ready state** with all core features implemented and a solid foundation for future enhancements.
+
+## Documentation Management
+
+### 📁 EmoMate Documentation Structure
+
+**All EmoMate project documentation is organized in the `/docs` folder:**
+
+```
+EmoMate/docs/
+├── EMOTION_DETECTION_MVP.md           # 情绪检测MVP功能文档
+├── EMOTION_DETECTION_ARCHITECTURE.md  # 技术架构设计文档  
+├── EMOTION_DETECTION_TROUBLESHOOTING.md # 故障排除指南
+└── HIYORI_INTEGRATION.md              # Hiyori Live2D集成文档
+```
+
+### 📋 Documentation Standards
+
+**所有新功能和技术决策都应记录在 `/docs` 文件夹中**：
+
+1. **功能文档**: 用户界面功能、API接口、使用指南
+2. **架构文档**: 技术实现细节、组件设计、数据流
+3. **故障排除**: 常见问题、解决方案、调试指南
+4. **集成文档**: 第三方库集成、跨组件交互
+
+### 📝 Documentation Guidelines
+
+- **语言**: 中文为主，关键技术术语保留英文
+- **格式**: Markdown格式，使用清晰的标题层级
+- **代码示例**: 包含完整的TypeScript代码示例
+- **版本管理**: 每个文档包含版本号和最后更新时间
+- **链接引用**: 使用相对路径链接其他文档
+
+### 🔄 Documentation Updates
+
+**重大变更时必须更新相关文档**：
+- 添加新组件时更新架构文档
+- 修复问题时更新故障排除指南
+- API变更时更新功能文档
+- 性能优化时更新最佳实践
+
+### 📊 Current Documentation Status
+
+- ✅ **情绪检测MVP**: 完整文档覆盖 (`/docs/EMOTION_DETECTION_MVP.md`)
+- ✅ **技术架构**: 详细设计文档 (`/docs/EMOTION_DETECTION_ARCHITECTURE.md`)
+- ✅ **故障排除**: 全面问题解决指南 (`/docs/EMOTION_DETECTION_TROUBLESHOOTING.md`)
+- ✅ **Hiyori集成**: Live2D集成文档 (`/docs/HIYORI_INTEGRATION.md`)
+
+**文档更新记录**:
+- **2025-01-20**: 创建情绪检测完整文档体系
+- **版本**: MVP 1.0.0 - 生产就绪状态

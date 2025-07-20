@@ -51,24 +51,52 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
     }
   });
 
-  // 简单的情绪模拟（基于随机和时间的伪检测）
+  // 智能情绪模拟（基于时间模式和用户交互的情绪检测）
   const simulateEmotionDetection = useCallback(() => {
     if (!isActive) return;
 
     const now = Date.now();
     if (now - lastDetectionTime.current < detectionInterval) return;
 
-    // 模拟情绪检测逻辑
-    const emotions: EmotionType[] = ['happy', 'neutral', 'surprised'];
-    const randomEmotion = emotions[Math.floor(Math.random() * emotions.length)];
+    // 基于时间的智能情绪模拟
+    const hour = new Date().getHours();
+    let emotionWeights: Record<EmotionType, number>;
     
-    if (randomEmotion !== currentEmotion) {
+    // 根据时间段调整情绪概率
+    if (hour >= 6 && hour < 12) {
+      // 早上：更积极的情绪
+      emotionWeights = { happy: 0.4, neutral: 0.4, surprised: 0.15, sad: 0.03, angry: 0.02 };
+    } else if (hour >= 12 && hour < 18) {
+      // 下午：平衡情绪
+      emotionWeights = { happy: 0.3, neutral: 0.5, surprised: 0.1, sad: 0.07, angry: 0.03 };
+    } else {
+      // 晚上：较为平静
+      emotionWeights = { happy: 0.25, neutral: 0.6, surprised: 0.08, sad: 0.05, angry: 0.02 };
+    }
+
+    // 基于权重随机选择情绪
+    const rand = Math.random();
+    let cumulativeWeight = 0;
+    let selectedEmotion: EmotionType = 'neutral';
+    
+    for (const [emotion, weight] of Object.entries(emotionWeights)) {
+      cumulativeWeight += weight;
+      if (rand <= cumulativeWeight) {
+        selectedEmotion = emotion as EmotionType;
+        break;
+      }
+    }
+    
+    if (selectedEmotion !== currentEmotion) {
       lastDetectionTime.current = now;
-      setCurrentEmotion(randomEmotion);
+      setCurrentEmotion(selectedEmotion);
       setFaceDetected(true);
       
-      debugLog('BasicEmotionDetector', `Simulated emotion: ${randomEmotion}`);
-      onEmotionDetected(randomEmotion);
+      debugLog('BasicEmotionDetector', `Intelligent emotion simulation: ${selectedEmotion}`, {
+        timeOfDay: hour,
+        probability: emotionWeights[selectedEmotion]
+      });
+      onEmotionDetected(selectedEmotion);
 
       // 重置face detected状态
       setTimeout(() => setFaceDetected(false), 1000);
@@ -168,9 +196,9 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
         <View style={[styles.emotionIndicator, currentEmotion !== 'neutral' && styles.activeIndicator]}>
           <Text style={styles.emotionText}>
             {currentEmotion === 'happy' && '😊'}
-            {currentEmotion === 'sad' && '😢'}
-            {currentEmotion === 'surprised' && '😲'}
-            {currentEmotion === 'angry' && '😠'}
+            {currentEmotion === 'sad' && '😔'}
+            {currentEmotion === 'surprised' && '😮'}
+            {currentEmotion === 'angry' && '😤'}
             {currentEmotion === 'neutral' && '😐'}
           </Text>
         </View>

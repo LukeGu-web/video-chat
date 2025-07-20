@@ -13,15 +13,8 @@ import {
   EmotionProvider,
   useEmotionContext,
   EmotionAwareCharacter,
-  // SimpleDraggableEmotionDetector,
+  BasicEmotionDetector,
 } from '../components';
-
-// Debug components for testing
-import { MinimalEmotionDetector } from '../components/MinimalEmotionDetector';
-import { TestVisionCamera } from '../components/TestVisionCamera';
-import { TestWorklets } from '../components/TestWorklets';
-import { TestFaceDetector } from '../components/TestFaceDetector';
-import { BasicEmotionDetector } from '../components/BasicEmotionDetector';
 
 type RootStackParamList = {
   Welcome: undefined;
@@ -281,13 +274,7 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
         onStopSpeaking={stopSpeaking}
       />
 
-      {/* Debug Components for testing */}
-      <MinimalEmotionDetector />
-      <TestVisionCamera />
-      <TestWorklets />
-      <TestFaceDetector />
-      
-      {/* Facial Emotion Detection - using basic version to avoid dependency conflicts */}
+      {/* Facial Emotion Detection */}
       <BasicEmotionDetector
         onEmotionDetected={setFacialEmotion}
         isActive={true}
