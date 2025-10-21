@@ -44,7 +44,6 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
 
   // 获取相机设备
   const frontDevice = useCameraDevice('front');
-  const cameraRef = useRef(null);
 
   // 状态管理
   const [currentEmotion, setCurrentEmotion] = useState<EmotionType>('neutral');
@@ -55,9 +54,12 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
     'simulation'
   );
 
-  // 检测频率控制
+  // Detection frequency control
   const lastDetectionTime = useRef(0);
   const lastMLKitDetection = useRef(0);
+
+  // Timeout management for cleanup
+  const faceDetectedTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // 动画值
   const scale = useSharedValue(1);
@@ -110,8 +112,18 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
     setCurrentEmotion(emotion);
     setFaceDetected(true);
     onEmotionDetected(emotion);
-    debugLog('BasicEmotionDetector', `MLKit检测到情绪: ${emotion}`, { confidence });
-    setTimeout(() => setFaceDetected(false), 1000);
+    debugLog('BasicEmotionDetector', `MLKit detected emotion: ${emotion}`, { confidence });
+
+    // Clear existing timeout to prevent memory leak
+    if (faceDetectedTimeoutRef.current) {
+      clearTimeout(faceDetectedTimeoutRef.current);
+    }
+
+    // Set new timeout with ref tracking
+    faceDetectedTimeoutRef.current = setTimeout(() => {
+      setFaceDetected(false);
+      faceDetectedTimeoutRef.current = null;
+    }, 1000);
   }, [onEmotionDetected]);
 
   // Create worklet-compatible callback
@@ -159,7 +171,10 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
         }
       }
     } catch (error) {
-      // Log error silently
+      // Log frame processing errors in debug mode
+      if (isDebugMode()) {
+        console.error('[BasicEmotionDetector] Frame processing error:', error);
+      }
     }
   }, [detectFaces, detectionInterval, updateEmotionWorklet]);
 
@@ -257,15 +272,23 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
       setCurrentEmotion(selectedEmotion);
       setFaceDetected(true);
 
-      debugLog('BasicEmotionDetector', `智能情绪模拟: ${selectedEmotion}`, {
+      debugLog('BasicEmotionDetector', `Intelligent emotion simulation: ${selectedEmotion}`, {
         timeOfDay: hour,
         probability: emotionWeights[selectedEmotion],
         mode: 'simulation',
       });
       onEmotionDetected(selectedEmotion);
 
-      // 重置face detected状态
-      setTimeout(() => setFaceDetected(false), 1000);
+      // Clear existing timeout to prevent memory leak
+      if (faceDetectedTimeoutRef.current) {
+        clearTimeout(faceDetectedTimeoutRef.current);
+      }
+
+      // Set new timeout with ref tracking
+      faceDetectedTimeoutRef.current = setTimeout(() => {
+        setFaceDetected(false);
+        faceDetectedTimeoutRef.current = null;
+      }, 1000);
     }
   }, [
     isActive,
@@ -300,7 +323,17 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
     requestPermissions();
   }, [useMLKit, visionHasPermission, expoPermission, requestExpoPermission, requestVisionPermission]);
 
-  // 自动返回neutral状态
+  // Cleanup timeout on component unmount
+  useEffect(() => {
+    return () => {
+      if (faceDetectedTimeoutRef.current) {
+        clearTimeout(faceDetectedTimeoutRef.current);
+        faceDetectedTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  // Auto reset to neutral state
   useEffect(() => {
     if (!isActive) return;
 
