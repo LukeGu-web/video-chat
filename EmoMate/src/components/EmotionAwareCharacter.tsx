@@ -1,9 +1,9 @@
 import React, { useEffect, useCallback, useRef } from 'react';
 import { View, Text } from 'react-native';
-import Live2DCharacter, { HIYORI_MOTIONS, HiyoriMotion } from './Live2DCharacter';
+import Live2DCharacter, { HIYORI_MOTIONS } from './Live2DCharacter';
 import { useEmotionContext } from './EmotionProvider';
 import { EmotionType } from '../types/emotion';
-import { useAIStatus } from '../store';
+import { useAIStatus, HiyoriMotion } from '../store';
 import { isDebugMode, debugLog } from '../utils/debug';
 
 interface EmotionAwareCharacterProps {

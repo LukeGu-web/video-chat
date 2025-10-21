@@ -1,113 +1,99 @@
-import { useMemo } from 'react';
-import { VisionCameraProxy, Frame } from 'react-native-vision-camera';
+import { useMemo, useEffect, useRef } from 'react';
+import { Frame } from 'react-native-vision-camera';
+import { useFaceDetector, FaceDetectionOptions, Face } from 'react-native-vision-camera-face-detector';
 import type { EmotionType, FaceData, EmotionDetectionResult } from '../types/emotion';
 
-// MLKit Face Detection Plugin Interface
-type MLKitFaceDetectorPlugin = {
-  detectFaces: (frame: Frame) => MLKitFace[];
+// Re-export Face type for backward compatibility
+export type MLKitFace = Face;
+
+// Re-export FaceDetectionOptions for backward compatibility
+export type MLKitFaceDetectionOptions = FaceDetectionOptions;
+
+// Face Detector Plugin Interface
+type FaceDetectorPlugin = {
+  detectFaces: (frame: Frame) => Face[];
+  stopListeners: () => void;
 };
 
-// MLKit Face Interface (based on reference implementation)
-interface MLKitFace {
-  leftEyeOpenProbability: number;
-  rightEyeOpenProbability: number;
-  smilingProbability: number;
-  bounds: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  };
-  rollAngle: number;
-  pitchAngle: number;
-  yawAngle: number;
-}
-
-// MLKit Face Detection Options
-interface MLKitFaceDetectionOptions {
-  performanceMode?: 'fast' | 'accurate';
-  classificationMode?: 'none' | 'all';
-  minFaceSize?: number;
-  trackingEnabled?: boolean;
-}
-
 /**
- * 创建MLKit面部检测插件
- * 基于react-native-vision-camera-face-detector的实现方式
+ * 使用react-native-vision-camera-face-detector 1.9.0 API
+ * 替代旧的VisionCameraProxy方式
  */
-function createMLKitFaceDetectorPlugin(
-  options?: MLKitFaceDetectionOptions
-): MLKitFaceDetectorPlugin | null {
-  try {
-    // 首先检查基础可用性
-    if (!isMLKitAvailable()) {
-      return null;
-    }
+export function useMLKitFaceDetector(
+  options?: FaceDetectionOptions
+): FaceDetectorPlugin | null {
+  const detectionOptions = useMemo<FaceDetectionOptions>(() => ({
+    performanceMode: 'fast',
+    classificationMode: 'all', // Enable emotion classification
+    landmarkMode: 'none',
+    contourMode: 'none',
+    minFaceSize: 0.15,
+    trackingEnabled: false,
+    ...options
+  }), [options]);
 
-    const plugin = VisionCameraProxy.initFrameProcessorPlugin('detectFaces', {
-      performanceMode: 'fast',
-      classificationMode: 'all', // 启用情绪分类
-      landmarkMode: 'none',      // 不需要landmarks
-      contourMode: 'none',       // 不需要contours
-      minFaceSize: 0.2,          // 最小面部大小
-      trackingEnabled: false,    // 禁用跟踪以提高性能
-      ...options
-    });
+  // Use the new useFaceDetector hook from 1.9.0
+  const { detectFaces, stopListeners } = useFaceDetector(detectionOptions);
 
-    if (!plugin) {
-      console.warn('[MLKitFaceDetector] Plugin初始化返回null');
-      return null;
-    }
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopListeners();
+    };
+  }, [stopListeners]);
+
+  return useMemo(() => {
+    if (!detectFaces) return null;
 
     return {
-      detectFaces: (frame: Frame): MLKitFace[] => {
+      detectFaces: (frame: Frame): Face[] => {
         'worklet';
         try {
-          // @ts-ignore - Frame processor plugin call
-          const result = plugin.call(frame);
-          return Array.isArray(result) ? (result as unknown) as MLKitFace[] : [];
+          const faces = detectFaces(frame);
+          return Array.isArray(faces) ? faces : [];
         } catch (error) {
-          console.warn('[MLKitFaceDetector] Detection failed:', error);
+          console.warn('[FaceDetector] Detection failed:', error);
           return [];
         }
-      }
+      },
+      stopListeners
     };
-  } catch (error) {
-    console.warn('[MLKitFaceDetector] Plugin initialization failed:', error);
-    return null;
-  }
+  }, [detectFaces, stopListeners]);
 }
 
 /**
  * 基于MLKit面部特征分析情绪
- * 参考react-native-vision-camera-face-detector的概率算法
+ * 使用react-native-vision-camera-face-detector 1.9.0 Face接口
  */
-export function analyzeEmotionFromMLKitFace(face: MLKitFace): EmotionDetectionResult {
-  const { smilingProbability, leftEyeOpenProbability, rightEyeOpenProbability } = face;
-  
-  // 眼睛开合平均值
-  const avgEyeOpen = (leftEyeOpenProbability + rightEyeOpenProbability) / 2;
-  
+export function analyzeEmotionFromMLKitFace(face: Face): EmotionDetectionResult {
+  // Face interface from 1.9.0: { smilingProbability, leftEyeOpenProbability, rightEyeOpenProbability, bounds }
+  const smilingProb = face.smilingProbability ?? 0;
+  const leftEyeProb = face.leftEyeOpenProbability ?? 0.5;
+  const rightEyeProb = face.rightEyeOpenProbability ?? 0.5;
+
+  // Calculate average eye open probability
+  const avgEyeOpen = (leftEyeProb + rightEyeProb) / 2;
+
   let emotion: EmotionType = 'neutral';
   let confidence = 0.5;
 
-  // 情绪分析算法
-  if (smilingProbability > 0.6) {
-    // 高微笑概率 = 开心
+  // Emotion analysis algorithm based on facial probabilities
+  if (smilingProb > 0.6) {
+    // High smiling probability = happy
     emotion = 'happy';
-    confidence = Math.min(smilingProbability, 0.95);
-  } else if (avgEyeOpen > 0.8 && smilingProbability < 0.3) {
-    // 眼睛大睁 + 低微笑 = 惊讶
+    confidence = Math.min(smilingProb, 0.95);
+  } else if (avgEyeOpen > 0.8 && smilingProb < 0.3) {
+    // Wide eyes + low smile = surprised
     emotion = 'surprised';
     confidence = Math.min(avgEyeOpen, 0.85);
-  } else if (avgEyeOpen < 0.4 && smilingProbability < 0.2) {
-    // 眼睛微闭 + 不微笑 = 悲伤
+  } else if (avgEyeOpen < 0.4 && smilingProb < 0.2) {
+    // Eyes closed + no smile = sad
     emotion = 'sad';
     confidence = Math.min(1.0 - avgEyeOpen, 0.8);
-  } else if (smilingProbability < 0.1 && avgEyeOpen > 0.5) {
-    // 不微笑 + 眼睛正常 = 愤怒
+  } else if (smilingProb < 0.1 && avgEyeOpen > 0.5) {
+    // No smile + normal eyes = angry
     emotion = 'angry';
-    confidence = Math.min(1.0 - smilingProbability, 0.75);
+    confidence = Math.min(1.0 - smilingProb, 0.75);
   }
 
   return {
@@ -118,21 +104,9 @@ export function analyzeEmotionFromMLKitFace(face: MLKitFace): EmotionDetectionRe
 }
 
 /**
- * 使用MLKit面部检测的Hook
- * 兼容EAS Build，无需本地原生代码修改
+ * Convert Face data to legacy FaceData format
  */
-export function useMLKitFaceDetector(
-  options?: MLKitFaceDetectionOptions
-): MLKitFaceDetectorPlugin | null {
-  return useMemo(() => {
-    return createMLKitFaceDetectorPlugin(options);
-  }, [options]);
-}
-
-/**
- * 将MLKit面部数据转换为EmotionDetector格式
- */
-export function convertMLKitFaceToFaceData(face: MLKitFace): FaceData {
+export function convertMLKitFaceToFaceData(face: Face): FaceData {
   return {
     smilingProbability: face.smilingProbability,
     leftEyeOpenProbability: face.leftEyeOpenProbability,
@@ -142,20 +116,17 @@ export function convertMLKitFaceToFaceData(face: MLKitFace): FaceData {
 }
 
 /**
- * 检查MLKit插件是否可用
+ * Check if face detection is available
+ * For 1.9.0, detection availability is determined by the useFaceDetector hook
  */
 export function isMLKitAvailable(): boolean {
+  // For version 1.9.0, face detection is available if the library is properly installed
+  // The actual availability check happens within useFaceDetector hook
   try {
-    // 检查VisionCameraProxy是否可用
-    if (!VisionCameraProxy || typeof VisionCameraProxy.initFrameProcessorPlugin !== 'function') {
-      return false;
-    }
-    
-    // 尝试初始化插件来检查可用性
-    const plugin = VisionCameraProxy.initFrameProcessorPlugin('detectFaces', {});
-    return plugin !== null;
+    // Check if the library exports are available
+    return typeof useFaceDetector === 'function';
   } catch (error) {
-    console.warn('[MLKitFaceDetector] MLKit不可用:', error);
+    console.warn('[FaceDetector] Face detection not available:', error);
     return false;
   }
 }

@@ -8,10 +8,10 @@ import {
   StyleSheet 
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { 
+import {
   EmotionProvider,
   useEmotionContext,
-  FacialEmotionDetector,
+  BasicEmotionDetector,
   ChatEmotionAnalyzer,
   EmotionAwareCharacter
 } from '../components';
@@ -75,7 +75,7 @@ const EmotionTestContent: React.FC = () => {
           </View>
           
           {isFacialDetectionActive && (
-            <FacialEmotionDetector
+            <BasicEmotionDetector
               onEmotionDetected={handleFacialEmotionDetected}
               isActive={isFacialDetectionActive}
             />

@@ -17,7 +17,7 @@ export const ChatEmotionAnalyzer: React.FC<ChatEmotionAnalyzerProps> = ({
   enabled = true,
   debounceMs = 500
 }) => {
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const lastAnalyzedText = useRef<string>('');
 
   useEffect(() => {

@@ -10,23 +10,20 @@ import {
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import {
   Camera,
-  useFrameProcessor,
   useCameraDevice,
   useCameraPermission,
+  useFrameProcessor,
 } from 'react-native-vision-camera';
+import { Worklets } from 'react-native-worklets-core';
+import { useFaceDetector } from 'react-native-vision-camera-face-detector';
+import type { FaceDetectionOptions } from 'react-native-vision-camera-face-detector';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
-  runOnJS,
 } from 'react-native-reanimated';
 import { EmotionDetectorProps, EmotionType } from '../types/emotion';
 import { isDebugMode, debugLog } from '../utils/debug';
-import {
-  useMLKitFaceDetector,
-  analyzeEmotionFromMLKitFace,
-  isMLKitAvailable,
-} from '../utils/faceDetection';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CONTAINER_WIDTH = 120;
@@ -47,6 +44,7 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
 
   // 获取相机设备
   const frontDevice = useCameraDevice('front');
+  const cameraRef = useRef(null);
 
   // 状态管理
   const [currentEmotion, setCurrentEmotion] = useState<EmotionType>('neutral');
@@ -64,36 +62,35 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
   // 动画值
   const scale = useSharedValue(1);
 
-  // MLKit面部检测插件
-  const mlkitDetector = useMLKitFaceDetector({
+  // MLKit face detection options (1.9.0)
+  const faceDetectionOptions = React.useMemo<FaceDetectionOptions>(() => ({
     performanceMode: 'fast',
     classificationMode: 'all',
-    minFaceSize: 0.2,
+    minFaceSize: 0.15,
     trackingEnabled: false,
-  });
+  }), []);
+
+  // Use the hook to get detectFaces function
+  const { detectFaces } = useFaceDetector(faceDetectionOptions);
 
   // 初始化检测模式和权限
   useEffect(() => {
     const checkMLKitAvailability = async () => {
       try {
-        // 暂时禁用MLKit，使用智能模拟模式
-        // TODO: 在完成MLKit配置后启用真实检测
-        const enableMLKit = false; // 暂时设为false
+        // 启用真实面部检测 (react-native-vision-camera-face-detector 1.9.0)
+        const enableMLKit = true; // 已升级到1.9.0，现在启用真实检测
 
-        if (enableMLKit) {
-          const available = isMLKitAvailable();
-          if (available && mlkitDetector && visionHasPermission) {
-            setUseMLKit(true);
-            setDetectionMode('mlkit');
-            debugLog('BasicEmotionDetector', 'MLKit面部检测已启用');
-            return;
-          }
+        if (enableMLKit && visionHasPermission) {
+          setUseMLKit(true);
+          setDetectionMode('mlkit');
+          debugLog('BasicEmotionDetector', 'MLKit面部检测已启用 (v1.9.0 - Callback方式)');
+          return;
         }
 
-        // 默认使用智能模拟模式
+        // 如果MLKit不可用，使用智能模拟模式作为后备
         setUseMLKit(false);
         setDetectionMode('simulation');
-        debugLog('BasicEmotionDetector', '使用智能模拟模式');
+        debugLog('BasicEmotionDetector', '使用智能模拟模式 (MLKit后备)');
       } catch (error) {
         debugLog(
           'BasicEmotionDetector',
@@ -106,59 +103,65 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
     };
 
     checkMLKitAvailability();
-  }, [mlkitDetector]);
+  }, [visionHasPermission]);
 
-  // MLKit情绪检测处理函数
-  const handleMLKitDetection = useCallback(
-    (emotion: EmotionType, confidence: number) => {
-      const now = Date.now();
-      if (now - lastMLKitDetection.current < detectionInterval) return;
+  // Callback to update emotion on JS thread
+  const updateEmotionCallback = useCallback((emotion: EmotionType, confidence: number) => {
+    setCurrentEmotion(emotion);
+    setFaceDetected(true);
+    onEmotionDetected(emotion);
+    debugLog('BasicEmotionDetector', `MLKit检测到情绪: ${emotion}`, { confidence });
+    setTimeout(() => setFaceDetected(false), 1000);
+  }, [onEmotionDetected]);
 
-      if (emotion !== currentEmotion && confidence > 0.6) {
-        lastMLKitDetection.current = now;
-        setCurrentEmotion(emotion);
-        setFaceDetected(true);
+  // Create worklet-compatible callback
+  const updateEmotionWorklet = Worklets.createRunOnJS(updateEmotionCallback);
 
-        debugLog('BasicEmotionDetector', `MLKit检测到情绪: ${emotion}`, {
-          confidence,
-          mode: 'mlkit',
-        });
+  // Frame processor for face detection
+  const frameProcessor = useFrameProcessor((frame) => {
+    'worklet';
 
-        onEmotionDetected(emotion);
+    try {
+      const faces = detectFaces(frame);
 
-        // 重置face detected状态
-        setTimeout(() => setFaceDetected(false), 1000);
-      }
-    },
-    [currentEmotion, onEmotionDetected, detectionInterval]
-  );
+      if (faces && faces.length > 0) {
+        const face = faces[0];
+        const smilingProb = face.smilingProbability ?? 0;
+        const leftEyeProb = face.leftEyeOpenProbability ?? 0.5;
+        const rightEyeProb = face.rightEyeOpenProbability ?? 0.5;
+        const avgEyeOpen = (leftEyeProb + rightEyeProb) / 2;
 
-  // MLKit Frame Processor
-  const frameProcessor = useFrameProcessor(
-    (frame) => {
-      'worklet';
+        let emotion: EmotionType = 'neutral';
+        let confidence = 0.5;
 
-      if (!isActive || !useMLKit || !mlkitDetector) return;
-
-      try {
-        const faces = mlkitDetector.detectFaces(frame);
-
-        if (faces.length > 0) {
-          const face = faces[0]; // 使用第一个检测到的面部
-          const emotionResult = analyzeEmotionFromMLKitFace(face);
-
-          // 使用runOnJS将结果传递给主线程
-          runOnJS(handleMLKitDetection)(
-            emotionResult.emotion,
-            emotionResult.confidence
-          );
+        if (smilingProb > 0.6) {
+          emotion = 'happy';
+          confidence = Math.min(smilingProb, 0.95);
+        } else if (avgEyeOpen > 0.8 && smilingProb < 0.3) {
+          emotion = 'surprised';
+          confidence = Math.min(avgEyeOpen, 0.85);
+        } else if (avgEyeOpen < 0.4 && smilingProb < 0.2) {
+          emotion = 'sad';
+          confidence = Math.min(1.0 - avgEyeOpen, 0.8);
+        } else if (smilingProb < 0.1 && avgEyeOpen > 0.5) {
+          emotion = 'angry';
+          confidence = Math.min(1.0 - smilingProb, 0.75);
         }
-      } catch (error) {
-        console.warn('[BasicEmotionDetector] MLKit检测错误:', error);
+
+        const now = Date.now();
+        const lastTime = lastMLKitDetection.current;
+
+        if (now - lastTime >= detectionInterval && confidence > 0.6) {
+          lastMLKitDetection.current = now;
+
+          // Call JS function from worklet context
+          updateEmotionWorklet(emotion, confidence);
+        }
       }
-    },
-    [isActive, useMLKit, mlkitDetector, handleMLKitDetection]
-  );
+    } catch (error) {
+      // Log error silently
+    }
+  }, [detectFaces, detectionInterval, updateEmotionWorklet]);
 
   // 创建PanResponder处理拖拽
   const panResponder = PanResponder.create({
@@ -424,6 +427,9 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
         <View style={styles.debugOverlay}>
           <Text style={styles.debugText}>Emotion: {currentEmotion}</Text>
           <Text style={styles.debugText}>Mode: {detectionMode}</Text>
+          <Text style={styles.debugText}>
+            MLKit: {useMLKit ? 'Enabled' : 'Disabled'}
+          </Text>
           <Text style={styles.debugText}>
             Detecting: {faceDetected ? 'Yes' : 'No'}
           </Text>
