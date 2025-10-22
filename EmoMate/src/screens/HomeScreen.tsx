@@ -1,5 +1,5 @@
 import React, { useEffect, useCallback, useState } from 'react';
-import { View, TouchableOpacity, Text } from 'react-native';
+import { View, TouchableOpacity, Text, ImageBackground } from 'react-native';
 import { SafeAreaView as SafeAreaViewRN } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useUserStore, ChatMessage, useAIStatus } from '../store';
@@ -225,62 +225,68 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
   }
 
   return (
-    <SafeAreaViewRN className='flex-1 bg-blue-100'>
-      {/* Error Toast */}
-      <ErrorToast
-        message={errorMessage}
-        isVisible={showErrorToast}
-        onDismiss={handleDismissError}
-        duration={4000}
-      />
+    <ImageBackground
+      source={require('../../assets/background/afternoon.jpeg')}
+      className='flex-1'
+      resizeMode='cover'
+    >
+      <SafeAreaViewRN className='flex-1'>
+        {/* Error Toast */}
+        <ErrorToast
+          message={errorMessage}
+          isVisible={showErrorToast}
+          onDismiss={handleDismissError}
+          duration={4000}
+        />
 
-      <Header
-        characterName={selectedCharacter || 'AI伴侣'}
-        onGoBack={handleGoBack}
-        onGoToChatHistory={handleGoToChatHistory}
-        onGoToEmotionTest={handleGoToEmotionTest}
-      />
+        <Header
+          characterName={selectedCharacter || 'AI伴侣'}
+          onGoBack={handleGoBack}
+          onGoToChatHistory={handleGoToChatHistory}
+          onGoToEmotionTest={handleGoToEmotionTest}
+        />
 
-      {/* Main Content Area */}
-      <View className='justify-center flex-1 '>
-        {/* Live2D Character with Emotion Awareness */}
-        <View className='items-center'>
-          <EmotionAwareCharacter
-            size={300}
-            loop={true}
-            className='shadow-lg'
-            enableEmotionMapping={true}
-          />
+        {/* Main Content Area */}
+        <View className='justify-center flex-1 '>
+          {/* Live2D Character with Emotion Awareness */}
+          <View className='items-center'>
+            <EmotionAwareCharacter
+              size={300}
+              loop={true}
+              className='shadow-lg'
+              enableEmotionMapping={true}
+            />
+          </View>
+
+          {/* Current Speech Bubble - Only show when AI is speaking */}
+          <View className='min-h-[100px] justify-end'>
+            {isSpeaking && currentSegment && (
+              <CurrentSpeechBubble currentMessage={currentSegment} />
+            )}
+          </View>
         </View>
 
-        {/* Current Speech Bubble - Only show when AI is speaking */}
-        <View className='min-h-[100px] justify-end'>
-          {isSpeaking && currentSegment && (
-            <CurrentSpeechBubble currentMessage={currentSegment} />
-          )}
-        </View>
-      </View>
+        {/* Voice Control */}
+        <VoiceControl
+          isListening={isListening}
+          isSupported={isSupported}
+          isAILoading={isAILoading}
+          isSpeaking={isSpeaking}
+          isGenerating={isGenerating}
+          error={error}
+          onStartListening={startListening}
+          onStopListening={stopListening}
+          onStopSpeaking={stopSpeaking}
+        />
 
-      {/* Voice Control */}
-      <VoiceControl
-        isListening={isListening}
-        isSupported={isSupported}
-        isAILoading={isAILoading}
-        isSpeaking={isSpeaking}
-        isGenerating={isGenerating}
-        error={error}
-        onStartListening={startListening}
-        onStopListening={stopListening}
-        onStopSpeaking={stopSpeaking}
-      />
-
-      {/* Facial Emotion Detection */}
-      <BasicEmotionDetector
-        onEmotionDetected={setFacialEmotion}
-        isActive={true}
-        detectionInterval={3000}
-      />
-    </SafeAreaViewRN>
+        {/* Facial Emotion Detection */}
+        <BasicEmotionDetector
+          onEmotionDetected={setFacialEmotion}
+          isActive={true}
+          detectionInterval={3000}
+        />
+      </SafeAreaViewRN>
+    </ImageBackground>
   );
 };
 
