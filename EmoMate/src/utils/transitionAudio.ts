@@ -81,35 +81,35 @@ class TransitionAudioManager {
     console.log('[TransitionAudio] 开始预加载过渡语音...');
 
     try {
-      // TODO: Phase 1 待实现 - 生成音频文件后取消注释
-      // const audioFiles = {
-      //   thinking_01: require('../../assets/audio/transitions/thinking_01.mp3'),
-      //   thinking_02: require('../../assets/audio/transitions/thinking_02.mp3'),
-      //   thinking_03: require('../../assets/audio/transitions/thinking_03.mp3'),
-      //   thinking_04: require('../../assets/audio/transitions/thinking_04.mp3'),
-      //
-      //   question_01: require('../../assets/audio/transitions/question_01.mp3'),
-      //   question_02: require('../../assets/audio/transitions/question_02.mp3'),
-      //   question_03: require('../../assets/audio/transitions/question_03.mp3'),
-      //
-      //   excited_01: require('../../assets/audio/transitions/excited_01.mp3'),
-      //   excited_02: require('../../assets/audio/transitions/excited_02.mp3'),
-      //   excited_03: require('../../assets/audio/transitions/excited_03.mp3'),
-      //   excited_04: require('../../assets/audio/transitions/excited_04.mp3'),
-      //
-      //   empathy_01: require('../../assets/audio/transitions/empathy_01.mp3'),
-      //   empathy_02: require('../../assets/audio/transitions/empathy_02.mp3'),
-      //   empathy_03: require('../../assets/audio/transitions/empathy_03.mp3'),
-      //
-      //   acknowledgment_01: require('../../assets/audio/transitions/acknowledgment_01.mp3'),
-      //   acknowledgment_02: require('../../assets/audio/transitions/acknowledgment_02.mp3'),
-      //   acknowledgment_03: require('../../assets/audio/transitions/acknowledgment_03.mp3'),
-      // };
-      //
-      // for (const [key, file] of Object.entries(audioFiles)) {
-      //   const { sound } = await Audio.Sound.createAsync(file);
-      //   this.audioCache[key] = sound;
-      // }
+      // Phase 1 实现: 预加载所有过渡音频
+      const audioFiles = {
+        thinking_01: require('../../assets/audio/transitions/thinking_01.mp3'),
+        thinking_02: require('../../assets/audio/transitions/thinking_02.mp3'),
+        thinking_03: require('../../assets/audio/transitions/thinking_03.mp3'),
+        thinking_04: require('../../assets/audio/transitions/thinking_04.mp3'),
+
+        question_01: require('../../assets/audio/transitions/question_01.mp3'),
+        question_02: require('../../assets/audio/transitions/question_02.mp3'),
+        question_03: require('../../assets/audio/transitions/question_03.mp3'),
+
+        excited_01: require('../../assets/audio/transitions/excited_01.mp3'),
+        excited_02: require('../../assets/audio/transitions/excited_02.mp3'),
+        excited_03: require('../../assets/audio/transitions/excited_03.mp3'),
+        excited_04: require('../../assets/audio/transitions/excited_04.mp3'),
+
+        empathy_01: require('../../assets/audio/transitions/empathy_01.mp3'),
+        empathy_02: require('../../assets/audio/transitions/empathy_02.mp3'),
+        empathy_03: require('../../assets/audio/transitions/empathy_03.mp3'),
+
+        acknowledgment_01: require('../../assets/audio/transitions/acknowledgment_01.mp3'),
+        acknowledgment_02: require('../../assets/audio/transitions/acknowledgment_02.mp3'),
+        acknowledgment_03: require('../../assets/audio/transitions/acknowledgment_03.mp3'),
+      };
+
+      for (const [key, file] of Object.entries(audioFiles)) {
+        const { sound } = await Audio.Sound.createAsync(file);
+        this.audioCache[key] = sound;
+      }
 
       this.initialized = true;
       console.log('[TransitionAudio] 预加载完成！');
@@ -125,29 +125,26 @@ class TransitionAudioManager {
    * @param category 过渡语音类别
    */
   async playTransition(category: TransitionCategory): Promise<void> {
-    // Phase 1: 暂时使用文本日志,待音频文件生成后替换为实际播放
-    const phrase = this.selectRandomPhrase(category);
-    console.log(`[TransitionAudio] 播放过渡语音 [${category}]: "${phrase}"`);
+    // Phase 1 实现: 播放预加载的过渡音频
+    if (!this.initialized) {
+      console.warn('[TransitionAudio] 音频未预加载,跳过播放');
+      return;
+    }
 
-    // TODO: Phase 1 待实现 - 生成音频文件后取消注释
-    // if (!this.initialized) {
-    //   console.warn('[TransitionAudio] 音频未预加载,跳过播放');
-    //   return;
-    // }
-    //
-    // const audioKey = this.selectRandomAudio(category);
-    // const sound = this.audioCache[audioKey];
-    //
-    // if (!sound) {
-    //   console.warn(`[TransitionAudio] 未找到音频: ${audioKey}`);
-    //   return;
-    // }
-    //
-    // try {
-    //   await sound.replayAsync(); // 从头播放
-    // } catch (error) {
-    //   console.error('[TransitionAudio] 播放失败:', error);
-    // }
+    const audioKey = this.selectRandomAudio(category);
+    const sound = this.audioCache[audioKey];
+
+    if (!sound) {
+      console.warn(`[TransitionAudio] 未找到音频: ${audioKey}`);
+      return;
+    }
+
+    try {
+      await sound.replayAsync(); // 从头播放
+      console.log(`[TransitionAudio] ✅ 播放过渡语音 [${category}]: ${audioKey}`);
+    } catch (error) {
+      console.error('[TransitionAudio] 播放失败:', error);
+    }
   }
 
   /**

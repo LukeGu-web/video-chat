@@ -223,7 +223,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       max_tokens: lengthConfig.maxTokens, // 使用动态token配置
       system: systemMessage,
       messages: contextMessages,
-      stop_sequences: ["\n\n", "用户:", "User:", "---"], // Phase 1: 添加停止序列优化
+      stop_sequences: ["用户:", "User:", "---"], // Phase 1: 添加停止序列优化 (移除 \n\n)
     };
 
     const response = await fetch(CLAUDE_API_CONFIG.baseURL, {
@@ -274,14 +274,15 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       clearProactiveTimer();
 
       try {
-        // Phase 1: 立即播放过渡语音 (0.3s 内反馈)
+        // Phase 1: 检测过渡语音类别 (暂不播放,避免与真实回答不连贯)
+        // 注: 过渡语音播放将在 Phase 2 流式响应中实现,与真实回答无缝衔接
         const detectedEmotion = detectUserEmotion(content);
         const transitionCategory = detectTransitionCategory(
           content,
           detectedEmotion as Emotion
         );
-        console.log(`[ChatAI] 过渡语音类别: ${transitionCategory}`);
-        transitionAudio.playTransition(transitionCategory); // 不await,立即继续
+        console.log(`[ChatAI] 过渡语音类别: ${transitionCategory} (Phase 1: 仅检测,不播放)`);
+        // transitionAudio.playTransition(transitionCategory); // Phase 2 启用
 
         // 检测对话类型
         const conversationType = detectConversationType(content, updatedMessages);
