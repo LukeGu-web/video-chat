@@ -68,6 +68,7 @@ class TransitionAudioManager {
   private audioCache: TransitionAudioCache = {};
   private initialized = false;
   private isPreloading = false;
+  private currentSound: Audio.Sound | null = null; // Track currently playing sound
 
   /**
    * 预加载所有过渡音频
@@ -125,10 +126,20 @@ class TransitionAudioManager {
    * @param category 过渡语音类别
    */
   async playTransition(category: TransitionCategory): Promise<void> {
-    // Phase 1 实现: 播放预加载的过渡音频
+    // Phase 2: 播放预加载的过渡音频
     if (!this.initialized) {
       console.warn('[TransitionAudio] 音频未预加载,跳过播放');
       return;
+    }
+
+    // Stop previous sound if playing
+    if (this.currentSound) {
+      try {
+        await this.currentSound.stopAsync();
+        await this.currentSound.setPositionAsync(0);
+      } catch (e) {
+        // Ignore stop errors
+      }
     }
 
     const audioKey = this.selectRandomAudio(category);
@@ -140,10 +151,32 @@ class TransitionAudioManager {
     }
 
     try {
+      this.currentSound = sound;
       await sound.replayAsync(); // 从头播放
       console.log(`[TransitionAudio] ✅ 播放过渡语音 [${category}]: ${audioKey}`);
     } catch (error) {
       console.error('[TransitionAudio] 播放失败:', error);
+      this.currentSound = null;
+    }
+  }
+
+  /**
+   * Stop currently playing transition audio
+   * Phase 2: Called when first real sentence arrives
+   */
+  async stop(): Promise<void> {
+    if (!this.currentSound) {
+      return;
+    }
+
+    try {
+      console.log('[TransitionAudio] ⏸️ 停止过渡语音');
+      await this.currentSound.stopAsync();
+      await this.currentSound.setPositionAsync(0);
+      this.currentSound = null;
+    } catch (error) {
+      console.error('[TransitionAudio] 停止失败:', error);
+      this.currentSound = null;
     }
   }
 

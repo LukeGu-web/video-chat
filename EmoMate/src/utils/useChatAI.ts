@@ -14,6 +14,8 @@ import {
 } from '../constants/ai';
 import { transitionAudio } from './transitionAudio'; // Phase 1: 过渡语音管理
 import { detectTransitionCategory, type Emotion } from './conversationAnalysis'; // Phase 1: 对话分析
+import { SentenceBuffer, parseSSEChunk } from './sentenceDetector'; // Phase 2: 句子检测
+import { TTSQueue } from './ttsQueue'; // Phase 2: TTS队列管理
 
 export interface ChatMessage {
   id: string;
@@ -188,6 +190,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     }, 300);
   }, [isProactiveModeEnabled, speak]);
 
+  // Phase 1: Non-streaming API call (kept for fallback)
   const callClaudeAPI = async (
     messages: ChatMessage[],
     config: ChatAIConfig,
@@ -208,7 +211,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     // 构建API消息格式，包含人格、情绪和上下文信息
     const personalityText = config.personality || currentPersonality;
     const systemMessage = buildSystemPrompt(personalityText, config.userEmotion, conversationType);
-    
+
     // 保留更多上下文消息以保持对话连贯性
     const contextMessages = messages
       .filter((msg) => msg.role !== 'system')
@@ -246,11 +249,126 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
 
     const data = await response.json();
     const rawResponse = data.content?.[0]?.text || '抱歉，我无法生成回复。';
-    
+
     // 验证和优化回应格式，传入对话类型
     return validateAndOptimizeResponse(rawResponse, conversationType);
   };
 
+  // Phase 2: Streaming API call with sentence-by-sentence TTS
+  // Note: Using XMLHttpRequest for streaming in React Native
+  const callClaudeAPIStreaming = async (
+    messages: ChatMessage[],
+    config: ChatAIConfig,
+    conversationType: 'simple' | 'normal' | 'detailed' | 'storytelling' = 'normal',
+    onSentence: (sentence: string) => void
+  ): Promise<string> => {
+    const apiKey = config.apiKey || getClaudeApiKey();
+    if (!apiKey) {
+      throw new Error(AI_ERROR_MESSAGES.API_KEY_MISSING);
+    }
+
+    const model = config.modelType
+      ? CLAUDE_API_CONFIG.models[config.modelType]
+      : CLAUDE_API_CONFIG.models[CLAUDE_API_CONFIG.defaultModel];
+
+    const lengthConfig = getResponseLengthConfig(conversationType);
+    const personalityText = config.personality || currentPersonality;
+    const systemMessage = buildSystemPrompt(personalityText, config.userEmotion, conversationType);
+
+    const contextMessages = messages
+      .filter((msg) => msg.role !== 'system')
+      .slice(-10)
+      .map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+      }));
+
+    const requestBody = {
+      model,
+      max_tokens: lengthConfig.maxTokens,
+      system: systemMessage,
+      messages: contextMessages,
+      stop_sequences: ["用户:", "User:", "---"],
+      stream: true, // Enable streaming
+    };
+
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', CLAUDE_API_CONFIG.baseURL, true);
+      xhr.responseType = 'text'; // Important for streaming
+
+      // Set headers
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.setRequestHeader('x-api-key', apiKey);
+      xhr.setRequestHeader('anthropic-version', CLAUDE_API_CONFIG.version);
+
+      let fullText = '';
+      let processedLength = 0;
+
+      // Create sentence buffer with callback
+      const sentenceBuffer = new SentenceBuffer((sentence) => {
+        console.log(`[ChatAI] Streaming sentence detected: "${sentence}"`);
+        onSentence(sentence);
+        fullText += sentence;
+      });
+
+      // Track processed lines to avoid duplicates
+      const processedLines = new Set<string>();
+
+      // Handle streaming progress
+      xhr.onprogress = () => {
+        const responseText = xhr.responseText;
+
+        // Only process new content
+        if (responseText.length > processedLength) {
+          const newContent = responseText.slice(processedLength);
+          processedLength = responseText.length;
+
+          // Process SSE lines
+          const lines = newContent.split('\n');
+
+          for (const line of lines) {
+            if (line.trim() === '' || processedLines.has(line)) continue;
+            processedLines.add(line);
+
+            // Parse SSE chunk
+            const text = parseSSEChunk(line);
+            if (text) {
+              sentenceBuffer.add(text);
+            }
+          }
+        }
+      };
+
+      // Handle completion
+      xhr.onload = () => {
+        if (xhr.status === 200) {
+          try {
+            // Flush remaining content
+            sentenceBuffer.flush();
+
+            // Validate and optimize final response
+            const optimizedResponse = validateAndOptimizeResponse(fullText, conversationType);
+            resolve(optimizedResponse);
+          } catch (error) {
+            reject(new Error(`Response processing failed: ${error}`));
+          }
+        } else {
+          reject(new Error(`${AI_ERROR_MESSAGES.API_CALL_FAILED}: ${xhr.status}`));
+        }
+      };
+
+      // Handle errors
+      xhr.onerror = () => {
+        reject(new Error('Network request failed'));
+      };
+
+      // Send request
+      xhr.send(JSON.stringify(requestBody));
+    });
+  };
+
+  // Phase 2: Streaming send message with TTS queue
   const sendMessage = useCallback(
     async (content: string, config?: ChatAIConfig) => {
       if (!content.trim()) return;
@@ -258,7 +376,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       setIsLoading(true);
       setError(null);
 
-      // 添加用户消息
+      // Add user message
       const userMessage: ChatMessage = {
         id: generateMessageId(),
         role: 'user',
@@ -269,66 +387,99 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       const updatedMessages = [...messages, userMessage];
       setMessages(updatedMessages);
 
-      // 更新最后用户消息时间并重启主动对话检测
+      // Update proactive conversation timer
       lastUserMessageTime.current = Date.now();
       clearProactiveTimer();
 
+      // Detect emotion and transition category
+      const detectedEmotion = detectUserEmotion(content);
+      const transitionCategory = detectTransitionCategory(
+        content,
+        detectedEmotion as Emotion
+      );
+      console.log(`[ChatAI] Phase 2: 过渡语音类别: ${transitionCategory}`);
+
+      // Detect conversation type
+      const conversationType = detectConversationType(content, updatedMessages);
+      console.log(`[ChatAI] Phase 2: 对话类型检测: "${content}" -> ${conversationType}`);
+
+      // Enhanced config with emotion
+      const enhancedConfig = {
+        ...config,
+        userEmotion: config?.userEmotion || detectedEmotion,
+      };
+
+      // Initialize TTS queue
+      const voiceId = enhancedConfig?.voiceId || 'hkfHEbBvdQFNX4uWHqRF';
+      const ttsQueue = new TTSQueue({
+        voiceId,
+        userEmotion: enhancedConfig?.userEmotion,
+      });
+
+      let transitionAudioPlayed = false;
+      let firstSentenceReceived = false;
+
       try {
-        // Phase 1: 检测过渡语音类别 (暂不播放,避免与真实回答不连贯)
-        // 注: 过渡语音播放将在 Phase 2 流式响应中实现,与真实回答无缝衔接
-        const detectedEmotion = detectUserEmotion(content);
-        const transitionCategory = detectTransitionCategory(
-          content,
-          detectedEmotion as Emotion
+        // Phase 2: Play transition audio immediately
+        if (enhancedConfig?.enableTTS !== false) {
+          console.log('[ChatAI] 🔊 Phase 2: 播放过渡语音');
+          transitionAudio.playTransition(transitionCategory).catch((err) => {
+            console.warn('[ChatAI] 过渡语音播放失败:', err);
+          });
+          transitionAudioPlayed = true;
+        }
+
+        // Stream API call with sentence-by-sentence TTS
+        const aiResponse = await callClaudeAPIStreaming(
+          updatedMessages,
+          enhancedConfig,
+          conversationType,
+          async (sentence) => {
+            // Phase 2: Stop transition audio on first sentence
+            if (!firstSentenceReceived && transitionAudioPlayed) {
+              console.log('[ChatAI] ⏸️ Phase 2: 停止过渡语音,开始真实回答');
+              await transitionAudio.stop(); // Stop transition audio
+              firstSentenceReceived = true;
+            }
+
+            // Enqueue sentence for TTS
+            if (enhancedConfig?.enableTTS !== false) {
+              console.log(`[ChatAI] 🎵 Phase 2: 加入TTS队列: "${sentence}"`);
+              await ttsQueue.enqueue(sentence);
+            }
+          }
         );
-        console.log(`[ChatAI] 过渡语音类别: ${transitionCategory} (Phase 1: 仅检测,不播放)`);
-        // transitionAudio.playTransition(transitionCategory); // Phase 2 启用
 
-        // 检测对话类型
-        const conversationType = detectConversationType(content, updatedMessages);
-        console.log(`[ChatAI] 对话类型检测: "${content}" -> ${conversationType}`);
-        
-        // 合并配置，包含情绪信息
-        const enhancedConfig = {
-          ...config,
-          userEmotion: config?.userEmotion || detectedEmotion
-        };
-
-        // 调用Claude API，传入对话类型
-        const aiResponse = await callClaudeAPI(updatedMessages, enhancedConfig, conversationType);
-
-        // 添加AI回复
+        // Add AI message with full response
         const aiMessage: ChatMessage = {
           id: generateMessageId(),
           role: 'assistant',
           content: aiResponse,
           timestamp: Date.now(),
-          conversationType: conversationType, // 记录对话类型用于调试
+          conversationType: conversationType,
         };
 
         setMessages([...updatedMessages, aiMessage]);
 
-        // 如果启用了 TTS，自动播放 AI 回复
+        // Wait for TTS queue to finish
         if (enhancedConfig?.enableTTS !== false) {
-          // 默认启用，除非明确设为 false
-          setTimeout(() => {
-            // 使用角色设定中的默认语音ID
-            const voiceId = enhancedConfig?.voiceId || 'hkfHEbBvdQFNX4uWHqRF';
-            speak(aiResponse, voiceId, enhancedConfig?.userEmotion).catch(() => {
-              // TTS error handled silently
-            });
-          }, 500); // 稍微延迟以确保消息已显示
+          console.log('[ChatAI] ⏳ Phase 2: 等待TTS队列完成');
+          await ttsQueue.waitForCompletion();
+          console.log('[ChatAI] ✅ Phase 2: TTS队列播放完成');
         }
 
-        // 启动主动对话检测
+        // Start proactive conversation detection
         setTimeout(() => {
           startProactiveConversation();
         }, 1000);
       } catch (err) {
-        // API error handled below
+        console.error('[ChatAI] Phase 2 error:', err);
         setError(err instanceof Error ? err.message : '发送消息失败');
 
-        // 添加错误消息
+        // Cancel TTS queue on error
+        ttsQueue.cancel();
+
+        // Add error message
         const errorMessage: ChatMessage = {
           id: generateMessageId(),
           role: 'assistant',
@@ -341,7 +492,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
         setIsLoading(false);
       }
     },
-    [messages, currentPersonality, speak]
+    [messages, currentPersonality, startProactiveConversation, clearProactiveTimer]
   );
 
   const clearMessages = useCallback(() => {
