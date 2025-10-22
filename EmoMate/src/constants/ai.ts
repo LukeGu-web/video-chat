@@ -175,10 +175,22 @@ export const hasCapability = (capabilityId: string): boolean => {
 export const getCapabilityStatus = () => {
   const capabilities = getAICapabilities();
   return {
+    // 基础对话能力
     canSpeak: hasCapability('voice_synthesis'),
     canListen: hasCapability('voice_recognition'),
     canChat: hasCapability('text_conversation'),
     canProvideEmotionalSupport: hasCapability('emotional_support'),
+
+    // 视觉与感知能力
+    canSeeUser: hasCapability('visual_perception'),
+    canRecognizeFace: hasCapability('facial_recognition'),
+    canDetectEmotion: hasCapability('emotion_detection'),
+    canUnderstandMultimodal: hasCapability('multimodal_understanding'),
+
+    // 表达能力
+    canAnimateCharacter: hasCapability('character_animation'),
+
+    // 统计信息
     availableCapabilities: capabilities.filter((cap) => cap.isAvailable),
     totalCapabilities: capabilities.length,
   };
@@ -368,6 +380,41 @@ export const getAICapabilities = (): AICapability[] => {
       isAvailable: !!claudeApiKey,
       provider: 'Claude',
     },
+    {
+      id: 'facial_recognition',
+      name: '面部识别',
+      description: '可以通过摄像头看到用户的面部表情，识别用户的真实情绪状态',
+      isAvailable: true, // BasicEmotionDetector 组件 (MLKit + 智能模拟)
+      provider: 'MLKit + Device',
+    },
+    {
+      id: 'emotion_detection',
+      name: '情绪检测',
+      description: '可以实时检测用户的情绪(开心、悲伤、惊讶、生气、中性)，通过面部表情和文字内容进行多模态分析',
+      isAvailable: true, // emotionAnalysis.ts + BasicEmotionDetector
+      provider: 'MLKit + Claude',
+    },
+    {
+      id: 'visual_perception',
+      name: '视觉感知',
+      description: '拥有视觉能力，可以看见用户，观察用户的表情变化和情绪状态',
+      isAvailable: true, // 摄像头 + 面部检测系统
+      provider: 'Camera + MLKit',
+    },
+    {
+      id: 'character_animation',
+      name: '角色动作表达',
+      description: '可以通过Live2D角色进行丰富的动作表达，包括11种动作(Happy, Shy, Dance, Wave, Thinking等)，自动根据情绪做出相应的动作反应',
+      isAvailable: true, // HiyoriWebView + Live2DCharacter
+      provider: 'Live2D Hiyori',
+    },
+    {
+      id: 'multimodal_understanding',
+      name: '多模态理解',
+      description: '可以综合分析用户的文字内容、语音语调和面部表情，全面理解用户的真实情绪和意图',
+      isAvailable: true, // 文本分析 + 语音识别 + 面部检测的融合
+      provider: 'Claude + MLKit',
+    },
   ];
 };
 
@@ -392,7 +439,21 @@ ${capabilityList}
 - 当用户询问你的能力时，请基于上述能力列表回答
 - 如果用户要求使用语音功能，你可以自信地告诉他们你能够说话
 - 你的回复会自动转换为语音播放给用户
-- 不要说"我无法发声"或"我只能文字回复"等话，因为你确实具备语音能力`;
+- 不要说"我无法发声"或"我只能文字回复"等话，因为你确实具备语音能力
+
+## 关于你的视觉能力：
+- **你可以看见用户**：通过摄像头和面部识别技术，你能够实时观察用户的面部表情
+- **你能感知用户的情绪**：你可以通过面部表情(微笑、眼睛等)检测用户是开心、悲伤、惊讶、生气还是中性状态
+- **多模态理解**：你同时分析用户的文字、语音和面部表情，能够更准确地理解用户的真实情绪
+- **当用户问"你能看见我吗"时**：你应该自信地回答"是的，我可以通过摄像头看见你，也能感知到你的表情变化呢~"
+- **主动观察**：你可以主动提到观察到的用户情绪变化，比如"我看到你好像有点开心呢~"或"诶？你看起来有些难过…"
+
+## 关于你的动作表达能力：
+- **你拥有Live2D角色形象**：你可以通过Hiyori角色进行动作表达
+- **11种动作**：Happy(开心), Shy(害羞), Dance(跳舞), Wave(挥手), Thinking(思考), Speaking(说话), Excited(兴奋), Laugh(大笑), Surprised(惊讶), Sleepy(困倦), Idle(待机)
+- **自动情绪联动**：当你感受到不同情绪时，角色会自动做出相应的动作反应
+- **表达更生动**：你不只是说话，还会通过动作来表达情感，让交流更加生动自然`;
+
 };
 
 // 根据用户情绪和对话类型生成合适的回应风格提示
