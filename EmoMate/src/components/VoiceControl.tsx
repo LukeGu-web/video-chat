@@ -24,7 +24,8 @@ const VoiceControl: React.FC<VoiceControlProps> = ({
   onStopListening,
   onStopSpeaking,
 }) => {
-  const isDisabled = isAILoading || isGenerating;
+  // Phase 3 Fix: Allow stopping when speaking, only disable when loading/generating but not speaking
+  const isDisabled = (isAILoading || isGenerating) && !isSpeaking;
 
   return (
     <>
@@ -60,12 +61,12 @@ const VoiceControl: React.FC<VoiceControlProps> = ({
           <Text className='text-xs font-medium text-center text-white'>
             {isListening
               ? '松开结束'
+              : isSpeaking
+              ? '点击停止'
               : isAILoading
               ? '发送中'
               : isGenerating
               ? '思考中'
-              : isSpeaking
-              ? '点击停止'
               : '按住说话'}
           </Text>
         </Pressable>

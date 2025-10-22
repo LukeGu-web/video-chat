@@ -223,6 +223,8 @@ export interface TTSQueueConfig {
   maxConcurrentSynthesis?: number; // Max parallel TTS requests
   maxRetries?: number; // Max retry attempts for failed synthesis
   retryDelay?: number; // Delay between retries (ms)
+  onPlayStart?: (text: string) => void; // Callback when item starts playing
+  onPlayEnd?: (text: string) => void; // Callback when item finishes playing
 }
 
 /**
@@ -523,10 +525,21 @@ export class TTSQueue {
         console.log(`[TTSQueue] 🔊 Playing ${item.id}: "${item.text}"`);
         item.status = 'playing';
 
+        // Callback: Playback started
+        if (this.config.onPlayStart) {
+          this.config.onPlayStart(item.text);
+        }
+
         // Set playback completion callback
         item.audio.setOnPlaybackStatusUpdate((status) => {
           if (status.isLoaded && status.didJustFinish) {
             item.status = 'completed';
+
+            // Callback: Playback ended
+            if (this.config.onPlayEnd) {
+              this.config.onPlayEnd(item.text);
+            }
+
             this.currentIndex++;
 
             // Cleanup audio

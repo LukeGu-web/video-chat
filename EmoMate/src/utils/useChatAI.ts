@@ -80,12 +80,17 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
   // Phase 3: Global TTS queue reference for user interruption
   const currentTTSQueue = useRef<TTSQueue | null>(null);
 
+  // Phase 3: Streaming TTS state tracking
+  const [isStreamGenerating, setIsStreamGenerating] = useState(false); // Claude streaming
+  const [isStreamSpeaking, setIsStreamSpeaking] = useState(false); // TTS queue playing
+  const [currentStreamSegment, setCurrentStreamSegment] = useState(''); // Current sentence being spoken
+
   // 集成混合 TTS 功能
-  const { 
-    isSpeaking, 
+  const {
+    isSpeaking,
     isGenerating,
-    speak, 
-    stop: stopTTS, 
+    speak,
+    stop: stopTTS,
     error: ttsError,
     currentProvider,
     switchProvider,
@@ -417,6 +422,20 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       const ttsQueue = new TTSQueue({
         voiceId,
         userEmotion: enhancedConfig?.userEmotion,
+        // Phase 3: Callbacks for subtitle display
+        onPlayStart: (text) => {
+          setCurrentStreamSegment(text);
+          if (!isStreamSpeaking) {
+            setIsStreamSpeaking(true);
+          }
+        },
+        onPlayEnd: (text) => {
+          // Check if there are more items in queue
+          const status = ttsQueue.getStatus();
+          if (status.pending === 0 && status.ready === 0 && status.synthesizing === 0) {
+            setCurrentStreamSegment('');
+          }
+        },
       });
 
       // Store current TTS queue for potential interruption
@@ -427,13 +446,17 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
 
       try {
         // Phase 2: Play transition audio immediately
-        if (enhancedConfig?.enableTTS !== false) {
-          console.log('[ChatAI] 🔊 Phase 2: 播放过渡语音');
-          transitionAudio.playTransition(transitionCategory).catch((err) => {
-            console.warn('[ChatAI] 过渡语音播放失败:', err);
-          });
-          transitionAudioPlayed = true;
-        }
+        // NOTE: Disabled temporarily as it doesn't blend well with actual response
+        // if (enhancedConfig?.enableTTS !== false) {
+        //   console.log('[ChatAI] 🔊 Phase 2: 播放过渡语音');
+        //   transitionAudio.playTransition(transitionCategory).catch((err) => {
+        //     console.warn('[ChatAI] 过渡语音播放失败:', err);
+        //   });
+        //   transitionAudioPlayed = true;
+        // }
+
+        // Phase 3: Set generating state
+        setIsStreamGenerating(true);
 
         // Stream API call with sentence-by-sentence TTS
         const aiResponse = await callClaudeAPIStreaming(
@@ -442,11 +465,12 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
           conversationType,
           async (sentence) => {
             // Phase 2: Stop transition audio on first sentence
-            if (!firstSentenceReceived && transitionAudioPlayed) {
-              console.log('[ChatAI] ⏸️ Phase 2: 停止过渡语音,开始真实回答');
-              await transitionAudio.stop(); // Stop transition audio
-              firstSentenceReceived = true;
-            }
+            // NOTE: Disabled since transition audio is disabled
+            // if (!firstSentenceReceived && transitionAudioPlayed) {
+            //   console.log('[ChatAI] ⏸️ Phase 2: 停止过渡语音,开始真实回答');
+            //   await transitionAudio.stop(); // Stop transition audio
+            //   firstSentenceReceived = true;
+            // }
 
             // Enqueue sentence for TTS
             if (enhancedConfig?.enableTTS !== false) {
@@ -455,6 +479,9 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
             }
           }
         );
+
+        // Phase 3: Generating complete, now speaking
+        setIsStreamGenerating(false);
 
         // Add AI message with full response
         const aiMessage: ChatMessage = {
@@ -470,7 +497,9 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
         // Wait for TTS queue to finish
         if (enhancedConfig?.enableTTS !== false) {
           console.log('[ChatAI] ⏳ Phase 2: 等待TTS队列完成');
+          setIsStreamSpeaking(true); // Phase 3: Set speaking state
           await ttsQueue.waitForCompletion();
+          setIsStreamSpeaking(false); // Phase 3: Clear speaking state
           console.log('[ChatAI] ✅ Phase 2: TTS队列播放完成');
         }
 
@@ -481,6 +510,11 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       } catch (err) {
         console.error('[ChatAI] Phase 2 error:', err);
         setError(err instanceof Error ? err.message : '发送消息失败');
+
+        // Phase 3: Clear states on error
+        setIsStreamGenerating(false);
+        setIsStreamSpeaking(false);
+        setCurrentStreamSegment('');
 
         // Cancel TTS queue on error
         ttsQueue.cancel();
@@ -521,6 +555,11 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
    */
   const stopSpeaking = useCallback(async () => {
     console.log('[ChatAI] 🛑 User interruption - stopping all audio');
+
+    // Phase 3: Clear streaming states
+    setIsStreamGenerating(false);
+    setIsStreamSpeaking(false);
+    setCurrentStreamSegment('');
 
     // 1. Stop TTS queue if active
     if (currentTTSQueue.current) {
@@ -592,8 +631,9 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
   return {
     messages,
     isLoading,
-    isSpeaking,
-    isGenerating,
+    // Phase 3: Use streaming states instead of hybrid TTS states
+    isSpeaking: isStreamSpeaking || isSpeaking, // Combine both for backward compatibility
+    isGenerating: isStreamGenerating || isGenerating, // Combine both for backward compatibility
     error: combinedError,
     currentTTSProvider: currentProvider,
     sendMessage,
@@ -601,7 +641,8 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     setPersonality,
     stopSpeaking,
     switchTTSProvider,
-    currentSegment,
+    // Phase 3: Use streaming segment or fallback to hybrid TTS segment
+    currentSegment: currentStreamSegment || currentSegment,
     enableProactiveMode,
     isProactiveModeEnabled,
   };
