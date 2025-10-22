@@ -19,6 +19,186 @@ import {
   preprocessTextForNaturalSpeech,
 } from '../constants/ai';
 
+/**
+ * Common phrases to pre-cache for instant playback
+ * Phase 3 Optimization: Cache frequently used short responses
+ */
+const CACHE_PHRASES = [
+  "嗯嗯，好的呢~",
+  "我明白了~",
+  "真的吗？",
+  "太好了！",
+  "是这样啊~",
+  "欸？",
+  "让我想想...",
+  "嗯...",
+  "好呀~",
+  "明白了~",
+  "没问题呢~",
+  "当然可以~",
+  "我懂了~",
+  "原来如此~",
+  "是吗？",
+  "哇！",
+  "欸嘿嘿~",
+  "好的~",
+  "收到了~",
+  "我知道了~",
+] as const;
+
+/**
+ * Audio cache interface
+ */
+interface AudioCacheEntry {
+  uri: string;
+  sound: Audio.Sound;
+  lastAccessed: number;
+}
+
+/**
+ * Global TTS audio cache
+ * Shared across all TTSQueue instances
+ */
+class TTSAudioCache {
+  private cache: Map<string, AudioCacheEntry> = new Map();
+  private maxCacheSize = 30; // Maximum number of cached items
+  private cacheDir = FileSystem.documentDirectory + 'tts_cache/';
+
+  /**
+   * Initialize cache directory
+   */
+  async initialize(): Promise<void> {
+    try {
+      const dirInfo = await FileSystem.getInfoAsync(this.cacheDir);
+      if (!dirInfo.exists) {
+        await FileSystem.makeDirectoryAsync(this.cacheDir, { intermediates: true });
+        console.log('[TTSCache] Cache directory created');
+      }
+    } catch (error) {
+      console.error('[TTSCache] Failed to create cache directory:', error);
+    }
+  }
+
+  /**
+   * Get cached audio for text
+   */
+  async get(text: string): Promise<Audio.Sound | null> {
+    const entry = this.cache.get(text);
+    if (!entry) {
+      return null;
+    }
+
+    // Update last accessed time
+    entry.lastAccessed = Date.now();
+
+    // Verify file still exists
+    const fileInfo = await FileSystem.getInfoAsync(entry.uri);
+    if (!fileInfo.exists) {
+      console.warn('[TTSCache] Cached file missing, removing from cache:', text);
+      this.cache.delete(text);
+      return null;
+    }
+
+    console.log(`[TTSCache] ✅ Cache hit: "${text}"`);
+    return entry.sound;
+  }
+
+  /**
+   * Set cached audio for text
+   */
+  async set(text: string, uri: string, sound: Audio.Sound): Promise<void> {
+    // Check cache size limit
+    if (this.cache.size >= this.maxCacheSize) {
+      await this.evictOldest();
+    }
+
+    this.cache.set(text, {
+      uri,
+      sound,
+      lastAccessed: Date.now(),
+    });
+
+    console.log(`[TTSCache] Cached: "${text}"`);
+  }
+
+  /**
+   * Pre-generate and cache common phrases
+   */
+  async preCacheCommonPhrases(synthesizeFn: (text: string) => Promise<{ uri: string; sound: Audio.Sound }>): Promise<void> {
+    console.log('[TTSCache] Pre-caching common phrases...');
+
+    let successCount = 0;
+    for (const phrase of CACHE_PHRASES) {
+      try {
+        // Skip if already cached
+        if (this.cache.has(phrase)) {
+          continue;
+        }
+
+        // Synthesize and cache
+        const { uri, sound } = await synthesizeFn(phrase);
+        await this.set(phrase, uri, sound);
+        successCount++;
+
+        // Add small delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 200));
+      } catch (error) {
+        console.warn(`[TTSCache] Failed to cache phrase "${phrase}":`, error);
+      }
+    }
+
+    console.log(`[TTSCache] ✅ Pre-cached ${successCount}/${CACHE_PHRASES.length} phrases`);
+  }
+
+  /**
+   * Evict least recently used item
+   */
+  private async evictOldest(): Promise<void> {
+    let oldestKey: string | null = null;
+    let oldestTime = Infinity;
+
+    for (const [key, entry] of this.cache.entries()) {
+      if (entry.lastAccessed < oldestTime) {
+        oldestTime = entry.lastAccessed;
+        oldestKey = key;
+      }
+    }
+
+    if (oldestKey) {
+      const entry = this.cache.get(oldestKey);
+      if (entry) {
+        try {
+          await entry.sound.unloadAsync();
+          await FileSystem.deleteAsync(entry.uri, { idempotent: true });
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+        this.cache.delete(oldestKey);
+        console.log(`[TTSCache] Evicted: "${oldestKey}"`);
+      }
+    }
+  }
+
+  /**
+   * Clear all cache
+   */
+  async clear(): Promise<void> {
+    for (const entry of this.cache.values()) {
+      try {
+        await entry.sound.unloadAsync();
+        await FileSystem.deleteAsync(entry.uri, { idempotent: true });
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+    }
+    this.cache.clear();
+    console.log('[TTSCache] Cache cleared');
+  }
+}
+
+// Global cache instance
+const ttsAudioCache = new TTSAudioCache();
+
 export type TTSQueueStatus =
   | 'pending'     // Waiting for synthesis
   | 'synthesizing' // Currently synthesizing
@@ -96,6 +276,7 @@ export class TTSQueue {
 
   /**
    * Synthesize audio for queue item with retry logic
+   * Phase 3: Added cache support for instant playback
    * @param item Queue item to synthesize
    */
   private async synthesize(item: TTSQueueItem): Promise<void> {
@@ -106,6 +287,41 @@ export class TTSQueue {
     this.activeSynthesisTasks++;
 
     try {
+      // Phase 3: Check cache first
+      const cachedSound = await ttsAudioCache.get(item.text);
+      if (cachedSound) {
+        // Clone the cached sound for independent playback
+        const status = await cachedSound.getStatusAsync();
+        if (status.isLoaded) {
+          const { sound } = await Audio.Sound.createAsync(
+            { uri: status.uri || '' },
+            { shouldPlay: false }
+          );
+
+          item.audio = sound;
+          item.audioUri = status.uri || undefined;
+          item.status = 'ready';
+          this.activeSynthesisTasks--;
+
+          console.log(`[TTSQueue] ⚡ Using cached audio for ${item.id}`);
+
+          // If this is the first item and playback hasn't started, start now
+          if (this.queue[0] === item && !this.isPlaying) {
+            this.playNext();
+          }
+
+          // Start synthesis for next pending item
+          const nextPendingIndex = this.queue.findIndex(
+            (q) => q.status === 'pending'
+          );
+          if (nextPendingIndex !== -1) {
+            this.synthesize(this.queue[nextPendingIndex]);
+          }
+
+          return;
+        }
+      }
+
       console.log(`[TTSQueue] Synthesizing ${item.id}... (attempt ${item.retryCount + 1})`);
 
       // Call ElevenLabs TTS API
@@ -122,6 +338,15 @@ export class TTSQueue {
       item.status = 'ready';
 
       console.log(`[TTSQueue] ✅ Synthesis complete for ${item.id}`);
+
+      // Phase 3: Cache the result for future use
+      if (item.text.length <= 30) { // Only cache short phrases
+        try {
+          await ttsAudioCache.set(item.text, audioUri, sound);
+        } catch (e) {
+          console.warn('[TTSQueue] Failed to cache audio:', e);
+        }
+      }
 
       // If this is the first item and playback hasn't started, start now
       if (this.queue[0] === item && !this.isPlaying) {
@@ -408,4 +633,104 @@ export class TTSQueue {
       failed: this.queue.filter((i) => i.status === 'failed').length,
     };
   }
+}
+
+/**
+ * Initialize TTS cache system
+ * Phase 3: Call this during app startup to prepare cache
+ */
+export async function initializeTTSCache(): Promise<void> {
+  await ttsAudioCache.initialize();
+  console.log('[TTSQueue] Cache system initialized');
+}
+
+/**
+ * Pre-cache common phrases for instant playback
+ * Phase 3: Optional - can be called after app startup to warm up cache
+ *
+ * Note: This function is CPU and network intensive. It's recommended to:
+ * 1. Call it in background after app startup
+ * 2. Or skip it and let cache build naturally during use
+ */
+export async function preCacheCommonPhrases(): Promise<void> {
+  // Synthesis function for cache pre-generation
+  const synthesizeForCache = async (text: string): Promise<{ uri: string; sound: Audio.Sound }> => {
+    const apiKey = getElevenLabsApiKey();
+    if (!apiKey) {
+      throw new Error('ElevenLabs API key not configured');
+    }
+
+    const voiceId = getLanLanVoiceId();
+    const url = `${ELEVENLABS_CONFIG.baseURL}/text-to-speech/${voiceId}`;
+    const voiceSettings = getEmotionalVoiceSettings();
+
+    // Create cache file path
+    const fileName = `tts_cache_${Date.now()}_${Math.random().toString(36).substring(7)}.mp3`;
+    const fileUri = (FileSystem.documentDirectory + 'tts_cache/') + fileName;
+
+    // Preprocess text
+    const processedText = preprocessTextForNaturalSpeech(text);
+
+    // Synthesize using XMLHttpRequest
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url, true);
+      xhr.responseType = 'blob';
+
+      xhr.setRequestHeader('Accept', 'audio/mpeg');
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.setRequestHeader('xi-api-key', apiKey);
+
+      xhr.onload = async () => {
+        if (xhr.status === 200) {
+          try {
+            const reader = new FileReader();
+            reader.onloadend = async () => {
+              const base64data = reader.result as string;
+              const base64Audio = base64data.split(',')[1];
+
+              await FileSystem.writeAsStringAsync(fileUri, base64Audio, {
+                encoding: FileSystem.EncodingType.Base64,
+              });
+
+              const { sound } = await Audio.Sound.createAsync(
+                { uri: fileUri },
+                { shouldPlay: false }
+              );
+
+              resolve({ uri: fileUri, sound });
+            };
+            reader.readAsDataURL(xhr.response);
+          } catch (error) {
+            reject(new Error(`Failed to save cache audio: ${error}`));
+          }
+        } else {
+          reject(new Error(`ElevenLabs API error: ${xhr.status}`));
+        }
+      };
+
+      xhr.onerror = () => {
+        reject(new Error('Network request failed during cache pre-generation'));
+      };
+
+      xhr.send(
+        JSON.stringify({
+          text: processedText,
+          model_id: ELEVENLABS_CONFIG.defaultModel,
+          voice_settings: voiceSettings,
+        })
+      );
+    });
+  };
+
+  // Use the cache's pre-generation method
+  await ttsAudioCache.preCacheCommonPhrases(synthesizeForCache);
+}
+
+/**
+ * Clear TTS cache
+ * Useful for troubleshooting or memory management
+ */
+export async function clearTTSCache(): Promise<void> {
+  await ttsAudioCache.clear();
 }

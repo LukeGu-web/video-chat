@@ -71,11 +71,14 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     initialConfig?.personality || createPersonalitySystemPrompt()
   );
   const [isProactiveModeEnabled, setIsProactiveModeEnabled] = useState(true);
-  
+
   // 主动对话相关状态
   const lastUserMessageTime = useRef<number>(Date.now());
   const proactiveTimer = useRef<NodeJS.Timeout | null>(null);
   const hasShownProactiveMessage = useRef<boolean>(false);
+
+  // Phase 3: Global TTS queue reference for user interruption
+  const currentTTSQueue = useRef<TTSQueue | null>(null);
 
   // 集成混合 TTS 功能
   const { 
@@ -409,12 +412,15 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
         userEmotion: config?.userEmotion || detectedEmotion,
       };
 
-      // Initialize TTS queue
+      // Initialize TTS queue (Phase 3: Store in ref for interruption)
       const voiceId = enhancedConfig?.voiceId || 'hkfHEbBvdQFNX4uWHqRF';
       const ttsQueue = new TTSQueue({
         voiceId,
         userEmotion: enhancedConfig?.userEmotion,
       });
+
+      // Store current TTS queue for potential interruption
+      currentTTSQueue.current = ttsQueue;
 
       let transitionAudioPlayed = false;
       let firstSentenceReceived = false;
@@ -506,8 +512,42 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     setCurrentPersonality(personality);
   }, []);
 
-  const stopSpeaking = useCallback(() => {
-    stopTTS();
+  /**
+   * Stop all audio playback (Phase 3: Enhanced for user interruption)
+   * Stops:
+   * 1. Current TTS queue playback
+   * 2. Transition audio
+   * 3. Hybrid TTS playback (fallback)
+   */
+  const stopSpeaking = useCallback(async () => {
+    console.log('[ChatAI] 🛑 User interruption - stopping all audio');
+
+    // 1. Stop TTS queue if active
+    if (currentTTSQueue.current) {
+      try {
+        await currentTTSQueue.current.cancel();
+        console.log('[ChatAI] ✅ TTS queue cancelled');
+      } catch (error) {
+        console.error('[ChatAI] Error cancelling TTS queue:', error);
+      }
+      currentTTSQueue.current = null;
+    }
+
+    // 2. Stop transition audio if playing
+    try {
+      await transitionAudio.stop();
+      console.log('[ChatAI] ✅ Transition audio stopped');
+    } catch (error) {
+      console.error('[ChatAI] Error stopping transition audio:', error);
+    }
+
+    // 3. Stop hybrid TTS (fallback, in case queue didn't work)
+    try {
+      stopTTS();
+      console.log('[ChatAI] ✅ Hybrid TTS stopped');
+    } catch (error) {
+      console.error('[ChatAI] Error stopping hybrid TTS:', error);
+    }
   }, [stopTTS]);
 
   const switchTTSProvider = useCallback((provider: TTSProvider) => {

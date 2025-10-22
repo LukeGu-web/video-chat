@@ -11,3 +11,9 @@ export { BasicEmotionDetector } from './BasicEmotionDetector';
 export { ChatEmotionAnalyzer } from './ChatEmotionAnalyzer';
 export { EmotionProvider, useEmotionContext } from './EmotionProvider';
 export { EmotionAwareCharacter } from './EmotionAwareCharacter';
+export {
+  ConversationStateIndicator,
+  MiniStateIndicator,
+  useConversationState,
+  ConversationState,
+} from './ConversationStateIndicator';
