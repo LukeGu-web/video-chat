@@ -1,20 +1,19 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useHybridTTS, TTSProvider } from './useHybridTTS';
-import { 
-  CLAUDE_API_CONFIG, 
-  getClaudeApiKey, 
-  PERSONALITY_PROMPTS,
+import {
+  CLAUDE_API_CONFIG,
+  getClaudeApiKey,
   AI_ERROR_MESSAGES,
   buildSystemPrompt,
   createPersonalitySystemPrompt,
-  generateEmotionalResponsePrompt,
   validateAndOptimizeResponse,
   PROACTIVE_CONVERSATION_CONFIG,
   selectProactiveTopic,
   detectConversationType,
   getResponseLengthConfig
 } from '../constants/ai';
-import { AI_PERSONALITY } from '../constants/personality';
+import { transitionAudio } from './transitionAudio'; // Phase 1: 过渡语音管理
+import { detectTransitionCategory, type Emotion } from './conversationAnalysis'; // Phase 1: 对话分析
 
 export interface ChatMessage {
   id: string;
@@ -224,6 +223,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       max_tokens: lengthConfig.maxTokens, // 使用动态token配置
       system: systemMessage,
       messages: contextMessages,
+      stop_sequences: ["\n\n", "用户:", "User:", "---"], // Phase 1: 添加停止序列优化
     };
 
     const response = await fetch(CLAUDE_API_CONFIG.baseURL, {
@@ -274,9 +274,15 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       clearProactiveTimer();
 
       try {
-        // 检测用户情绪
+        // Phase 1: 立即播放过渡语音 (0.3s 内反馈)
         const detectedEmotion = detectUserEmotion(content);
-        
+        const transitionCategory = detectTransitionCategory(
+          content,
+          detectedEmotion as Emotion
+        );
+        console.log(`[ChatAI] 过渡语音类别: ${transitionCategory}`);
+        transitionAudio.playTransition(transitionCategory); // 不await,立即继续
+
         // 检测对话类型
         const conversationType = detectConversationType(content, updatedMessages);
         console.log(`[ChatAI] 对话类型检测: "${content}" -> ${conversationType}`);
