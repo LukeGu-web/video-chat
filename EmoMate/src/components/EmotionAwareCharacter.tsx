@@ -54,6 +54,11 @@ export const EmotionAwareCharacter: React.FC<EmotionAwareCharacterProps> = ({
     // Use advanced motion mapper
     const selection = selectMotion(context);
 
+    console.log(`🎯 [EmotionAwareCharacter] Motion selected: ${selection.motion}`);
+    console.log(`   📝 Reason: ${selection.reason}`);
+    console.log(`   ⭐ Priority: ${selection.priority}`);
+    console.log(`   🎭 Emotion: ${combinedEmotion} | AI Status: ${aiStatus || 'none'}`);
+
     debugLog('EmotionAwareCharacter', `Motion selection`, {
       context,
       selection,
