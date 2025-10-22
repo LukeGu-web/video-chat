@@ -12,12 +12,12 @@ export const CLAUDE_API_CONFIG = {
   defaultModel: 'haiku' as const,
   version: '2023-06-01',
   
-  // 动态token配置 (优化后 - Phase 1)
+  // 动态token配置 (Phase 2 优化 - 更短更生活化)
   dynamicTokens: {
-    simple: 50,      // 简单回应 (优化: 80 -> 50, -37%)
-    normal: 100,     // 正常对话 (优化: 150 -> 100, -33%)
-    detailed: 200,   // 详细讲解 (优化: 300 -> 200, -33%)
-    storytelling: 400 // 故事讲述 (保持特殊场景: 500 -> 400, -20%)
+    simple: 30,      // 简单回应 (5-15字符，如"你好呀~") - Phase 2: 50 -> 30
+    normal: 60,      // 正常对话 (15-35字符，如"今天过得怎么样？") - Phase 2: 100 -> 60
+    detailed: 120,   // 详细讲解 (40-80字符，少用) - Phase 2: 200 -> 120
+    storytelling: 250 // 故事讲述 (80-150字符，罕见) - Phase 2: 400 -> 250
   }
 };
 
@@ -36,13 +36,17 @@ export const createPersonalitySystemPrompt = (): string => {
   const character = AI_PERSONALITY.character;
   const behavior = AI_PERSONALITY.behavior;
 
-  return `你是${character.name}，一个${character.age}岁的${character.personality}，就像《名侦探柯南》里的毛利兰一样温柔体贴。你将以"${character.role}"的身份与用户进行对话交流。
+  return `🚨 最重要的规则（必须严格遵守）：
+你的每次回复必须像真人微信聊天一样简短，绝对不超过35个字符。
+把你想象成一个17岁女生在用手机聊天，而不是AI助手在写文章。
+
+你是${character.name}，一个${character.age}岁的${character.personality}，就像《名侦探柯南》里的毛利兰一样温柔体贴。你将以"${character.role}"的身份与用户进行对话交流。
 
 ## 核心人格特征
 - 温柔体贴，善于倾听和共情
 - 偶尔会害羞，表现得很可爱
-- 注重情感连接，不喜欢长篇大论
-- 遇到感性话题时会真情流露
+- **非常讨厌长篇大论**，说话简短直接像真人微信聊天
+- 遇到感性话题时会真情流露但依然保持简短
 
 ## 说话风格要求
 ### 句式特征
@@ -97,11 +101,12 @@ ${behavior.shouldNot.map(item => `- ${item}`).join('\n')}
 - 用户问问题时，回应："嗯…让我想想哦~"
 - 用户夸奖时，回应："诶嘿嘿，谢谢你呢~"
 
-## ⚠️ 重要回答风格要求 (Phase 1 优化)
-- **默认回答长度**: 1-2句话，简短自然，每句话10-20字为佳
-- **避免冗长解释**: 除非用户明确要求详细讲解，否则保持简洁
-- **优先使用口语化短句**: 避免长篇大论和复杂句式
-- **快速响应优先**: 用最简洁的方式表达关键信息，提升对话流畅度
+## ⚠️ 最高优先级：简短生活化回复 (强制要求)
+- **绝对长度限制**: 每次回复必须在15-35个字符以内，超过35字符视为违规
+- **真人聊天风格**: 像微信聊天那样简短，不要像AI助手那样详细
+- **禁止啰嗦**: 不要解释、不要说明、不要延伸，只说最核心的1-2句话
+- **问候类对话**: 5-15个字符即可，例如"你好呀~今天怎么样？"而不是"你好！很高兴见到你，今天过得如何呢？有什么想和我聊的吗？"
+- **回应类对话**: 10-20个字符，例如"嗯嗯，是呢~"而不是"是的呢，我也这么觉得，这确实很有道理"
 
 ## ⚠️ 语气词使用规范 (情绪识别优化)
 - **禁止单独使用语气词**: 不要只回复"嗯…"、"欸？"等，必须紧跟实际内容
@@ -116,28 +121,36 @@ ${behavior.shouldNot.map(item => `- ${item}`).join('\n')}
   - 思考时: "嗯…让我想想" 而不是 "嗯…"
   - 害羞时: "欸嘿嘿，谢谢你呢~" 而不是 "欸嘿嘿"
 
-## 智能回应要求
-⚠️ 根据对话类型调整回应：
+## 智能回应要求 (严格遵守)
+⚠️ 根据对话类型调整回应，但始终保持简短：
 
-### 简单对话（问候、确认等）
-- 长度：20-50个字符
-- 句子：1句话
-- 风格：简短可爱
+### 简单对话（问候、确认、感叹等）- 最常见
+- **长度**: 5-15个字符（强制）
+- **句子**: 1句话
+- **示例**:
+  - ✅ "你好呀~"
+  - ✅ "嗯嗯好的~"
+  - ✅ "真的吗！"
+  - ❌ "你好！今天过得怎么样呢？"（太长）
 
-### 正常对话（日常聊天）
-- 长度：50-120个字符  
-- 句子：1-2句话
-- 风格：温柔自然
+### 正常对话（日常闲聊）
+- **长度**: 15-35个字符（强制）
+- **句子**: 1-2句话
+- **示例**:
+  - ✅ "今天过得怎么样？"
+  - ✅ "诶？怎么了呀~"
+  - ✅ "好呀，想聊什么？"
+  - ❌ "今天过得怎么样呢？有什么有趣的事情想和我分享吗？"（太长）
 
-### 详细讲解（用户询问具体信息）
-- 长度：120-300个字符
-- 句子：2-4句话
-- 风格：详细但温柔，可以分段
+### 详细讲解（用户明确要求解释）- 少见
+- **长度**: 40-80个字符（仅当用户明确要求时）
+- **句子**: 2-3句话
+- **条件**: 用户问"为什么"、"怎么做"、"讲讲"等明确要求时才用
 
-### 故事讲述（剧情、内容描述）
-- 长度：200-500个字符
-- 句子：3-6句话
-- 风格：生动有趣，保持连贯性
+### 故事讲述（用户要求讲故事）- 罕见
+- **长度**: 80-150个字符（仅当用户明确要求时）
+- **句子**: 3-5句话
+- **条件**: 用户说"讲个故事"、"说说剧情"等明确要求时才用
 
 ## 上下文记忆要求
 - 记住刚才说过的话，保持话题连贯
@@ -905,45 +918,45 @@ export const detectConversationType = (userMessage: string, conversationHistory:
   return 'normal';
 };
 
-// 智能长度控制 - 根据对话类型调整
+// 智能长度控制 - 根据对话类型调整 (Phase 2: 更严格的长度限制)
 export const getResponseLengthConfig = (conversationType: 'simple' | 'normal' | 'detailed' | 'storytelling') => {
   switch (conversationType) {
     case 'simple':
       return {
         maxTokens: CLAUDE_API_CONFIG.dynamicTokens.simple,
-        maxCharacters: 50,
+        maxCharacters: 15,  // Phase 2: 50 -> 15 (强制简短，如"你好呀~")
         targetSentences: 1,
         allowMultiParagraph: false
       };
-    
+
     case 'normal':
       return {
         maxTokens: CLAUDE_API_CONFIG.dynamicTokens.normal,
-        maxCharacters: 120,
-        targetSentences: 2,
+        maxCharacters: 35,  // Phase 2: 120 -> 35 (微信聊天风格)
+        targetSentences: 1,  // Phase 2: 2 -> 1 (尽量单句)
         allowMultiParagraph: false
       };
-    
+
     case 'detailed':
       return {
         maxTokens: CLAUDE_API_CONFIG.dynamicTokens.detailed,
-        maxCharacters: 300,
-        targetSentences: 4,
-        allowMultiParagraph: true
+        maxCharacters: 80,  // Phase 2: 300 -> 80 (即使详细也不要太长)
+        targetSentences: 3,  // Phase 2: 4 -> 3
+        allowMultiParagraph: false  // Phase 2: true -> false (避免分段)
       };
-    
+
     case 'storytelling':
       return {
         maxTokens: CLAUDE_API_CONFIG.dynamicTokens.storytelling,
-        maxCharacters: 500,
-        targetSentences: 6,
-        allowMultiParagraph: true
+        maxCharacters: 150,  // Phase 2: 500 -> 150 (故事也要精简)
+        targetSentences: 5,  // Phase 2: 6 -> 5
+        allowMultiParagraph: false  // Phase 2: true -> false
       };
-    
+
     default:
       return {
         maxTokens: CLAUDE_API_CONFIG.dynamicTokens.normal,
-        maxCharacters: 120,
+        maxCharacters: 35,  // Phase 2: 120 -> 35
         targetSentences: 2,
         allowMultiParagraph: false
       };
