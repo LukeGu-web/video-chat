@@ -552,11 +552,13 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
    * 1. Current TTS queue playback
    * 2. Transition audio
    * 3. Hybrid TTS playback (fallback)
+   * 4. Clears all loading/generating/speaking states
    */
   const stopSpeaking = useCallback(async () => {
     console.log('[ChatAI] 🛑 User interruption - stopping all audio');
 
-    // Phase 3: Clear streaming states
+    // Phase 3: Clear ALL states (including isLoading)
+    setIsLoading(false); // CRITICAL: Clear loading state to allow new messages
     setIsStreamGenerating(false);
     setIsStreamSpeaking(false);
     setCurrentStreamSegment('');
