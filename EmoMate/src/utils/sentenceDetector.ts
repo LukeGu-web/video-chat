@@ -49,8 +49,11 @@ export class SentenceBuffer {
       const sentence = this.buffer.slice(lastIndex, endIndex).trim();
 
       if (sentence.length > 0 && this.isCompleteSentence(sentence)) {
-        this.onSentenceComplete(sentence);
-        lastIndex = endIndex;
+        // Filter out standalone interjections (they should be part of next sentence)
+        if (!this.isStandaloneInterjection(sentence)) {
+          this.onSentenceComplete(sentence);
+          lastIndex = endIndex;
+        }
       }
     }
 
@@ -59,6 +62,29 @@ export class SentenceBuffer {
       this.buffer = this.buffer.slice(lastIndex);
       sentenceEnds.lastIndex = 0; // Reset regex
     }
+  }
+
+  /**
+   * Check if text is a standalone interjection/filler
+   * These should be combined with following content
+   */
+  private isStandaloneInterjection(text: string): boolean {
+    // Common Chinese interjections and fillers
+    const interjections = [
+      '嗯', '呃', '啊', '哦', '诶', '欸', '呢', '吧', '哈',
+      '嘿', '唔', '哎', '噢', '喔', '哇', '咦', '嘛', '喽',
+      '嗯嗯', '哈哈', '嘿嘿', '欸嘿嘿', '诶嘿嘿'
+    ];
+
+    // Remove punctuation and whitespace for matching
+    const cleanText = text.replace(/[。！？.!?\s~…]+/g, '');
+
+    // Check if it's a pure interjection (<=3 chars and matches pattern)
+    if (cleanText.length <= 3 && interjections.some(i => cleanText.includes(i))) {
+      return true;
+    }
+
+    return false;
   }
 
   /**
@@ -79,11 +105,38 @@ export class SentenceBuffer {
   /**
    * Force flush remaining buffer as final sentence
    * Called when stream ends
+   * Enhanced: Ensures final sentence has proper punctuation
    */
   flush(): void {
     const remaining = this.buffer.trim();
     if (remaining.length > 0) {
-      this.onSentenceComplete(remaining);
+      // Add punctuation if missing for more natural speech synthesis
+      let finalSentence = remaining;
+      const lastChar = remaining[remaining.length - 1];
+
+      // If no ending punctuation, add one based on content
+      if (!/[。！？.!?]/.test(lastChar)) {
+        // Check if it's a question
+        if (remaining.includes('吗') || remaining.includes('呢') ||
+            remaining.includes('？') || remaining.includes('?') ||
+            remaining.startsWith('怎么') || remaining.startsWith('为什么') ||
+            remaining.startsWith('什么') || remaining.startsWith('哪里')) {
+          finalSentence += '？';
+        }
+        // Check if it's an exclamation
+        else if (remaining.includes('！') || remaining.includes('!') ||
+                 remaining.includes('太') || remaining.includes('好棒') ||
+                 remaining.includes('真')) {
+          finalSentence += '！';
+        }
+        // Default: add period
+        else {
+          finalSentence += '。';
+        }
+        console.log(`[SentenceDetector] Added punctuation to final sentence: "${remaining}" → "${finalSentence}"`);
+      }
+
+      this.onSentenceComplete(finalSentence);
       this.buffer = '';
     }
   }

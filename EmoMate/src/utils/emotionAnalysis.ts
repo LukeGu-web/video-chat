@@ -32,16 +32,26 @@ export function getEmotionFromFace(face: FaceData): EmotionType {
 
 // Keyword-based emotion analysis for text
 const EMOTION_KEYWORDS = {
-  happy: ['开心', '高兴', '快乐', '兴奋', '愉快', '欣喜', '喜悦', '满意', '幸福', 'happy', 'joy', 'excited'],
+  happy: ['开心', '高兴', '快乐', '兴奋', '愉快', '欣喜', '喜悦', '满意', '幸福', '太好了', '好棒', 'happy', 'joy', 'excited'],
   sad: ['难过', '伤心', '沮丧', '失落', '痛苦', '悲伤', '郁闷', '不开心', 'sad', 'depressed', 'upset'],
   angry: ['生气', '愤怒', '气愤', '恼火', '烦躁', '讨厌', '恨', '怒', 'angry', 'mad', 'furious'],
-  surprised: ['惊讶', '震惊', '意外', '吃惊', '惊奇', '不敢相信', 'surprised', 'shocked', 'amazed'],
+  surprised: ['惊讶', '震惊', '意外', '吃惊', '惊奇', '不敢相信', '诶？', '欸？', '真的吗', 'surprised', 'shocked', 'amazed'],
   neutral: ['还好', '一般', '平常', '普通', '正常', 'okay', 'fine', 'neutral']
 };
 
+// Interjection-only phrases that should default to neutral if no other emotion detected
+const PURE_INTERJECTIONS = ['嗯', '呃', '啊', '哦', '诶', '欸', '呢', '吧', '哈', '嘿', '唔', '哎', '嗯嗯', '哈哈', '嘿嘿'];
+
 export async function analyzeTextEmotion(text: string): Promise<EmotionType> {
   const lowerText = text.toLowerCase();
-  
+
+  // Check if text is pure interjection (should be neutral/idle)
+  const cleanText = text.replace(/[。！？.!?\s~…]+/g, '');
+  if (cleanText.length <= 3 && PURE_INTERJECTIONS.some(i => cleanText.includes(i))) {
+    debugLog('EmotionAnalysis', `Pure interjection detected, defaulting to neutral: "${text}"`);
+    return 'neutral';
+  }
+
   // First try keyword-based detection for quick results
   for (const [emotion, keywords] of Object.entries(EMOTION_KEYWORDS)) {
     if (keywords.some(keyword => lowerText.includes(keyword.toLowerCase()))) {
@@ -49,7 +59,13 @@ export async function analyzeTextEmotion(text: string): Promise<EmotionType> {
       return emotion as EmotionType;
     }
   }
-  
+
+  // If text is too short (< 4 chars after cleanup), default to neutral
+  if (cleanText.length < 4) {
+    debugLog('EmotionAnalysis', `Text too short, defaulting to neutral: "${text}"`);
+    return 'neutral';
+  }
+
   // If no keywords found, use Claude API for semantic analysis
   try {
     const apiKey = getClaudeApiKey();
@@ -83,14 +99,14 @@ Text: "${text}"`
 
     const data = await response.json();
     const emotionResult = data.content?.[0]?.text?.trim().toLowerCase();
-    
+
     // Validate the response is a valid emotion
     const validEmotions: EmotionType[] = ['happy', 'sad', 'angry', 'surprised', 'neutral'];
     const detectedEmotion = validEmotions.find(e => e === emotionResult) || 'neutral';
-    
+
     debugLog('EmotionAnalysis', `Claude API emotion detected: ${detectedEmotion}`, { text, rawResponse: emotionResult });
     return detectedEmotion;
-    
+
   } catch (error) {
     debugLog('EmotionAnalysis', 'Claude API emotion analysis failed, returning neutral', error);
     return 'neutral';
