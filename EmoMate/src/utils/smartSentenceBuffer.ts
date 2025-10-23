@@ -295,8 +295,27 @@ export class SmartSentenceBuffer {
     // Rule 6: Question/interaction words (+0.15)
     // Questions are often important for engagement
     const questionWords = ['吗', '呢', '吧', '？', '怎么', '什么', '为什么'];
-    if (questionWords.some(w => sentence.includes(w))) {
-      score += 0.15;
+    const hasQuestion = questionWords.some(w => sentence.includes(w));
+
+    if (hasQuestion) {
+      // But penalize empty/delaying questions
+      const delayingQuestions = [
+        /^(你说|你是说|你问|你指|你想|你觉得|你认为)/,
+        /^(什么|怎么|为什么)[？吗呢]?$/,
+        /^诶[？吗呢]/,
+        /^(是吗|真的吗|这样啊)[？~]*$/
+      ];
+
+      if (delayingQuestions.some(pattern => pattern.test(sentence.trim()))) {
+        // This is a delaying question, penalize it
+        score -= 0.3;
+        if (this.debug) {
+          console.log(`[SmartBuffer] ⚠️ Delaying question detected: "${sentence}"`);
+        }
+      } else {
+        // Legitimate question (e.g., "你吃了吗?", "要不要一起?")
+        score += 0.15;
+      }
     }
 
     // Clamp score between 0 and 1
@@ -310,37 +329,37 @@ export class SmartSentenceBuffer {
     switch (this.conversationType) {
       case 'simple':
         return {
-          maxCharacters: 50,
-          maxSentences: 1, // Only 1 sentence for simple
-          importanceThreshold: 0.6
+          maxCharacters: 60,  // Increased: 50 -> 60
+          maxSentences: 2,    // Relaxed: 1 -> 2 (allow natural follow-up)
+          importanceThreshold: 0.5  // Lowered: 0.6 -> 0.5 (less strict)
         };
 
       case 'normal':
         return {
-          maxCharacters: 80,
-          maxSentences: 2, // At most 2 sentences for normal
-          importanceThreshold: 0.6
+          maxCharacters: 100, // Increased: 80 -> 100
+          maxSentences: 3,    // Relaxed: 2 -> 3 (allow proper explanation)
+          importanceThreshold: 0.5  // Lowered: 0.6 -> 0.5
         };
 
       case 'detailed':
         return {
-          maxCharacters: 150,
-          maxSentences: 3,
-          importanceThreshold: 0.5 // Lower threshold for detailed
+          maxCharacters: 180, // Increased: 150 -> 180
+          maxSentences: 4,    // Relaxed: 3 -> 4
+          importanceThreshold: 0.4  // Lowered: 0.5 -> 0.4
         };
 
       case 'storytelling':
         return {
-          maxCharacters: 250,
-          maxSentences: 5,
-          importanceThreshold: 0.4 // Lowest threshold for storytelling
+          maxCharacters: 300, // Increased: 250 -> 300
+          maxSentences: 6,    // Relaxed: 5 -> 6
+          importanceThreshold: 0.3  // Lowered: 0.4 -> 0.3
         };
 
       default:
         return {
-          maxCharacters: 80,
-          maxSentences: 2,
-          importanceThreshold: 0.6
+          maxCharacters: 100,
+          maxSentences: 3,
+          importanceThreshold: 0.5
         };
     }
   }
