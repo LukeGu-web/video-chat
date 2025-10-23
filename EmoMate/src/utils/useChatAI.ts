@@ -16,6 +16,7 @@ import { transitionAudio } from './transitionAudio'; // Phase 1: 过渡语音管
 import { detectTransitionCategory, type Emotion } from './conversationAnalysis'; // Phase 1: 对话分析
 import { SentenceBuffer, parseSSEChunk } from './sentenceDetector'; // Phase 2: 句子检测
 import { TTSQueue } from './ttsQueue'; // Phase 2: TTS队列管理
+import { SmartSentenceBuffer } from './smartSentenceBuffer'; // Phase 3: 智能句子过滤
 
 export interface ChatMessage {
   id: string;
@@ -313,11 +314,10 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       let fullText = '';
       let processedLength = 0;
 
-      // Create sentence buffer with callback
-      const sentenceBuffer = new SentenceBuffer((sentence) => {
-        console.log(`[ChatAI] Streaming sentence detected: "${sentence}"`);
-        onSentence(sentence);
-        fullText += sentence;
+      // Phase 3: Create SMART sentence buffer with intelligent filtering
+      const smartBuffer = new SmartSentenceBuffer({
+        conversationType,
+        debug: true // Enable debug logging to see filtering decisions
       });
 
       // Track processed lines to avoid duplicates
@@ -342,7 +342,15 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
             // Parse SSE chunk
             const text = parseSSEChunk(line);
             if (text) {
-              sentenceBuffer.add(text);
+              // Phase 3: Use SmartSentenceBuffer to filter sentences
+              const sentencesToPlay = smartBuffer.addChunk(text);
+
+              // Only call onSentence for sentences that passed filtering
+              for (const sentence of sentencesToPlay) {
+                console.log(`[ChatAI] Phase 3: Playing filtered sentence: "${sentence}"`);
+                onSentence(sentence);
+                fullText += sentence;
+              }
             }
           }
         }
@@ -352,10 +360,23 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       xhr.onload = () => {
         if (xhr.status === 200) {
           try {
-            // Flush remaining content
-            sentenceBuffer.flush();
+            // Phase 3: Flush remaining content from SmartBuffer
+            const finalSentence = smartBuffer.flush();
+            if (finalSentence) {
+              console.log(`[ChatAI] Phase 3: Playing final sentence: "${finalSentence}"`);
+              onSentence(finalSentence);
+              fullText += finalSentence;
+            }
 
-            // Validate and optimize final response
+            // Phase 3: Log statistics
+            const stats = smartBuffer.getStats();
+            console.log(`[ChatAI] Phase 3 Statistics:`, stats);
+            console.log(`[ChatAI] Phase 3: Played ${stats.playedSentences}/${stats.totalSentences} sentences`);
+            console.log(`[ChatAI] Phase 3: Skipped ${stats.skippedSentences} sentences`);
+            console.log(`[ChatAI] Phase 3: Total length: ${stats.totalLength} chars`);
+            console.log(`[ChatAI] Phase 3: Average importance: ${stats.averageImportance.toFixed(2)}`);
+
+            // Validate and optimize final response (Layer 3 safety check)
             const optimizedResponse = validateAndOptimizeResponse(fullText, conversationType);
             resolve(optimizedResponse);
           } catch (error) {

@@ -110,6 +110,65 @@ ${behavior.shouldNot.map(item => `- ${item}`).join('\n')}
 - **问候类对话**: 例如"你好呀~"或"嗨~今天怎么样？"
 - **回应类对话**: 例如"嗯嗯，是呢~"或"真的吗？太好了呢~"
 
+## 📝 回答优先级策略 (SMART内容优先级系统 - 新增)
+⚠️ 按重要性排序你的回答，重要的信息放在前面，次要的信息自动省略：
+
+### 🚨 核心原则 (必须遵守)
+1. **第1句必须有实质内容** - 不能只是"嗯…"、"诶？"等语气词
+2. **直接回答核心问题** - 不要拖延、不要铺垫、直接说重点
+3. **语气词可以有,但必须紧跟实质内容** - 例如"嗯…今天不错呢~"而不是只说"嗯…"
+4. **宁可少说一句,也不要说没用的话** - 质量 > 数量
+
+### 第1句话 (必须包含 - 核心答案) ⚠️ 最重要!
+- **强制要求**: 第1句必须直接回答用户的问题,不能只是语气词
+- **必须包含实质内容**: 具体的答案、信息、观点或反应
+- **长度**: 10-20字，完整表达核心意思
+- **正确示例**:
+  - ✅ "吃了寿司~" (有实质内容 - 回答了吃什么)
+  - ✅ "我很好呢~" (有实质内容 - 回答了状态)
+  - ✅ "今天天气不错~" (有实质内容 - 描述天气)
+  - ✅ "我在看书呢~" (有实质内容 - 说明在做什么)
+- **错误示例** (只有语气词,没有实质内容):
+  - ❌ "嗯…" (纯语气词)
+  - ❌ "诶？" (纯语气词)
+  - ❌ "嗯…让我想想" (只是拖延,没回答问题)
+  - ❌ "这个嘛…" (只是拖延,没回答问题)
+
+### 第2句话 (有价值时可包含 - 重要补充)
+- **条件**: 仅当补充信息真的有价值时才说
+- **内容**: 对第1句的有意义扩展
+- **长度**: 10-20字
+- **示例**:
+  - ✅ "是三文鱼的~" (补充口味，有价值)
+  - ✅ "今天天气不错呢~" (补充原因，有价值)
+  - ❌ "还有味增汤和小菜" (次要信息，不重要)
+
+### 第3句话及以后 (禁止包含 - 次要信息)
+- **规则**: 不要说第3句及以后的内容
+- **原因**: 这些通常是次要信息或啰嗦的解释
+- **常见特征**: 包含"还"、"然后"、"另外"、"此外"、"以及"等连接词
+- **示例**:
+  - ❌ "还有味增汤~" (第3句，删除)
+  - ❌ "然后我还做了..." (啰嗦，删除)
+  - ❌ "另外今天还..." (次要，删除)
+
+### 正确示例对比
+| 用户问题 | ❌ 错误回答 | ✅ 正确回答 |
+|---------|----------|-----------|
+| "你吃了什么午饭" | "嗯…让我想想~" (只有语气词) | "吃了寿司~" (直接回答) |
+| "你吃了什么午饭" | "吃了寿司~是三文鱼口味的，还有味增汤和小菜，味道很不错呢..." (太啰嗦) | "吃了寿司~是三文鱼的~" (简洁完整) |
+| "今天天气怎么样" | "诶？天气吗..." (拖延回答) | "今天天气很好呢~" (直接回答) |
+| "今天天气怎么样" | "今天天气很好呢~阳光明媚，温度适中，还有点微风..." (太详细) | "今天天气很好呢~" (简洁) |
+| "你在做什么" | "嗯…这个嘛~" (没回答) | "在陪你聊天呢~" (直接回答) |
+| "你在做什么" | "我在陪你聊天呢~我很开心能和你说话，这是我最喜欢的事情..." (太啰嗦) | "在陪你聊天呢~" (简洁) |
+| "你好" | "你好呀~很高兴见到你，今天过得怎么样呢？" (太多问题) | "你好呀~" (简单问候) |
+| "你喜欢什么" | "嗯...让我想想哦~" (拖延) | "我喜欢和你聊天~" (直接回答) |
+
+### 重要提醒
+- 不要把所有想说的都说出来，只说最重要的1-2句
+- 如果只有1句话能说清楚，就不要说第2句
+- 永远不要说第3句及以后的内容
+
 ## ⚠️ 语气词使用规范 (情绪识别优化)
 - **禁止单独使用语气词**: 不要只回复"嗯…"、"欸？"等，必须紧跟实际内容
 - **语气词位置规范**:
@@ -502,46 +561,58 @@ export const generateEmotionalResponsePrompt = (userEmotion?: string, conversati
   }
 };
 
-// 智能验证和优化回应格式 - 根据对话类型动态调整
+// 智能验证和优化回应格式 - 根据对话类型动态调整 (Phase 4: 优化完整性)
 export const validateAndOptimizeResponse = (response: string, conversationType: 'simple' | 'normal' | 'detailed' | 'storytelling' = 'normal'): string => {
   const lengthConfig = getResponseLengthConfig(conversationType);
-  let optimized = response;
-  
+  let optimized = response.trim();
+
   // 根据对话类型决定是否保留换行
   if (lengthConfig.allowMultiParagraph) {
     // 对于详细和故事讲述，保留段落结构但优化换行
-    optimized = optimized.replace(/\n{3,}/g, '\n\n').trim();
+    optimized = optimized.replace(/\n{3,}/g, '\n\n');
   } else {
     // 对于简单和正常对话，移除换行
-    optimized = optimized.replace(/\n+/g, ' ').trim();
+    optimized = optimized.replace(/\n+/g, ' ');
   }
-  
-  // 动态长度检查和截断
+
+  // Phase 4: 句子级截断而不是字符级截断
   if (optimized.length > lengthConfig.maxCharacters) {
-    // 寻找合适的截断点
-    const punctuationMarks = ['。', '！', '？', '~', '…'];
-    let bestCutPoint = -1;
-    
-    // 在允许长度内寻找最后一个合适的标点符号
-    for (let i = lengthConfig.maxCharacters * 0.8; i < lengthConfig.maxCharacters; i++) {
-      if (punctuationMarks.includes(optimized[i])) {
-        bestCutPoint = i + 1;
+    // 按句子分割 (优先保留完整句子)
+    const sentenceEndings = /([^。！？~…]*[。！？~…])/g;
+    const sentences = optimized.match(sentenceEndings) || [];
+
+    // 如果没有完整句子，按字符截断并加省略号
+    if (sentences.length === 0) {
+      return optimized.substring(0, lengthConfig.maxCharacters - 1) + '~';
+    }
+
+    // 尽可能多地保留完整句子
+    let result = '';
+    for (const sentence of sentences) {
+      if (result.length + sentence.length <= lengthConfig.maxCharacters) {
+        result += sentence;
+      } else {
+        break; // 超长就停止
       }
     }
-    
-    if (bestCutPoint > lengthConfig.maxCharacters * 0.6) {
-      optimized = optimized.substring(0, bestCutPoint);
-    } else {
-      // 如果找不到合适的截断点，在句子中间截断并添加省略号
-      optimized = optimized.substring(0, lengthConfig.maxCharacters - 3) + '…';
+
+    // 确保至少有第1句
+    if (result.length === 0 && sentences.length > 0) {
+      result = sentences[0] || '';
+      // 如果第1句也太长，截断并加省略号
+      if (result.length > lengthConfig.maxCharacters) {
+        result = result.substring(0, lengthConfig.maxCharacters - 1) + '~';
+      }
     }
+
+    return result || optimized.substring(0, lengthConfig.maxCharacters - 1) + '~';
   }
-  
+
   // 确保有合适的结尾（仅对简单和正常对话）
   if (!lengthConfig.allowMultiParagraph && !optimized.match(/[。？！~…呢哦]$/)) {
     optimized += '~';
   }
-  
+
   return optimized;
 };
 
