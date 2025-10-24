@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { setAudioModeAsync } from 'expo-audio'; // Import setAudioModeAsync for audio session configuration
 import {
   WelcomeScreen,
   HomeScreen,
@@ -24,6 +25,41 @@ export type RootStackParamList = {
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+
+/**
+ * Configure audio session for optimal voice playback
+ * Fixes: Low volume issue on iPhone by setting proper audio category and mode
+ */
+async function configureAudioSession(): Promise<void> {
+  try {
+    // Configure audio mode for voice-optimized playback
+    await setAudioModeAsync({
+      // iOS: Allow audio playback even when device is in silent mode
+      playsInSilentMode: true,
+
+      // iOS: Allow audio recording (needed for speech recognition)
+      allowsRecording: true,
+
+      // iOS/Android: Keep audio session active in background
+      shouldPlayInBackground: true,
+
+      // iOS: Duck other audio when playing (reduce others' volume)
+      interruptionMode: 'duckOthers',
+
+      // Android: Duck other audio when playing
+      interruptionModeAndroid: 'duckOthers',
+
+      // Android: Use speaker output by default (not earpiece)
+      // This ensures louder volume for TTS playback
+      shouldRouteThroughEarpiece: false,
+    });
+
+    console.log('[App] ✅ Audio session configured for optimal voice playback');
+  } catch (error) {
+    console.error('[App] ❌ Failed to configure audio session:', error);
+    throw error;
+  }
+}
 
 /**
  * Warmup TTS service with a test synthesis
@@ -56,6 +92,10 @@ export default function App() {
     const initializeApp = async () => {
       try {
         console.log('[App] 开始初始化应用...');
+
+        // 0. 配置音频会话 (Fix: iPhone音量过小问题)
+        console.log('[App] 配置音频会话...');
+        await configureAudioSession();
 
         // 1. 预加载过渡语音
         console.log('[App] 预加载过渡语音...');

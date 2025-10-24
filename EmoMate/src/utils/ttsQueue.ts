@@ -296,6 +296,9 @@ export class TTSQueue {
         // Create a new player from the cached URI for independent playback
         const player = createAudioPlayer({ uri: cachedEntry.uri });
 
+        // Fix: Set volume to maximum (1.0) to ensure proper playback volume
+        player.volume = 1.0;
+
         item.player = player;
         item.audioUri = cachedEntry.uri;
         item.status = 'ready';
@@ -326,6 +329,9 @@ export class TTSQueue {
 
       // Create audio player
       const player = createAudioPlayer({ uri: audioUri });
+
+      // Fix: Set volume to maximum (1.0) to ensure proper playback volume
+      player.volume = 1.0;
 
       item.player = player;
       item.audioUri = audioUri;
@@ -721,6 +727,9 @@ export async function preCacheCommonPhrases(): Promise<void> {
                 file.write(audioBytes);
 
                 const player = createAudioPlayer({ uri: file.uri });
+
+                // Fix: Set volume to maximum (1.0) to ensure proper playback volume
+                player.volume = 1.0;
 
                 resolve({ uri: file.uri, player });
               } catch (error) {

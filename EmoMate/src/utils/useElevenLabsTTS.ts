@@ -309,9 +309,11 @@ export const useElevenLabsTTS = (): UseElevenLabsTTSReturn => {
       // 使用 replace 方法设置新的音频源
       audioPlayer.replace(newAudioUri);
       setAudioUri(newAudioUri);
-      
+
       // 等待音频加载完成后播放
       setTimeout(() => {
+        // Fix: Set volume to maximum (1.0) to ensure proper playback volume
+        audioPlayer.volume = 1.0;
         audioPlayer.play();
         setIsGenerating(false);
         
