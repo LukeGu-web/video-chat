@@ -10,7 +10,7 @@
  */
 
 import { Audio } from 'expo-av';
-import * as FileSystem from 'expo-file-system';
+import { File, Directory, Paths } from 'expo-file-system';
 import {
   ELEVENLABS_CONFIG,
   getElevenLabsApiKey,
@@ -18,6 +18,7 @@ import {
   getLanLanVoiceId,
   preprocessTextForNaturalSpeech,
 } from '../constants/ai';
+import { base64ToUint8Array, safeDeleteFile, ensureDirectoryExists } from './fileSystemHelpers';
 
 /**
  * Common phrases to pre-cache for instant playback
@@ -62,20 +63,18 @@ interface AudioCacheEntry {
 class TTSAudioCache {
   private cache: Map<string, AudioCacheEntry> = new Map();
   private maxCacheSize = 30; // Maximum number of cached items
-  private cacheDir = FileSystem.documentDirectory + 'tts_cache/';
+  private cacheDir = new Directory(Paths.document, 'tts_cache');
 
   /**
    * Initialize cache directory
    */
   async initialize(): Promise<void> {
     try {
-      const dirInfo = await FileSystem.getInfoAsync(this.cacheDir);
-      if (!dirInfo.exists) {
-        await FileSystem.makeDirectoryAsync(this.cacheDir, { intermediates: true });
-        console.log('[TTSCache] Cache directory created');
-      }
+      ensureDirectoryExists(this.cacheDir);
+      console.log('[TTSCache] Cache directory initialized');
     } catch (error) {
       console.error('[TTSCache] Failed to create cache directory:', error);
+      throw error;
     }
   }
 
@@ -92,8 +91,8 @@ class TTSAudioCache {
     entry.lastAccessed = Date.now();
 
     // Verify file still exists
-    const fileInfo = await FileSystem.getInfoAsync(entry.uri);
-    if (!fileInfo.exists) {
+    const file = new File(entry.uri);
+    if (!file.exists) {
       console.warn('[TTSCache] Cached file missing, removing from cache:', text);
       this.cache.delete(text);
       return null;
@@ -169,12 +168,14 @@ class TTSAudioCache {
       if (entry) {
         try {
           await entry.sound.unloadAsync();
-          await FileSystem.deleteAsync(entry.uri, { idempotent: true });
+          await safeDeleteFile(entry.uri);
+          this.cache.delete(oldestKey);
+          console.log(`[TTSCache] Evicted: "${oldestKey}"`);
         } catch (e) {
-          // Ignore cleanup errors
+          console.error(`[TTSCache] Failed to evict "${oldestKey}":`, e);
+          // Still remove from cache to prevent memory leak
+          this.cache.delete(oldestKey);
         }
-        this.cache.delete(oldestKey);
-        console.log(`[TTSCache] Evicted: "${oldestKey}"`);
       }
     }
   }
@@ -186,9 +187,9 @@ class TTSAudioCache {
     for (const entry of this.cache.values()) {
       try {
         await entry.sound.unloadAsync();
-        await FileSystem.deleteAsync(entry.uri, { idempotent: true });
+        await safeDeleteFile(entry.uri);
       } catch (e) {
-        // Ignore cleanup errors
+        console.warn('[TTSCache] Failed to cleanup cache entry:', e);
       }
     }
     this.cache.clear();
@@ -419,11 +420,12 @@ export class TTSQueue {
     const url = `${ELEVENLABS_CONFIG.baseURL}/text-to-speech/${voiceId}`;
     const voiceSettings = getEmotionalVoiceSettings(this.config.userEmotion);
 
-    // Create temp file path
+    // Create temp file
     const fileName = `tts_queue_${Date.now()}_${Math.random()
       .toString(36)
       .substring(7)}.mp3`;
-    const fileUri = FileSystem.documentDirectory + fileName;
+    const file = new File(Paths.document, fileName);
+    file.create();
 
     // Preprocess text for natural speech
     const processedText = preprocessTextForNaturalSpeech(text);
@@ -444,25 +446,37 @@ export class TTSQueue {
             // Convert blob to base64 and save
             const reader = new FileReader();
             reader.onloadend = async () => {
-              const base64data = reader.result as string;
-              const base64Audio = base64data.split(',')[1];
+              try {
+                const base64data = reader.result as string;
+                const base64Audio = base64data.split(',')[1];
 
-              await FileSystem.writeAsStringAsync(fileUri, base64Audio, {
-                encoding: FileSystem.EncodingType.Base64,
-              });
+                if (!base64Audio || base64Audio.trim().length === 0) {
+                  throw new Error('Received empty audio data from ElevenLabs');
+                }
 
-              resolve(fileUri);
+                // Convert base64 to Uint8Array for Expo v54
+                const audioBytes = base64ToUint8Array(base64Audio);
+                file.write(audioBytes);
+
+                resolve(file.uri);
+              } catch (error) {
+                await safeDeleteFile(file.uri);
+                reject(new Error(`Failed to save audio file: ${error}`));
+              }
             };
             reader.readAsDataURL(xhr.response);
           } catch (error) {
-            reject(new Error(`Failed to save audio file: ${error}`));
+            await safeDeleteFile(file.uri);
+            reject(new Error(`Failed to process audio data: ${error}`));
           }
         } else {
+          await safeDeleteFile(file.uri);
           reject(new Error(`ElevenLabs API error: ${xhr.status}`));
         }
       };
 
-      xhr.onerror = () => {
+      xhr.onerror = async () => {
+        await safeDeleteFile(file.uri);
         reject(new Error('Network request failed'));
       };
 
@@ -531,7 +545,7 @@ export class TTSQueue {
         }
 
         // Set playback completion callback
-        item.audio.setOnPlaybackStatusUpdate((status) => {
+        item.audio.setOnPlaybackStatusUpdate(async (status) => {
           if (status.isLoaded && status.didJustFinish) {
             item.status = 'completed';
 
@@ -545,7 +559,7 @@ export class TTSQueue {
             // Cleanup audio
             item.audio?.unloadAsync();
             if (item.audioUri) {
-              FileSystem.deleteAsync(item.audioUri, { idempotent: true });
+              await safeDeleteFile(item.audioUri);
             }
 
             // Play next
@@ -614,7 +628,7 @@ export class TTSQueue {
         }
       }
       if (item.audioUri) {
-        FileSystem.deleteAsync(item.audioUri, { idempotent: true });
+        await safeDeleteFile(item.audioUri);
       }
     }
 
@@ -677,9 +691,12 @@ export async function preCacheCommonPhrases(): Promise<void> {
     const url = `${ELEVENLABS_CONFIG.baseURL}/text-to-speech/${voiceId}`;
     const voiceSettings = getEmotionalVoiceSettings();
 
-    // Create cache file path
+    // Create cache file
     const fileName = `tts_cache_${Date.now()}_${Math.random().toString(36).substring(7)}.mp3`;
-    const fileUri = (FileSystem.documentDirectory + 'tts_cache/') + fileName;
+    const cacheDir = new Directory(Paths.document, 'tts_cache');
+    ensureDirectoryExists(cacheDir);
+    const file = new File(cacheDir, fileName);
+    file.create();
 
     // Preprocess text
     const processedText = preprocessTextForNaturalSpeech(text);
@@ -699,30 +716,42 @@ export async function preCacheCommonPhrases(): Promise<void> {
           try {
             const reader = new FileReader();
             reader.onloadend = async () => {
-              const base64data = reader.result as string;
-              const base64Audio = base64data.split(',')[1];
+              try {
+                const base64data = reader.result as string;
+                const base64Audio = base64data.split(',')[1];
 
-              await FileSystem.writeAsStringAsync(fileUri, base64Audio, {
-                encoding: FileSystem.EncodingType.Base64,
-              });
+                if (!base64Audio || base64Audio.trim().length === 0) {
+                  throw new Error('Received empty audio data from ElevenLabs');
+                }
 
-              const { sound } = await Audio.Sound.createAsync(
-                { uri: fileUri },
-                { shouldPlay: false }
-              );
+                // Convert base64 to Uint8Array for Expo v54
+                const audioBytes = base64ToUint8Array(base64Audio);
+                file.write(audioBytes);
 
-              resolve({ uri: fileUri, sound });
+                const { sound } = await Audio.Sound.createAsync(
+                  { uri: file.uri },
+                  { shouldPlay: false }
+                );
+
+                resolve({ uri: file.uri, sound });
+              } catch (error) {
+                await safeDeleteFile(file.uri);
+                reject(new Error(`Failed to save cache audio: ${error}`));
+              }
             };
             reader.readAsDataURL(xhr.response);
           } catch (error) {
-            reject(new Error(`Failed to save cache audio: ${error}`));
+            await safeDeleteFile(file.uri);
+            reject(new Error(`Failed to process cache audio: ${error}`));
           }
         } else {
+          await safeDeleteFile(file.uri);
           reject(new Error(`ElevenLabs API error: ${xhr.status}`));
         }
       };
 
-      xhr.onerror = () => {
+      xhr.onerror = async () => {
+        await safeDeleteFile(file.uri);
         reject(new Error('Network request failed during cache pre-generation'));
       };
 

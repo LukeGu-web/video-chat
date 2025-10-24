@@ -1,9 +1,15 @@
 import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { WelcomeScreen, HomeScreen, ChatHistoryScreen, HiyoriScreen, EmotionTestScreen } from './src/screens';
+import {
+  WelcomeScreen,
+  HomeScreen,
+  ChatHistoryScreen,
+  HiyoriScreen,
+  EmotionTestScreen,
+} from './src/screens';
 import { isDebugMode } from './src/utils/debug';
 import { transitionAudio } from './src/utils/transitionAudio'; // Phase 1: 过渡语音预加载
 import { TTSQueue, initializeTTSCache } from './src/utils/ttsQueue'; // Phase 3: TTS 预热 + 缓存
@@ -17,7 +23,7 @@ export type RootStackParamList = {
   EmotionTest: undefined;
 };
 
-const Stack = createStackNavigator<RootStackParamList>();
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
 /**
  * Warmup TTS service with a test synthesis
@@ -29,10 +35,10 @@ async function warmupTTS(): Promise<void> {
 
     // Send a very short test phrase to warm up the connection
     // This pre-establishes the HTTPS connection and validates API key
-    await testQueue.enqueue("嗯");
+    await testQueue.enqueue('嗯');
 
     // Wait briefly for synthesis to start (don't wait for completion)
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
     // Cancel to avoid playing the test audio
     await testQueue.cancel();
@@ -73,23 +79,23 @@ export default function App() {
   }, []);
 
   return (
-    <GestureHandlerRootView className="flex-1">
+    <GestureHandlerRootView className='flex-1'>
       <NavigationContainer>
         <Stack.Navigator
-          initialRouteName="Welcome"
+          initialRouteName='Welcome'
           screenOptions={{
             headerShown: false,
           }}
         >
-          <Stack.Screen name="Welcome" component={WelcomeScreen} />
-          <Stack.Screen name="Home" component={HomeScreen} />
-          <Stack.Screen name="ChatHistory" component={ChatHistoryScreen} />
-          <Stack.Screen name="Hiyori" component={HiyoriScreen} />
+          <Stack.Screen name='Welcome' component={WelcomeScreen} />
+          <Stack.Screen name='Home' component={HomeScreen} />
+          <Stack.Screen name='ChatHistory' component={ChatHistoryScreen} />
+          <Stack.Screen name='Hiyori' component={HiyoriScreen} />
           {isDebugMode() && (
-            <Stack.Screen name="EmotionTest" component={EmotionTestScreen} />
+            <Stack.Screen name='EmotionTest' component={EmotionTestScreen} />
           )}
         </Stack.Navigator>
-        <StatusBar style="auto" />
+        <StatusBar style='auto' />
       </NavigationContainer>
     </GestureHandlerRootView>
   );

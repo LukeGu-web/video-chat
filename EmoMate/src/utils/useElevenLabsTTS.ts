@@ -1,13 +1,14 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useAudioPlayer } from 'expo-audio';
-import * as FileSystem from 'expo-file-system';
-import { 
-  ELEVENLABS_CONFIG, 
-  getElevenLabsApiKey, 
-  getEmotionalVoiceSettings, 
+import { File, Paths } from 'expo-file-system';
+import {
+  ELEVENLABS_CONFIG,
+  getElevenLabsApiKey,
+  getEmotionalVoiceSettings,
   getLanLanVoiceId,
   preprocessTextForNaturalSpeech
 } from '../constants/ai';
+import { base64ToUint8Array, safeDeleteFile } from './fileSystemHelpers';
 
 export interface UseElevenLabsTTSReturn {
   isSpeaking: boolean;
@@ -58,47 +59,60 @@ export const useElevenLabsTTS = (): UseElevenLabsTTSReturn => {
     const voice = voiceId || getLanLanVoiceId(); // 使用兰兰专用语音
     const url = `${ELEVENLABS_CONFIG.baseURL}/text-to-speech/${voice}`;
     const voiceSettings = getEmotionalVoiceSettings(userEmotion); // 获取情感化语音设置
-    
-    // 创建临时文件路径
+
+    // 创建临时文件
     const fileName = `elevenlabs_${Date.now()}.mp3`;
-    const fileUri = FileSystem.documentDirectory + fileName;
+    const file = new File(Paths.document, fileName);
+    file.create();
 
     // 使用 XMLHttpRequest 来正确处理二进制数据
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', url, true);
       xhr.responseType = 'blob';
-      
+
       // 设置请求头
       xhr.setRequestHeader('Accept', 'audio/mpeg');
       xhr.setRequestHeader('Content-Type', 'application/json');
       xhr.setRequestHeader('xi-api-key', apiKey);
-      
+
       xhr.onload = async () => {
         if (xhr.status === 200) {
           try {
             // 将 blob 转换为 base64 并保存到文件
             const reader = new FileReader();
             reader.onloadend = async () => {
-              const base64data = reader.result as string;
-              const base64Audio = base64data.split(',')[1]; // 移除 data:audio/mpeg;base64, 前缀
-              
-              await FileSystem.writeAsStringAsync(fileUri, base64Audio, {
-                encoding: FileSystem.EncodingType.Base64,
-              });
-              
-              resolve(fileUri);
+              try {
+                const base64data = reader.result as string;
+                const base64Audio = base64data.split(',')[1]; // 移除 data:audio/mpeg;base64, 前缀
+
+                if (!base64Audio || base64Audio.trim().length === 0) {
+                  throw new Error('Received empty audio data from ElevenLabs');
+                }
+
+                // Convert base64 to Uint8Array for Expo v54
+                const audioBytes = base64ToUint8Array(base64Audio);
+                file.write(audioBytes);
+
+                resolve(file.uri);
+              } catch (error) {
+                await safeDeleteFile(file.uri);
+                reject(new Error(`保存音频文件失败: ${error}`));
+              }
             };
             reader.readAsDataURL(xhr.response);
           } catch (error) {
-            reject(new Error(`保存音频文件失败: ${error}`));
+            await safeDeleteFile(file.uri);
+            reject(new Error(`处理音频数据失败: ${error}`));
           }
         } else {
+          await safeDeleteFile(file.uri);
           reject(new Error(`ElevenLabs API调用失败: ${xhr.status}`));
         }
       };
       
-      xhr.onerror = () => {
+      xhr.onerror = async () => {
+        await safeDeleteFile(file.uri);
         reject(new Error('网络请求失败'));
       };
       
@@ -123,10 +137,11 @@ export const useElevenLabsTTS = (): UseElevenLabsTTSReturn => {
     const voice = voiceId || getLanLanVoiceId(); // 使用兰兰专用语音
     const url = `${ELEVENLABS_CONFIG.baseURL}/text-to-speech/${voice}/stream/with-timestamps`;
     const voiceSettings = getEmotionalVoiceSettings(userEmotion); // 获取情感化语音设置
-    
-    // 创建临时文件路径
+
+    // 创建临时文件
     const fileName = `elevenlabs_${Date.now()}.mp3`;
-    const fileUri = FileSystem.documentDirectory + fileName;
+    const file = new File(Paths.document, fileName);
+    file.create();
 
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
@@ -203,21 +218,28 @@ export const useElevenLabsTTS = (): UseElevenLabsTTSReturn => {
           try {
             // 保存音频文件
             if (audioData) {
-              await FileSystem.writeAsStringAsync(fileUri, audioData, {
-                encoding: FileSystem.EncodingType.Base64,
-              });
+              if (audioData.trim().length === 0) {
+                throw new Error('Received empty audio data from ElevenLabs');
+              }
+
+              // Convert base64 to Uint8Array for Expo v54
+              const audioBytes = base64ToUint8Array(audioData);
+              await file.write(audioBytes);
             }
-            
-            resolve({ audioUri: fileUri, segments });
+
+            resolve({ audioUri: file.uri, segments });
           } catch (error) {
+            await safeDeleteFile(file.uri);
             reject(new Error(`保存音频文件失败: ${error}`));
           }
         } else {
+          await safeDeleteFile(file.uri);
           reject(new Error(`ElevenLabs API调用失败: ${xhr.status}`));
         }
       };
       
-      xhr.onerror = () => {
+      xhr.onerror = async () => {
+        await safeDeleteFile(file.uri);
         reject(new Error('网络请求失败'));
       };
       
@@ -251,8 +273,8 @@ export const useElevenLabsTTS = (): UseElevenLabsTTSReturn => {
       
       // 延迟清理音频文件
       if (!isGenerating && audioUri && audioPlayer.currentTime > 0) {
-        setTimeout(() => {
-          FileSystem.deleteAsync(audioUri, { idempotent: true });
+        setTimeout(async () => {
+          await safeDeleteFile(audioUri);
           setAudioUri(null);
         }, 500);
       }
@@ -275,7 +297,7 @@ export const useElevenLabsTTS = (): UseElevenLabsTTSReturn => {
 
       // 清理之前的音频文件
       if (audioUri) {
-        FileSystem.deleteAsync(audioUri, { idempotent: true });
+        await safeDeleteFile(audioUri);
       }
 
       // 使用情感化语音生成
@@ -365,7 +387,7 @@ export const useElevenLabsTTS = (): UseElevenLabsTTSReturn => {
       
       // 清理临时音频文件
       if (audioUri) {
-        FileSystem.deleteAsync(audioUri, { idempotent: true });
+        await safeDeleteFile(audioUri);
         setAudioUri(null);
       }
     } catch (err) {

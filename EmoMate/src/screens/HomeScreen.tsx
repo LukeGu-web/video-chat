@@ -1,7 +1,7 @@
 import React, { useEffect, useCallback, useState } from 'react';
 import { View, TouchableOpacity, Text, ImageBackground } from 'react-native';
 import { SafeAreaView as SafeAreaViewRN } from 'react-native-safe-area-context';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useUserStore, ChatMessage, useAIStatus } from '../store';
 import { useSpeechToText, useChatAI } from '../utils';
 import { PERSONALITY_PROMPTS } from '../constants';
@@ -24,7 +24,10 @@ type RootStackParamList = {
   EmotionTest: undefined;
 };
 
-type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Home'>;
+type HomeScreenNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  'Home'
+>;
 
 interface Props {
   navigation: HomeScreenNavigationProp;

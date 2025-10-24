@@ -1,15 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { requestCameraAndMicrophonePermissions, checkCameraAndMicrophonePermissions, PermissionStatus } from '../utils';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import {
+  requestCameraAndMicrophonePermissions,
+  checkCameraAndMicrophonePermissions,
+  PermissionStatus,
+} from '../utils';
 
 type RootStackParamList = {
   Welcome: undefined;
   Home: undefined;
 };
 
-type WelcomeScreenNavigationProp = StackNavigationProp<
+type WelcomeScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
   'Welcome'
 >;
@@ -40,7 +44,7 @@ const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
   const requestPermissions = async () => {
     const status = await requestCameraAndMicrophonePermissions();
     setPermissionStatus(status);
-    
+
     if (!status.allGranted) {
       Alert.alert(
         '权限需求',
@@ -60,43 +64,58 @@ const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
 
   if (isCheckingPermissions) {
     return (
-      <SafeAreaView className="flex-1 bg-background justify-center items-center px-4">
-        <Text className="text-4xl font-bold text-primary mb-4 text-center">Welcome to EmoMate</Text>
-        <Text className="text-lg text-gray-500 mb-12 text-center">正在检查权限...</Text>
+      <SafeAreaView className='items-center justify-center flex-1 px-4 bg-background'>
+        <Text className='mb-4 text-4xl font-bold text-center text-primary'>
+          Welcome to EmoMate
+        </Text>
+        <Text className='mb-12 text-lg text-center text-gray-500'>
+          正在检查权限...
+        </Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-background justify-center items-center px-4">
-      <Text className="text-4xl font-bold text-primary mb-4 text-center">Welcome to EmoMate</Text>
-      <Text className="text-lg text-gray-500 mb-12 text-center">Your emotional companion</Text>
-      
+    <SafeAreaView className='items-center justify-center flex-1 px-4 bg-background'>
+      <Text className='mb-4 text-4xl font-bold text-center text-primary'>
+        Welcome to EmoMate
+      </Text>
+      <Text className='mb-12 text-lg text-center text-gray-500'>
+        Your emotional companion
+      </Text>
+
       {!permissionStatus.allGranted && (
-        <View className="bg-white p-4 rounded-lg mb-8 items-center">
-          <Text className="text-base text-black text-center mb-4">
+        <View className='items-center p-4 mb-8 bg-white rounded-lg'>
+          <Text className='mb-4 text-base text-center text-black'>
             请开启摄像头与麦克风权限以便与 AI 对话
           </Text>
-          <View className="gap-2 items-center">
-            <Text className={`text-sm font-medium ${permissionStatus.camera ? 'text-green-600' : 'text-red-600'}`}>
+          <View className='items-center gap-2'>
+            <Text
+              className={`text-sm font-medium ${
+                permissionStatus.camera ? 'text-green-600' : 'text-red-600'
+              }`}
+            >
               摄像头: {permissionStatus.camera ? '已授权' : '未授权'}
             </Text>
-            <Text className={`text-sm font-medium ${permissionStatus.microphone ? 'text-green-600' : 'text-red-600'}`}>
+            <Text
+              className={`text-sm font-medium ${
+                permissionStatus.microphone ? 'text-green-600' : 'text-red-600'
+              }`}
+            >
               麦克风: {permissionStatus.microphone ? '已授权' : '未授权'}
             </Text>
           </View>
         </View>
       )}
-      
-      <TouchableOpacity 
-        className="bg-primary px-8 py-4 rounded-lg min-w-[200px]"
+
+      <TouchableOpacity
+        className='bg-primary px-8 py-4 rounded-lg min-w-[200px]'
         onPress={handleGetStarted}
       >
-        <Text className="text-white text-lg font-semibold text-center">
+        <Text className='text-lg font-semibold text-center text-white'>
           {permissionStatus.allGranted ? 'Get Started' : '请求权限'}
         </Text>
       </TouchableOpacity>
-
     </SafeAreaView>
   );
 };
