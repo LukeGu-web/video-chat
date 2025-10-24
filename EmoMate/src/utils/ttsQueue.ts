@@ -9,7 +9,7 @@
  * - Graceful cleanup and cancellation
  */
 
-import { Audio } from 'expo-av';
+import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
 import { File, Directory, Paths } from 'expo-file-system';
 import {
   ELEVENLABS_CONFIG,
@@ -52,7 +52,7 @@ const CACHE_PHRASES = [
  */
 interface AudioCacheEntry {
   uri: string;
-  sound: Audio.Sound;
+  player: AudioPlayer;
   lastAccessed: number;
 }
 
@@ -81,7 +81,7 @@ class TTSAudioCache {
   /**
    * Get cached audio for text
    */
-  async get(text: string): Promise<Audio.Sound | null> {
+  async get(text: string): Promise<AudioCacheEntry | null> {
     const entry = this.cache.get(text);
     if (!entry) {
       return null;
@@ -99,13 +99,13 @@ class TTSAudioCache {
     }
 
     console.log(`[TTSCache] ✅ Cache hit: "${text}"`);
-    return entry.sound;
+    return entry;
   }
 
   /**
    * Set cached audio for text
    */
-  async set(text: string, uri: string, sound: Audio.Sound): Promise<void> {
+  async set(text: string, uri: string, player: AudioPlayer): Promise<void> {
     // Check cache size limit
     if (this.cache.size >= this.maxCacheSize) {
       await this.evictOldest();
@@ -113,7 +113,7 @@ class TTSAudioCache {
 
     this.cache.set(text, {
       uri,
-      sound,
+      player,
       lastAccessed: Date.now(),
     });
 
@@ -123,7 +123,7 @@ class TTSAudioCache {
   /**
    * Pre-generate and cache common phrases
    */
-  async preCacheCommonPhrases(synthesizeFn: (text: string) => Promise<{ uri: string; sound: Audio.Sound }>): Promise<void> {
+  async preCacheCommonPhrases(synthesizeFn: (text: string) => Promise<{ uri: string; player: AudioPlayer }>): Promise<void> {
     console.log('[TTSCache] Pre-caching common phrases...');
 
     let successCount = 0;
@@ -135,8 +135,8 @@ class TTSAudioCache {
         }
 
         // Synthesize and cache
-        const { uri, sound } = await synthesizeFn(phrase);
-        await this.set(phrase, uri, sound);
+        const { uri, player } = await synthesizeFn(phrase);
+        await this.set(phrase, uri, player);
         successCount++;
 
         // Add small delay to avoid rate limiting
@@ -167,7 +167,7 @@ class TTSAudioCache {
       const entry = this.cache.get(oldestKey);
       if (entry) {
         try {
-          await entry.sound.unloadAsync();
+          entry.player.remove();
           await safeDeleteFile(entry.uri);
           this.cache.delete(oldestKey);
           console.log(`[TTSCache] Evicted: "${oldestKey}"`);
@@ -186,7 +186,7 @@ class TTSAudioCache {
   async clear(): Promise<void> {
     for (const entry of this.cache.values()) {
       try {
-        await entry.sound.unloadAsync();
+        entry.player.remove();
         await safeDeleteFile(entry.uri);
       } catch (e) {
         console.warn('[TTSCache] Failed to cleanup cache entry:', e);
@@ -212,7 +212,7 @@ export interface TTSQueueItem {
   id: string;
   text: string;
   status: TTSQueueStatus;
-  audio?: Audio.Sound;
+  player?: AudioPlayer;
   audioUri?: string;
   error?: string;
   retryCount?: number; // Track retry attempts
@@ -291,38 +291,32 @@ export class TTSQueue {
 
     try {
       // Phase 3: Check cache first
-      const cachedSound = await ttsAudioCache.get(item.text);
-      if (cachedSound) {
-        // Clone the cached sound for independent playback
-        const status = await cachedSound.getStatusAsync();
-        if (status.isLoaded) {
-          const { sound } = await Audio.Sound.createAsync(
-            { uri: status.uri || '' },
-            { shouldPlay: false }
-          );
+      const cachedEntry = await ttsAudioCache.get(item.text);
+      if (cachedEntry) {
+        // Create a new player from the cached URI for independent playback
+        const player = createAudioPlayer({ uri: cachedEntry.uri });
 
-          item.audio = sound;
-          item.audioUri = status.uri || undefined;
-          item.status = 'ready';
-          this.activeSynthesisTasks--;
+        item.player = player;
+        item.audioUri = cachedEntry.uri;
+        item.status = 'ready';
+        this.activeSynthesisTasks--;
 
-          console.log(`[TTSQueue] ⚡ Using cached audio for ${item.id}`);
+        console.log(`[TTSQueue] ⚡ Using cached audio for ${item.id}`);
 
-          // If this is the first item and playback hasn't started, start now
-          if (this.queue[0] === item && !this.isPlaying) {
-            this.playNext();
-          }
-
-          // Start synthesis for next pending item
-          const nextPendingIndex = this.queue.findIndex(
-            (q) => q.status === 'pending'
-          );
-          if (nextPendingIndex !== -1) {
-            this.synthesize(this.queue[nextPendingIndex]);
-          }
-
-          return;
+        // If this is the first item and playback hasn't started, start now
+        if (this.queue[0] === item && !this.isPlaying) {
+          this.playNext();
         }
+
+        // Start synthesis for next pending item
+        const nextPendingIndex = this.queue.findIndex(
+          (q) => q.status === 'pending'
+        );
+        if (nextPendingIndex !== -1) {
+          this.synthesize(this.queue[nextPendingIndex]);
+        }
+
+        return;
       }
 
       console.log(`[TTSQueue] Synthesizing ${item.id}... (attempt ${item.retryCount + 1})`);
@@ -330,13 +324,10 @@ export class TTSQueue {
       // Call ElevenLabs TTS API
       const audioUri = await this.callElevenLabsTTS(item.text);
 
-      // Load audio for playback
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: audioUri },
-        { shouldPlay: false }
-      );
+      // Create audio player
+      const player = createAudioPlayer({ uri: audioUri });
 
-      item.audio = sound;
+      item.player = player;
       item.audioUri = audioUri;
       item.status = 'ready';
 
@@ -345,7 +336,7 @@ export class TTSQueue {
       // Phase 3: Cache the result for future use
       if (item.text.length <= 30) { // Only cache short phrases
         try {
-          await ttsAudioCache.set(item.text, audioUri, sound);
+          await ttsAudioCache.set(item.text, audioUri, player);
         } catch (e) {
           console.warn('[TTSQueue] Failed to cache audio:', e);
         }
@@ -534,7 +525,7 @@ export class TTSQueue {
     }
 
     // Play audio
-    if (item.audio && !this.isCancelled) {
+    if (item.player && !this.isCancelled) {
       try {
         console.log(`[TTSQueue] 🔊 Playing ${item.id}: "${item.text}"`);
         item.status = 'playing';
@@ -545,8 +536,8 @@ export class TTSQueue {
         }
 
         // Set playback completion callback
-        item.audio.setOnPlaybackStatusUpdate(async (status) => {
-          if (status.isLoaded && status.didJustFinish) {
+        const subscription = item.player.addListener('playbackStatusUpdate', async (status) => {
+          if (status.didJustFinish) {
             item.status = 'completed';
 
             // Callback: Playback ended
@@ -557,7 +548,8 @@ export class TTSQueue {
             this.currentIndex++;
 
             // Cleanup audio
-            item.audio?.unloadAsync();
+            subscription.remove();
+            item.player?.remove();
             if (item.audioUri) {
               await safeDeleteFile(item.audioUri);
             }
@@ -569,7 +561,7 @@ export class TTSQueue {
           }
         });
 
-        await item.audio.playAsync();
+        item.player.play();
       } catch (error) {
         console.error(`[TTSQueue] ❌ Playback error for ${item.id}:`, error);
         item.status = 'failed';
@@ -609,10 +601,10 @@ export class TTSQueue {
 
     // Stop current playback
     const currentItem = this.queue[this.currentIndex];
-    if (currentItem?.audio) {
+    if (currentItem?.player) {
       try {
-        await currentItem.audio.stopAsync();
-        await currentItem.audio.unloadAsync();
+        currentItem.player.pause();
+        currentItem.player.remove();
       } catch (e) {
         // Ignore errors during cleanup
       }
@@ -620,9 +612,9 @@ export class TTSQueue {
 
     // Cleanup all audio resources
     for (const item of this.queue) {
-      if (item.audio) {
+      if (item.player) {
         try {
-          await item.audio.unloadAsync();
+          item.player.remove();
         } catch (e) {
           // Ignore
         }
@@ -681,7 +673,7 @@ export async function initializeTTSCache(): Promise<void> {
  */
 export async function preCacheCommonPhrases(): Promise<void> {
   // Synthesis function for cache pre-generation
-  const synthesizeForCache = async (text: string): Promise<{ uri: string; sound: Audio.Sound }> => {
+  const synthesizeForCache = async (text: string): Promise<{ uri: string; player: AudioPlayer }> => {
     const apiKey = getElevenLabsApiKey();
     if (!apiKey) {
       throw new Error('ElevenLabs API key not configured');
@@ -728,12 +720,9 @@ export async function preCacheCommonPhrases(): Promise<void> {
                 const audioBytes = base64ToUint8Array(base64Audio);
                 file.write(audioBytes);
 
-                const { sound } = await Audio.Sound.createAsync(
-                  { uri: file.uri },
-                  { shouldPlay: false }
-                );
+                const player = createAudioPlayer({ uri: file.uri });
 
-                resolve({ uri: file.uri, sound });
+                resolve({ uri: file.uri, player });
               } catch (error) {
                 await safeDeleteFile(file.uri);
                 reject(new Error(`Failed to save cache audio: ${error}`));

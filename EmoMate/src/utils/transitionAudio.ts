@@ -8,7 +8,7 @@
  * - 快速播放(0.3s内)提供立即反馈
  */
 
-import { Audio } from 'expo-av';
+import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
 
 export type TransitionCategory =
   | 'thinking'        // 思考类(中性)
@@ -61,14 +61,14 @@ export const TRANSITION_PHRASES = {
 };
 
 interface TransitionAudioCache {
-  [key: string]: Audio.Sound;
+  [key: string]: AudioPlayer;
 }
 
 class TransitionAudioManager {
   private audioCache: TransitionAudioCache = {};
   private initialized = false;
   private isPreloading = false;
-  private currentSound: Audio.Sound | null = null; // Track currently playing sound
+  private currentPlayer: AudioPlayer | null = null; // Track currently playing audio
 
   /**
    * 预加载所有过渡音频
@@ -108,8 +108,8 @@ class TransitionAudioManager {
       };
 
       for (const [key, file] of Object.entries(audioFiles)) {
-        const { sound } = await Audio.Sound.createAsync(file);
-        this.audioCache[key] = sound;
+        const player = createAudioPlayer(file);
+        this.audioCache[key] = player;
       }
 
       this.initialized = true;
@@ -132,31 +132,32 @@ class TransitionAudioManager {
       return;
     }
 
-    // Stop previous sound if playing
-    if (this.currentSound) {
+    // Stop previous player if playing
+    if (this.currentPlayer) {
       try {
-        await this.currentSound.stopAsync();
-        await this.currentSound.setPositionAsync(0);
+        this.currentPlayer.pause();
+        this.currentPlayer.seekTo(0);
       } catch (e) {
         // Ignore stop errors
       }
     }
 
     const audioKey = this.selectRandomAudio(category);
-    const sound = this.audioCache[audioKey];
+    const player = this.audioCache[audioKey];
 
-    if (!sound) {
+    if (!player) {
       console.warn(`[TransitionAudio] 未找到音频: ${audioKey}`);
       return;
     }
 
     try {
-      this.currentSound = sound;
-      await sound.replayAsync(); // 从头播放
+      this.currentPlayer = player;
+      player.seekTo(0); // Reset to beginning
+      player.play(); // Play from start
       console.log(`[TransitionAudio] ✅ 播放过渡语音 [${category}]: ${audioKey}`);
     } catch (error) {
       console.error('[TransitionAudio] 播放失败:', error);
-      this.currentSound = null;
+      this.currentPlayer = null;
     }
   }
 
@@ -165,18 +166,18 @@ class TransitionAudioManager {
    * Phase 2: Called when first real sentence arrives
    */
   async stop(): Promise<void> {
-    if (!this.currentSound) {
+    if (!this.currentPlayer) {
       return;
     }
 
     try {
       console.log('[TransitionAudio] ⏸️ 停止过渡语音');
-      await this.currentSound.stopAsync();
-      await this.currentSound.setPositionAsync(0);
-      this.currentSound = null;
+      this.currentPlayer.pause();
+      this.currentPlayer.seekTo(0);
+      this.currentPlayer = null;
     } catch (error) {
       console.error('[TransitionAudio] 停止失败:', error);
-      this.currentSound = null;
+      this.currentPlayer = null;
     }
   }
 
@@ -217,9 +218,9 @@ class TransitionAudioManager {
    */
   async cleanup(): Promise<void> {
     console.log('[TransitionAudio] 清理资源...');
-    for (const sound of Object.values(this.audioCache)) {
+    for (const player of Object.values(this.audioCache)) {
       try {
-        await sound.unloadAsync();
+        player.remove();
       } catch (error) {
         console.error('[TransitionAudio] 清理音频失败:', error);
       }
