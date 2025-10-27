@@ -13,7 +13,7 @@ import {
   WEATHER_DESCRIPTORS,
   type SceneMetadata,
   type WeatherType,
-} from '@/config/backgroundScenes';
+} from '../config/backgroundScenes';
 
 // ==================== Types ====================
 
