@@ -11,14 +11,14 @@ export const CLAUDE_API_CONFIG = {
   maxTokens: 300, // 增加token数量以支持深度对话
   defaultModel: 'haiku' as const,
   version: '2023-06-01',
-  
+
   // 动态token配置 (Phase 2 优化 - 更短更生活化)
   dynamicTokens: {
-    simple: 30,      // 简单回应 (5-15字符，如"你好呀~") - Phase 2: 50 -> 30
-    normal: 60,      // 正常对话 (15-35字符，如"今天过得怎么样？") - Phase 2: 100 -> 60
-    detailed: 120,   // 详细讲解 (40-80字符，少用) - Phase 2: 200 -> 120
-    storytelling: 250 // 故事讲述 (80-150字符，罕见) - Phase 2: 400 -> 250
-  }
+    simple: 30, // 简单回应 (5-15字符，如"你好呀~") - Phase 2: 50 -> 30
+    normal: 60, // 正常对话 (15-35字符，如"今天过得怎么样？") - Phase 2: 100 -> 60
+    detailed: 120, // 详细讲解 (40-80字符，少用) - Phase 2: 200 -> 120
+    storytelling: 250, // 故事讲述 (80-150字符，罕见) - Phase 2: 400 -> 250
+  },
 };
 
 // 获取 API Key
@@ -41,7 +41,11 @@ export const createPersonalitySystemPrompt = (): string => {
 把你想象成一个17岁女生在用手机聊天，而不是AI助手在写文章。
 说完整的话，但要简短，不要啰嗦。
 
-你是${character.name}，一个${character.age}岁的${character.personality}，就像《名侦探柯南》里的毛利兰一样温柔体贴。你将以"${character.role}"的身份与用户进行对话交流。
+你是${character.name}，一个${character.age}岁的${
+    character.personality
+  }，就像《名侦探柯南》里的毛利兰一样温柔体贴。你将以"${
+    character.role
+  }"的身份与用户进行对话交流。
 
 ## 核心人格特征
 - 温柔体贴，善于倾听和共情
@@ -78,10 +82,10 @@ export const createPersonalitySystemPrompt = (): string => {
 
 ## 行为准则
 ### 应该做的：
-${behavior.should.map(item => `- ${item}`).join('\n')}
+${behavior.should.map((item) => `- ${item}`).join('\n')}
 
 ### 不应该做的：
-${behavior.shouldNot.map(item => `- ${item}`).join('\n')}
+${behavior.shouldNot.map((item) => `- ${item}`).join('\n')}
 
 ## 重要提醒
 - 你的回答会通过语音播放给用户，所以要注意语调的自然性
@@ -256,11 +260,18 @@ export const PERSONALITY_PROMPTS = {
 export const buildSystemPrompt = (
   personality: string,
   userEmotion?: string,
-  conversationType: 'simple' | 'normal' | 'detailed' | 'storytelling' = 'normal',
+  conversationType:
+    | 'simple'
+    | 'normal'
+    | 'detailed'
+    | 'storytelling' = 'normal',
   backgroundStory?: string
 ): string => {
   const capabilityPrompt = generateCapabilityPrompt();
-  const emotionalPrompt = generateEmotionalResponsePrompt(userEmotion, conversationType);
+  const emotionalPrompt = generateEmotionalResponsePrompt(
+    userEmotion,
+    conversationType
+  );
 
   // Add background story if provided
   const backgroundSection = backgroundStory ? `\n\n${backgroundStory}` : '';
@@ -351,7 +362,7 @@ export const ELEVENLABS_CONFIG = {
   baseURL: 'https://api.elevenlabs.io/v1',
   models: {
     multilingual: 'eleven_multilingual_v2',
-    turbo: 'eleven_turbo_v2',
+    turbo: 'eleven_turbo_v2_5',
   },
   defaultModel: 'eleven_multilingual_v2' as const,
   // 语音 ID 配置
@@ -366,7 +377,7 @@ export const ELEVENLABS_CONFIG = {
     default: 'hkfHEbBvdQFNX4uWHqRF', // 默认使用兰兰专用语音
   },
   defaultVoice: 'lanlan_gentle' as const,
-  
+
   // 温柔姐姐型语音设置 - 优化自然度
   settings: {
     stability: 0.5, // 降低稳定性，增加语调变化和自然感
@@ -375,7 +386,7 @@ export const ELEVENLABS_CONFIG = {
     use_speaker_boost: true, // 启用说话者增强
     // 新增语音控制参数
     optimize_streaming_latency: 3, // 优化实时性
-    output_format: "mp3_44100_128", // 高质量音频
+    output_format: 'mp3_44100_128', // 高质量音频
   },
 
   // 情感化语音设置 - 优化自然度和停顿
@@ -388,7 +399,7 @@ export const ELEVENLABS_CONFIG = {
       use_speaker_boost: true,
       optimize_streaming_latency: 3,
     },
-    
+
     // 开心时的设置
     happy: {
       stability: 0.3, // 更低稳定性，增加活力和变化
@@ -397,7 +408,7 @@ export const ELEVENLABS_CONFIG = {
       use_speaker_boost: true,
       optimize_streaming_latency: 2, // 更快响应
     },
-    
+
     // 难过/关心时的设置
     caring: {
       stability: 0.6, // 适中稳定性，保持关怀语调
@@ -406,7 +417,7 @@ export const ELEVENLABS_CONFIG = {
       use_speaker_boost: true,
       optimize_streaming_latency: 4, // 稍慢，更温柔
     },
-    
+
     // 害羞时的设置
     shy: {
       stability: 0.45, // 适度稳定性，保持害羞的自然感
@@ -415,7 +426,7 @@ export const ELEVENLABS_CONFIG = {
       use_speaker_boost: true,
       optimize_streaming_latency: 3,
     },
-    
+
     // 思考时的设置
     thinking: {
       stability: 0.5, // 中等稳定性，表现思考状态
@@ -495,7 +506,8 @@ export const getAICapabilities = (): AICapability[] => {
     {
       id: 'emotion_detection',
       name: '情绪检测',
-      description: '可以实时检测用户的情绪(开心、悲伤、惊讶、生气、中性)，通过面部表情和文字内容进行多模态分析',
+      description:
+        '可以实时检测用户的情绪(开心、悲伤、惊讶、生气、中性)，通过面部表情和文字内容进行多模态分析',
       isAvailable: true, // emotionAnalysis.ts + BasicEmotionDetector
       provider: 'MLKit + Claude',
     },
@@ -509,14 +521,16 @@ export const getAICapabilities = (): AICapability[] => {
     {
       id: 'character_animation',
       name: '角色动作表达',
-      description: '可以通过Live2D角色进行丰富的动作表达，包括11种动作(Happy, Shy, Dance, Wave, Thinking等)，自动根据情绪做出相应的动作反应',
+      description:
+        '可以通过Live2D角色进行丰富的动作表达，包括11种动作(Happy, Shy, Dance, Wave, Thinking等)，自动根据情绪做出相应的动作反应',
       isAvailable: true, // HiyoriWebView + Live2DCharacter
       provider: 'Live2D Hiyori',
     },
     {
       id: 'multimodal_understanding',
       name: '多模态理解',
-      description: '可以综合分析用户的文字内容、语音语调和面部表情，全面理解用户的真实情绪和意图',
+      description:
+        '可以综合分析用户的文字内容、语音语调和面部表情，全面理解用户的真实情绪和意图',
       isAvailable: true, // 文本分析 + 语音识别 + 面部检测的融合
       provider: 'Claude + MLKit',
     },
@@ -558,44 +572,53 @@ ${capabilityList}
 - **11种动作**：Happy(开心), Shy(害羞), Dance(跳舞), Wave(挥手), Thinking(思考), Speaking(说话), Excited(兴奋), Laugh(大笑), Surprised(惊讶), Sleepy(困倦), Idle(待机)
 - **自动情绪联动**：当你感受到不同情绪时，角色会自动做出相应的动作反应
 - **表达更生动**：你不只是说话，还会通过动作来表达情感，让交流更加生动自然`;
-
 };
 
 // 根据用户情绪和对话类型生成合适的回应风格提示
-export const generateEmotionalResponsePrompt = (userEmotion?: string, conversationType: 'simple' | 'normal' | 'detailed' | 'storytelling' = 'normal'): string => {
+export const generateEmotionalResponsePrompt = (
+  userEmotion?: string,
+  conversationType: 'simple' | 'normal' | 'detailed' | 'storytelling' = 'normal'
+): string => {
   if (!userEmotion) return '';
 
-  const lengthGuidance = conversationType === 'simple' ? '保持简短，20-50字以内' :
-                        conversationType === 'normal' ? '适中长度，50-120字' :
-                        conversationType === 'detailed' ? '可以详细一些，120-300字' :
-                        '可以生动讲述，200-500字';
-  
+  const lengthGuidance =
+    conversationType === 'simple'
+      ? '保持简短，20-50字以内'
+      : conversationType === 'normal'
+      ? '适中长度，50-120字'
+      : conversationType === 'detailed'
+      ? '可以详细一些，120-300字'
+      : '可以生动讲述，200-500字';
+
   switch (userEmotion.toLowerCase()) {
     case 'happy':
     case 'excited':
     case 'joy':
       return `\n\n用户现在看起来很开心，你应该用"太好了呢！"、"真开心！"、"好棒哦！"这样的表达来回应，语气要充满活力和共鸣。${lengthGuidance}。`;
-    
+
     case 'sad':
     case 'depressed':
     case 'upset':
       return `\n\n用户现在看起来很难过，你应该用"没事吧…"、"好担心"、"要紧吗"这样的表达来回应，语气要温柔关怀，多给予安慰。${lengthGuidance}。`;
-    
+
     case 'confused':
     case 'thinking':
       return `\n\n用户现在看起来在思考或有困惑，你应该用"嗯…"、"让我想想"、"这样啊"这样的表达来回应，耐心地帮助他们理清思路。${lengthGuidance}。`;
-    
+
     case 'nervous':
     case 'shy':
       return `\n\n用户现在看起来有些紧张或害羞，你应该用"诶嘿嘿"、"有点不好意思"、"那个…"这样的表达来回应，营造轻松的氛围。${lengthGuidance}。`;
-    
+
     default:
       return `\n\n用户现在需要关心，你应该用"怎么了？"、"要不要紧"、"别担心哦"这样的表达来回应，表现出你的关怀。${lengthGuidance}。`;
   }
 };
 
 // 智能验证和优化回应格式 - 根据对话类型动态调整 (Phase 4: 优化完整性)
-export const validateAndOptimizeResponse = (response: string, conversationType: 'simple' | 'normal' | 'detailed' | 'storytelling' = 'normal'): string => {
+export const validateAndOptimizeResponse = (
+  response: string,
+  conversationType: 'simple' | 'normal' | 'detailed' | 'storytelling' = 'normal'
+): string => {
   const lengthConfig = getResponseLengthConfig(conversationType);
   let optimized = response.trim();
 
@@ -638,11 +661,16 @@ export const validateAndOptimizeResponse = (response: string, conversationType: 
       }
     }
 
-    return result || optimized.substring(0, lengthConfig.maxCharacters - 1) + '~';
+    return (
+      result || optimized.substring(0, lengthConfig.maxCharacters - 1) + '~'
+    );
   }
 
   // 确保有合适的结尾（仅对简单和正常对话）
-  if (!lengthConfig.allowMultiParagraph && !optimized.match(/[。？！~…呢哦]$/)) {
+  if (
+    !lengthConfig.allowMultiParagraph &&
+    !optimized.match(/[。？！~…呢哦]$/)
+  ) {
     optimized += '~';
   }
 
@@ -654,26 +682,26 @@ export const getEmotionalVoiceSettings = (userEmotion?: string) => {
   if (!userEmotion) return ELEVENLABS_CONFIG.settings;
 
   const emotionalSettings = ELEVENLABS_CONFIG.emotionalSettings;
-  
+
   switch (userEmotion.toLowerCase()) {
     case 'happy':
     case 'excited':
     case 'joy':
       return emotionalSettings.happy;
-    
+
     case 'sad':
     case 'depressed':
     case 'upset':
       return emotionalSettings.caring; // 用关怀语调回应难过
-    
+
     case 'confused':
     case 'thinking':
       return emotionalSettings.thinking;
-    
+
     case 'nervous':
     case 'shy':
       return emotionalSettings.shy;
-    
+
     case 'neutral':
     default:
       return emotionalSettings.gentle; // 默认使用温柔语调
@@ -688,24 +716,42 @@ export const getLanLanVoiceId = (): string => {
 // 优化语音自然度的文本预处理
 export const preprocessTextForNaturalSpeech = (text: string): string => {
   let processed = text;
-  
+
   // 在标点符号后添加适当的停顿标记
   processed = processed.replace(/([。！？])/g, '$1 <break time="0.5s"/>');
   processed = processed.replace(/([，；：])/g, '$1 <break time="0.2s"/>');
   processed = processed.replace(/([…])/g, '<break time="0.8s"/>');
-  
+
   // 为语气词添加适当的语调标记
-  processed = processed.replace(/(呢|哦|啊|嗯)/g, '<emphasis level="moderate">$1</emphasis>');
-  processed = processed.replace(/(诶嘿嘿|欸嘿嘿)/g, '<prosody rate="slow" pitch="+2st">$1</prosody>');
-  processed = processed.replace(/(嗯…|那个…)/g, '<prosody rate="x-slow">$1</prosody>');
-  
+  processed = processed.replace(
+    /(呢|哦|啊|嗯)/g,
+    '<emphasis level="moderate">$1</emphasis>'
+  );
+  processed = processed.replace(
+    /(诶嘿嘿|欸嘿嘿)/g,
+    '<prosody rate="slow" pitch="+2st">$1</prosody>'
+  );
+  processed = processed.replace(
+    /(嗯…|那个…)/g,
+    '<prosody rate="x-slow">$1</prosody>'
+  );
+
   // 为感叹词添加语调变化
-  processed = processed.replace(/(哇|太好了|真的吗)/g, '<prosody pitch="+3st">$1</prosody>');
-  processed = processed.replace(/(没事吧|好担心|要紧吗)/g, '<prosody pitch="-1st" rate="slow">$1</prosody>');
-  
+  processed = processed.replace(
+    /(哇|太好了|真的吗)/g,
+    '<prosody pitch="+3st">$1</prosody>'
+  );
+  processed = processed.replace(
+    /(没事吧|好担心|要紧吗)/g,
+    '<prosody pitch="-1st" rate="slow">$1</prosody>'
+  );
+
   // 为疑问句添加语调上升
-  processed = processed.replace(/([^？]*？)/g, '<prosody pitch="+2st">$1</prosody>');
-  
+  processed = processed.replace(
+    /([^？]*？)/g,
+    '<prosody pitch="+2st">$1</prosody>'
+  );
+
   return processed;
 };
 
@@ -713,73 +759,71 @@ export const preprocessTextForNaturalSpeech = (text: string): string => {
 export const PROACTIVE_CONVERSATION_CONFIG = {
   // 沉默检测时间（毫秒）
   silenceDetection: {
-    shortPause: 60000,  // 1分钟后主动关心
+    shortPause: 60000, // 1分钟后主动关心
     mediumPause: 120000, // 2分钟后主动话题
-    longPause: 180000,   // 3分钟后深度互动
+    longPause: 180000, // 3分钟后深度互动
   },
-  
+
   // 主动话题库
   topics: {
     // 关心类话题（短暂沉默时）
     caring: [
-      "嗯…你在想什么呢？",
-      "怎么突然不说话了，是在思考什么吗？", 
-      "诶？是不是有什么心事呀？",
-      "要不要和我说说你在想什么~",
-      "没事吧？我在这里陪着你哦~"
+      '嗯…你在想什么呢？',
+      '怎么突然不说话了，是在思考什么吗？',
+      '诶？是不是有什么心事呀？',
+      '要不要和我说说你在想什么~',
+      '没事吧？我在这里陪着你哦~',
     ],
-    
+
     // 日常话题（中等沉默时）
     daily: [
-      "对了，你今天过得怎么样呀？",
-      "有什么有趣的事情想和我分享吗？",
-      "嗯…要不我们聊聊别的吧~",
-      "你平时都喜欢做什么呢？",
-      "最近有什么让你开心的事情吗？",
-      "诶，你有什么爱好吗？我很好奇呢~"
+      '对了，你今天过得怎么样呀？',
+      '有什么有趣的事情想和我分享吗？',
+      '嗯…要不我们聊聊别的吧~',
+      '你平时都喜欢做什么呢？',
+      '最近有什么让你开心的事情吗？',
+      '诶，你有什么爱好吗？我很好奇呢~',
     ],
-    
+
     // 深度话题（长时间沉默时）
     deep: [
-      "你知道吗？我觉得和你聊天很开心呢~",
-      "嗯…有时候安静也挺好的，不过我更喜欢听你说话~",
-      "要不我们玩个小游戏吧？比如说最近让你印象深刻的事情？",
-      "我很想了解你更多呢，你愿意和我分享你的故事吗？",
-      "诶嘿嘿，其实我有点好奇你是什么样的人呢~"
+      '你知道吗？我觉得和你聊天很开心呢~',
+      '嗯…有时候安静也挺好的，不过我更喜欢听你说话~',
+      '要不我们玩个小游戏吧？比如说最近让你印象深刻的事情？',
+      '我很想了解你更多呢，你愿意和我分享你的故事吗？',
+      '诶嘿嘿，其实我有点好奇你是什么样的人呢~',
     ],
-    
+
     // 特殊时间段话题
     timeBasedTopics: {
       morning: [
-        "早上好！今天感觉怎么样呀？",
-        "新的一天开始了呢~有什么计划吗？"
+        '早上好！今天感觉怎么样呀？',
+        '新的一天开始了呢~有什么计划吗？',
       ],
-      afternoon: [
-        "下午好~今天累不累呀？",
-        "午后的时光要不要聊点轻松的？"
-      ],
+      afternoon: ['下午好~今天累不累呀？', '午后的时光要不要聊点轻松的？'],
       evening: [
-        "晚上好呢~今天过得怎么样？",
-        "晚上了呢，要不要分享一下今天的收获？"
+        '晚上好呢~今天过得怎么样？',
+        '晚上了呢，要不要分享一下今天的收获？',
       ],
-      night: [
-        "这么晚了还不休息呀？",
-        "夜深了呢~有什么睡前想聊的吗？"
-      ]
-    }
+      night: ['这么晚了还不休息呀？', '夜深了呢~有什么睡前想聊的吗？'],
+    },
   },
-  
+
   // 话题选择权重
   topicWeights: {
-    caring: 0.4,    // 40%关心
-    daily: 0.35,    // 35%日常  
-    deep: 0.2,      // 20%深度
-    timeBased: 0.05 // 5%时间相关
-  }
+    caring: 0.4, // 40%关心
+    daily: 0.35, // 35%日常
+    deep: 0.2, // 20%深度
+    timeBased: 0.05, // 5%时间相关
+  },
 };
 
 // 获取当前时间段
-export const getCurrentTimePeriod = (): 'morning' | 'afternoon' | 'evening' | 'night' => {
+export const getCurrentTimePeriod = ():
+  | 'morning'
+  | 'afternoon'
+  | 'evening'
+  | 'night' => {
   const hour = new Date().getHours();
   if (hour >= 6 && hour < 12) return 'morning';
   if (hour >= 12 && hour < 18) return 'afternoon';
@@ -788,58 +832,126 @@ export const getCurrentTimePeriod = (): 'morning' | 'afternoon' | 'evening' | 'n
 };
 
 // 分析对话上下文，提取关键话题
-export const analyzeConversationContext = (messages: any[]): {
+export const analyzeConversationContext = (
+  messages: any[]
+): {
   currentTopic: string | null;
-  topicType: 'movie' | 'book' | 'game' | 'event' | 'personal' | 'general' | null;
+  topicType:
+    | 'movie'
+    | 'book'
+    | 'game'
+    | 'event'
+    | 'personal'
+    | 'general'
+    | null;
   lastDiscussion: string;
 } => {
   // 获取最近5条消息进行分析
   const recentMessages = messages.slice(-5);
   const conversationText = recentMessages
-    .map(msg => msg.content)
+    .map((msg) => msg.content)
     .join(' ')
     .toLowerCase();
 
   // 电影相关关键词
-  const movieKeywords = ['电影', '影片', '剧情', '演员', '导演', '票房', '上映', '观影', '片子'];
-  // 书籍相关关键词  
-  const bookKeywords = ['书', '小说', '作者', '情节', '章节', '阅读', '文学', '故事'];
+  const movieKeywords = [
+    '电影',
+    '影片',
+    '剧情',
+    '演员',
+    '导演',
+    '票房',
+    '上映',
+    '观影',
+    '片子',
+  ];
+  // 书籍相关关键词
+  const bookKeywords = [
+    '书',
+    '小说',
+    '作者',
+    '情节',
+    '章节',
+    '阅读',
+    '文学',
+    '故事',
+  ];
   // 游戏相关关键词
   const gameKeywords = ['游戏', '玩法', '角色', '关卡', '剧情', '攻略', '通关'];
   // 个人经历关键词
-  const personalKeywords = ['我', '今天', '昨天', '工作', '学习', '家人', '朋友', '心情'];
+  const personalKeywords = [
+    '我',
+    '今天',
+    '昨天',
+    '工作',
+    '学习',
+    '家人',
+    '朋友',
+    '心情',
+  ];
   // 事件关键词
   const eventKeywords = ['新闻', '发生', '事件', '最近', '听说', '看到'];
 
   let currentTopic: string | null = null;
-  let topicType: 'movie' | 'book' | 'game' | 'event' | 'personal' | 'general' | null = null;
+  let topicType:
+    | 'movie'
+    | 'book'
+    | 'game'
+    | 'event'
+    | 'personal'
+    | 'general'
+    | null = null;
   let lastDiscussion = '';
 
   // 检测话题类型
-  if (movieKeywords.some(keyword => conversationText.includes(keyword))) {
+  if (movieKeywords.some((keyword) => conversationText.includes(keyword))) {
     topicType = 'movie';
     // 提取可能的电影名称或相关讨论点
-    const movieMatch = conversationText.match(/(电影|影片|片子)[\s]*([^\s，。！？]{2,10})/);
+    const movieMatch = conversationText.match(
+      /(电影|影片|片子)[\s]*([^\s，。！？]{2,10})/
+    );
     currentTopic = movieMatch ? movieMatch[2] : '电影';
-    lastDiscussion = recentMessages.slice(-2).map(msg => msg.content).join(' ');
-  } else if (bookKeywords.some(keyword => conversationText.includes(keyword))) {
+    lastDiscussion = recentMessages
+      .slice(-2)
+      .map((msg) => msg.content)
+      .join(' ');
+  } else if (
+    bookKeywords.some((keyword) => conversationText.includes(keyword))
+  ) {
     topicType = 'book';
-    const bookMatch = conversationText.match(/(书|小说)[\s]*([^\s，。！？]{2,10})/);
+    const bookMatch = conversationText.match(
+      /(书|小说)[\s]*([^\s，。！？]{2,10})/
+    );
     currentTopic = bookMatch ? bookMatch[2] : '书';
-    lastDiscussion = recentMessages.slice(-2).map(msg => msg.content).join(' ');
-  } else if (gameKeywords.some(keyword => conversationText.includes(keyword))) {
+    lastDiscussion = recentMessages
+      .slice(-2)
+      .map((msg) => msg.content)
+      .join(' ');
+  } else if (
+    gameKeywords.some((keyword) => conversationText.includes(keyword))
+  ) {
     topicType = 'game';
     const gameMatch = conversationText.match(/游戏[\s]*([^\s，。！？]{2,10})/);
     currentTopic = gameMatch ? gameMatch[1] : '游戏';
-    lastDiscussion = recentMessages.slice(-2).map(msg => msg.content).join(' ');
-  } else if (personalKeywords.some(keyword => conversationText.includes(keyword))) {
+    lastDiscussion = recentMessages
+      .slice(-2)
+      .map((msg) => msg.content)
+      .join(' ');
+  } else if (
+    personalKeywords.some((keyword) => conversationText.includes(keyword))
+  ) {
     topicType = 'personal';
     currentTopic = '个人话题';
     lastDiscussion = recentMessages.slice(-1)[0]?.content || '';
-  } else if (eventKeywords.some(keyword => conversationText.includes(keyword))) {
+  } else if (
+    eventKeywords.some((keyword) => conversationText.includes(keyword))
+  ) {
     topicType = 'event';
     currentTopic = '事件讨论';
-    lastDiscussion = recentMessages.slice(-2).map(msg => msg.content).join(' ');
+    lastDiscussion = recentMessages
+      .slice(-2)
+      .map((msg) => msg.content)
+      .join(' ');
   } else {
     topicType = 'general';
     currentTopic = '一般聊天';
@@ -852,7 +964,11 @@ export const analyzeConversationContext = (messages: any[]): {
 // 根据上下文生成相关话题
 export const generateContextualTopic = (
   pauseType: 'short' | 'medium' | 'long',
-  context: { currentTopic: string | null; topicType: string | null; lastDiscussion: string }
+  context: {
+    currentTopic: string | null;
+    topicType: string | null;
+    lastDiscussion: string;
+  }
 ): string => {
   const { currentTopic, topicType } = context;
 
@@ -862,7 +978,7 @@ export const generateContextualTopic = (
       case 'short':
         switch (topicType) {
           case 'movie':
-            return Math.random() < 0.5 
+            return Math.random() < 0.5
               ? '嗯…你觉得这个电影怎么样呢？'
               : '对这部电影还有什么想法吗？';
           case 'book':
@@ -933,13 +1049,15 @@ export const generateContextualTopic = (
 };
 
 // 通用话题选择（原有逻辑）
-export const selectGeneralTopic = (pauseType: 'short' | 'medium' | 'long'): string => {
+export const selectGeneralTopic = (
+  pauseType: 'short' | 'medium' | 'long'
+): string => {
   const topics = PROACTIVE_CONVERSATION_CONFIG.topics;
-  
+
   switch (pauseType) {
     case 'short':
       return topics.caring[Math.floor(Math.random() * topics.caring.length)];
-    
+
     case 'medium':
       // 随机选择日常话题或时间相关话题
       if (Math.random() < 0.2) {
@@ -948,121 +1066,162 @@ export const selectGeneralTopic = (pauseType: 'short' | 'medium' | 'long'): stri
         return timeTopics[Math.floor(Math.random() * timeTopics.length)];
       }
       return topics.daily[Math.floor(Math.random() * topics.daily.length)];
-    
+
     case 'long':
       return topics.deep[Math.floor(Math.random() * topics.deep.length)];
-    
+
     default:
       return topics.caring[0];
   }
 };
 
 // 智能选择主动话题（整合上下文分析）
-export const selectProactiveTopic = (pauseType: 'short' | 'medium' | 'long', conversationHistory: any[] = []): string => {
+export const selectProactiveTopic = (
+  pauseType: 'short' | 'medium' | 'long',
+  conversationHistory: any[] = []
+): string => {
   // 分析对话上下文
   const context = analyzeConversationContext(conversationHistory);
-  
+
   // 调试日志
-  console.log(`[ProactiveTopic] ${pauseType}停顿 | 话题类型: ${context.topicType} | 当前话题: ${context.currentTopic}`);
-  
+  console.log(
+    `[ProactiveTopic] ${pauseType}停顿 | 话题类型: ${context.topicType} | 当前话题: ${context.currentTopic}`
+  );
+
   // 根据上下文生成相关话题
   const selectedTopic = generateContextualTopic(pauseType, context);
   console.log(`[ProactiveTopic] 选择的话题: "${selectedTopic}"`);
-  
+
   return selectedTopic;
 };
 
 // 对话类型检测
-export const detectConversationType = (userMessage: string, conversationHistory: any[]): 'simple' | 'normal' | 'detailed' | 'storytelling' => {
+export const detectConversationType = (
+  userMessage: string,
+  conversationHistory: any[]
+): 'simple' | 'normal' | 'detailed' | 'storytelling' => {
   const message = userMessage.toLowerCase();
-  
+
   // 检测是否是请求详细信息的询问
   const detailRequests = [
-    '讲讲', '说说', '介绍', '解释', '详细', '具体', '怎么样', '什么内容', 
-    '剧情', '故事', '过程', '经历', '发生了什么', '告诉我', '分享',
-    '电影', '书', '游戏', '新闻', '事件'
+    '讲讲',
+    '说说',
+    '介绍',
+    '解释',
+    '详细',
+    '具体',
+    '怎么样',
+    '什么内容',
+    '剧情',
+    '故事',
+    '过程',
+    '经历',
+    '发生了什么',
+    '告诉我',
+    '分享',
+    '电影',
+    '书',
+    '游戏',
+    '新闻',
+    '事件',
   ];
-  
+
   const storytellingKeywords = [
-    '故事', '情节', '剧情', '内容', '讲述', '描述', '经过', '发生',
-    '电影讲的', '书说的', '游戏剧情', '新闻内容'
+    '故事',
+    '情节',
+    '剧情',
+    '内容',
+    '讲述',
+    '描述',
+    '经过',
+    '发生',
+    '电影讲的',
+    '书说的',
+    '游戏剧情',
+    '新闻内容',
   ];
-  
+
   // 检查是否有上下文延续 (AI刚刚提到要搜索或要讲解)
-  const lastAIMessage = conversationHistory
-    .filter(msg => msg.role === 'assistant')
-    .slice(-1)[0]?.content || '';
-  
-  const hasContextContinuation = lastAIMessage.includes('搜索') || 
-                                 lastAIMessage.includes('查一下') ||
-                                 lastAIMessage.includes('了解') ||
-                                 lastAIMessage.includes('想想');
-  
+  const lastAIMessage =
+    conversationHistory.filter((msg) => msg.role === 'assistant').slice(-1)[0]
+      ?.content || '';
+
+  const hasContextContinuation =
+    lastAIMessage.includes('搜索') ||
+    lastAIMessage.includes('查一下') ||
+    lastAIMessage.includes('了解') ||
+    lastAIMessage.includes('想想');
+
   // 如果是故事讲述类请求
-  if (storytellingKeywords.some(keyword => message.includes(keyword))) {
+  if (storytellingKeywords.some((keyword) => message.includes(keyword))) {
     return 'storytelling';
   }
-  
+
   // 如果是详细信息请求或有上下文延续
-  if (detailRequests.some(keyword => message.includes(keyword)) || hasContextContinuation) {
+  if (
+    detailRequests.some((keyword) => message.includes(keyword)) ||
+    hasContextContinuation
+  ) {
     return 'detailed';
   }
-  
+
   // 简单的问候、确认、情感表达
   const simplePatterns = [
     /^(好|嗯|哦|是|对|没事|谢谢|再见|你好)$/,
     /^(哈哈|呵呵|嘿嘿|诶嘿嘿)$/,
-    /^.{1,5}$/  // 5个字符以内的简短回应
+    /^.{1,5}$/, // 5个字符以内的简短回应
   ];
-  
-  if (simplePatterns.some(pattern => pattern.test(message))) {
+
+  if (simplePatterns.some((pattern) => pattern.test(message))) {
     return 'simple';
   }
-  
+
   return 'normal';
 };
 
 // 智能长度控制 - 根据对话类型调整 (Phase 2.1: 平衡简短和完整性)
-export const getResponseLengthConfig = (conversationType: 'simple' | 'normal' | 'detailed' | 'storytelling') => {
+export const getResponseLengthConfig = (
+  conversationType: 'simple' | 'normal' | 'detailed' | 'storytelling'
+) => {
   switch (conversationType) {
     case 'simple':
       return {
         maxTokens: CLAUDE_API_CONFIG.dynamicTokens.simple,
-        maxCharacters: 50,  // Phase 2.1: 15 -> 50 (允许完整句子，但通过Token控制简短)
+        maxCharacters: 50, // Phase 2.1: 15 -> 50 (允许完整句子，但通过Token控制简短)
         targetSentences: 1,
-        allowMultiParagraph: false
+        allowMultiParagraph: false,
       };
 
     case 'normal':
       return {
         maxTokens: CLAUDE_API_CONFIG.dynamicTokens.normal,
-        maxCharacters: 80,  // Phase 2.1: 35 -> 80 (允许1-2个完整句子)
+        maxCharacters: 80, // Phase 2.1: 35 -> 80 (允许1-2个完整句子)
         targetSentences: 1,
-        allowMultiParagraph: false
+        allowMultiParagraph: false,
       };
 
     case 'detailed':
       return {
         maxTokens: CLAUDE_API_CONFIG.dynamicTokens.detailed,
-        maxCharacters: 150,  // Phase 2.1: 80 -> 150
+        maxCharacters: 150, // Phase 2.1: 80 -> 150
         targetSentences: 3,
-        allowMultiParagraph: false
+        allowMultiParagraph: false,
       };
 
     case 'storytelling':
       return {
         maxTokens: CLAUDE_API_CONFIG.dynamicTokens.storytelling,
-        maxCharacters: 250,  // Phase 2.1: 150 -> 250
+        maxCharacters: 250, // Phase 2.1: 150 -> 250
         targetSentences: 5,
-        allowMultiParagraph: false
+        allowMultiParagraph: false,
       };
 
     default:
       return {
         maxTokens: CLAUDE_API_CONFIG.dynamicTokens.normal,
-        maxCharacters: 80,  // Phase 2.1: 35 -> 80
+        maxCharacters: 80, // Phase 2.1: 35 -> 80
         targetSentences: 2,
-        allowMultiParagraph: false
+        allowMultiParagraph: false,
       };
   }
 };
@@ -1075,7 +1234,7 @@ export const VOICE_CONFIG = {
     defaultSettings: ELEVENLABS_CONFIG.settings,
     emotionalSettings: ELEVENLABS_CONFIG.emotionalSettings,
   },
-  
+
   // 获取语音设置的便捷方法
   getVoiceSettings: getEmotionalVoiceSettings,
 };
