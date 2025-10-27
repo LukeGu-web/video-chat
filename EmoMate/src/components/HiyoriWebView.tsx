@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { WebView } from 'react-native-webview';
+import Constants from 'expo-constants';
 import {
   isDebugMode,
   debugLog,
@@ -38,6 +39,11 @@ interface WebViewState {
 
 const TIMEOUT_MS = 10000; // 10 seconds timeout
 const MAX_LOAD_ATTEMPTS = 3;
+
+// 获取 hiyori view 的 URL
+const getHiyoriViewUrl = (): string | undefined => {
+  return Constants.expoConfig?.extra?.hiyoriViewUrl;
+};
 
 const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
   ({ style, onModelReady, onMotionResult }, ref) => {
@@ -568,7 +574,7 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
       <View className='flex-1' style={style}>
         <WebView
           ref={webViewRef}
-          source={{ uri: 'http://192.168.31.83:5174/' }}
+          source={{ uri: getHiyoriViewUrl() || 'about:blank' }}
           onMessage={handleWebViewMessage}
           onLoadStart={handleLoadStart}
           onLoadEnd={handleLoadEnd}

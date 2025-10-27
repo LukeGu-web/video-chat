@@ -60,9 +60,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       'expo-build-properties',
       {
         ios: {
-          deploymentTarget: '15.5'
-        }
-      }
+          deploymentTarget: '15.5',
+        },
+      },
     ],
   ],
   extra: {
@@ -71,6 +71,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
     claudeApiKey: process.env.CLAUDE_API_KEY,
     elevenLabsApiKey: process.env.ELEVENLABS_API_KEY,
+    hiyoriViewUrl: process.env.HIYORI_VIEW_URL,
     showTestComponents: process.env.SHOW_TEST_COMPONENTS === 'true',
   },
 });

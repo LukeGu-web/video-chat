@@ -252,14 +252,22 @@ export const PERSONALITY_PROMPTS = {
   companion: createPersonalitySystemPrompt(), // 使用兰兰的人格设定
 };
 
-// 构建完整的系统提示，包含人格和能力信息
-export const buildSystemPrompt = (personality: string, userEmotion?: string, conversationType: 'simple' | 'normal' | 'detailed' | 'storytelling' = 'normal'): string => {
+// 构建完整的系统提示，包含人格、能力信息和背景故事
+export const buildSystemPrompt = (
+  personality: string,
+  userEmotion?: string,
+  conversationType: 'simple' | 'normal' | 'detailed' | 'storytelling' = 'normal',
+  backgroundStory?: string
+): string => {
   const capabilityPrompt = generateCapabilityPrompt();
   const emotionalPrompt = generateEmotionalResponsePrompt(userEmotion, conversationType);
-  
+
+  // Add background story if provided
+  const backgroundSection = backgroundStory ? `\n\n${backgroundStory}` : '';
+
   return `${personality}
 
-${capabilityPrompt}${emotionalPrompt}`;
+${capabilityPrompt}${emotionalPrompt}${backgroundSection}`;
 };
 
 // 实用的能力查询函数

@@ -1,5 +1,5 @@
 import React, { useEffect, useCallback, useState } from 'react';
-import { View, TouchableOpacity, Text, ImageBackground } from 'react-native';
+import { View, TouchableOpacity, Text, ImageBackground, ActivityIndicator } from 'react-native';
 import { SafeAreaView as SafeAreaViewRN } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useUserStore, ChatMessage, useAIStatus } from '../store';
@@ -15,6 +15,9 @@ import {
   EmotionAwareCharacter,
   BasicEmotionDetector,
 } from '../components';
+import { useBackgroundContext } from '../hooks/useBackgroundContext';
+import { getBackgroundImageSource, formatStoryForAI } from '../utils/backgroundStory';
+import { isDebugMode } from '../utils/debug';
 
 type RootStackParamList = {
   Welcome: undefined;
@@ -43,6 +46,13 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
     chatHistory,
     addChatMessage,
   } = useUserStore();
+
+  // Background context hook
+  const {
+    context: backgroundContext,
+    isLoading: isBackgroundLoading,
+    error: backgroundError,
+  } = useBackgroundContext();
 
   const { setAIStatus } = useAIStatus();
   const {
@@ -73,14 +83,14 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
   // Test mode state
   const [isTestMode, setIsTestMode] = useState(false);
 
-  // Handle errors
+  // Handle errors (including background errors)
   useEffect(() => {
-    if (error || aiError) {
-      const message = error || aiError || '';
+    if (error || aiError || backgroundError) {
+      const message = error || aiError || backgroundError?.message || '';
       setErrorMessage(message);
       setShowErrorToast(true);
     }
-  }, [error, aiError]);
+  }, [error, aiError, backgroundError]);
 
   // 统一的 AI 状态管理 - 直接使用Hiyori动作
   useEffect(() => {
@@ -152,10 +162,16 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
         };
         addChatMessage(userMessage);
 
-        // 2. 调用 AI 获取回复并播放 TTS
+        // 2. 准备背景故事（如果可用）
+        const backgroundStory = backgroundContext
+          ? formatStoryForAI(backgroundContext)
+          : undefined;
+
+        // 3. 调用 AI 获取回复并播放 TTS
         await sendMessage(inputText, {
           modelType: 'haiku',
           enableTTS: true, // 启用语音播放
+          backgroundStory, // 传递背景故事
         });
 
         // 注意：状态变化由统一的 useEffect 管理
@@ -164,7 +180,7 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
         // 错误处理，状态会自动回到 idle
       }
     },
-    [addChatMessage, sendMessage]
+    [addChatMessage, sendMessage, backgroundContext]
   );
 
   // 核心语音对话流程（使用 runAIFlow）
@@ -227,9 +243,24 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
     );
   }
 
+  // Get background image source
+  const backgroundSource = backgroundContext
+    ? getBackgroundImageSource(backgroundContext.imagePath)
+    : require('../../assets/background/afternoon.jpeg'); // Fallback
+
+  // Show loading indicator while background is loading
+  if (isBackgroundLoading) {
+    return (
+      <View className='flex-1 items-center justify-center bg-background'>
+        <ActivityIndicator size='large' color='#3B82F6' />
+        <Text className='mt-4 text-gray-600'>加载背景场景...</Text>
+      </View>
+    );
+  }
+
   return (
     <ImageBackground
-      source={require('../../assets/background/afternoon.jpeg')}
+      source={backgroundSource}
       className='flex-1'
       resizeMode='cover'
     >
@@ -288,6 +319,30 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
           isActive={true}
           detectionInterval={3000}
         />
+
+        {/* Debug Background Info (only in debug mode) */}
+        {isDebugMode() && backgroundContext && (
+          <View className='absolute top-20 left-4 right-4 bg-black/70 p-3 rounded-lg'>
+            <Text className='text-white text-xs font-bold mb-1'>
+              背景场景调试信息
+            </Text>
+            <Text className='text-white text-xs'>
+              场景ID: {backgroundContext.scene.id}
+            </Text>
+            <Text className='text-white text-xs'>
+              类型: {backgroundContext.scene.dayType} - {backgroundContext.scene.timePeriod}
+            </Text>
+            <Text className='text-white text-xs'>
+              地点: {backgroundContext.scene.location}
+            </Text>
+            <Text className='text-white text-xs'>
+              天气: {backgroundContext.weather}
+            </Text>
+            <Text className='text-white text-xs' numberOfLines={2}>
+              故事: {backgroundContext.story.substring(0, 60)}...
+            </Text>
+          </View>
+        )}
       </SafeAreaViewRN>
     </ImageBackground>
   );

@@ -34,6 +34,7 @@ export interface ChatAIConfig {
   ttsProvider?: TTSProvider; // TTS 提供商选择
   voiceId?: string; // ElevenLabs 语音 ID
   userEmotion?: string; // 用户当前情绪状态
+  backgroundStory?: string; // 背景故事上下文
 }
 
 export interface UseChatAIReturn {
@@ -217,9 +218,14 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     // 获取动态token配置
     const lengthConfig = getResponseLengthConfig(conversationType);
 
-    // 构建API消息格式，包含人格、情绪和上下文信息
+    // 构建API消息格式，包含人格、情绪、上下文信息和背景故事
     const personalityText = config.personality || currentPersonality;
-    const systemMessage = buildSystemPrompt(personalityText, config.userEmotion, conversationType);
+    const systemMessage = buildSystemPrompt(
+      personalityText,
+      config.userEmotion,
+      conversationType,
+      config.backgroundStory
+    );
 
     // 保留更多上下文消息以保持对话连贯性
     const contextMessages = messages
@@ -282,7 +288,12 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
 
     const lengthConfig = getResponseLengthConfig(conversationType);
     const personalityText = config.personality || currentPersonality;
-    const systemMessage = buildSystemPrompt(personalityText, config.userEmotion, conversationType);
+    const systemMessage = buildSystemPrompt(
+      personalityText,
+      config.userEmotion,
+      conversationType,
+      config.backgroundStory
+    );
 
     const contextMessages = messages
       .filter((msg) => msg.role !== 'system')
