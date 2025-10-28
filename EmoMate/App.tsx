@@ -29,16 +29,21 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 /**
  * Configure audio session for optimal voice playback
  * Fixes: Low volume issue on iPhone by setting proper audio category and mode
+ *
+ * Critical: Start with allowsRecording: false to ensure speaker output
+ * Reference: https://snack.expo.dev/@keith-kurak/ios---recording-sound-forces-future-playback-to-earpiece
  */
 async function configureAudioSession(): Promise<void> {
   try {
     // Configure audio mode for voice-optimized playback
+    // Start with allowsRecording: false to route audio through speaker by default
     await setAudioModeAsync({
       // iOS: Allow audio playback even when device is in silent mode
       playsInSilentMode: true,
 
-      // iOS: Allow audio recording (needed for speech recognition)
-      allowsRecording: true,
+      // iOS: Start with recording disabled for louder speaker output
+      // Will be enabled when user starts speaking
+      allowsRecording: false,
 
       // iOS/Android: Keep audio session active in background
       shouldPlayInBackground: true,
@@ -54,7 +59,7 @@ async function configureAudioSession(): Promise<void> {
       shouldRouteThroughEarpiece: false,
     });
 
-    console.log('[App] ✅ Audio session configured for optimal voice playback');
+    console.log('[App] ✅ Audio session configured for optimal voice playback (allowsRecording: false)');
   } catch (error) {
     console.error('[App] ❌ Failed to configure audio session:', error);
     throw error;

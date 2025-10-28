@@ -4,6 +4,7 @@ import {
   useSpeechRecognitionEvent,
   getSupportedLocales,
 } from 'expo-speech-recognition';
+import { audioModeManager } from './audioModeManager';
 
 export interface SpeechToTextResult {
   transcript: string;
@@ -70,8 +71,17 @@ export const useSpeechToText = (): UseSpeechToTextReturn => {
     setError(null);
   });
 
-  useSpeechRecognitionEvent('end', () => {
+  useSpeechRecognitionEvent('end', async () => {
     setIsListening(false);
+
+    // Fix: Critical - Set allowsRecording to false after recording ends
+    // This ensures subsequent audio playback routes through speaker instead of earpiece
+    try {
+      await audioModeManager.setPlaybackMode(); // Sets allowsRecording: false
+      console.log('[SpeechToText] Audio mode set to playback after recording ended');
+    } catch (error) {
+      console.warn('[SpeechToText] Failed to set playback mode after recording ended:', error);
+    }
   });
 
   useSpeechRecognitionEvent('result', (event) => {
@@ -106,6 +116,14 @@ export const useSpeechToText = (): UseSpeechToTextReturn => {
         return;
       }
 
+      // Fix: Set audio mode to recording before starting speech recognition
+      // This ensures proper audio routing for microphone input
+      try {
+        await audioModeManager.setRecordingMode();
+      } catch (error) {
+        console.warn('[SpeechToText] Failed to set recording mode:', error);
+      }
+
       ExpoSpeechRecognitionModule.start({
         lang: 'zh-CN', // "en-US" 先尝试英语，因为iOS可能没有中文模型
         interimResults: true,
@@ -122,6 +140,16 @@ export const useSpeechToText = (): UseSpeechToTextReturn => {
   const stopListening = async () => {
     try {
       ExpoSpeechRecognitionModule.stop();
+
+      // Fix: Critical - Set allowsRecording to false after stopping recording
+      // This ensures audio playback routes through speaker instead of earpiece
+      // Reference: https://snack.expo.dev/@keith-kurak/ios---recording-sound-forces-future-playback-to-earpiece
+      try {
+        await audioModeManager.setPlaybackMode(); // Sets allowsRecording: false
+        console.log('[SpeechToText] Audio mode set to playback after stopping recording');
+      } catch (error) {
+        console.warn('[SpeechToText] Failed to set playback mode after recording:', error);
+      }
     } catch (err) {
       setError(`Failed to stop speech recognition: ${err}`);
     }

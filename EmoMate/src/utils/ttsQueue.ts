@@ -19,6 +19,7 @@ import {
   preprocessTextForNaturalSpeech,
 } from '../constants/ai';
 import { base64ToUint8Array, safeDeleteFile, ensureDirectoryExists } from './fileSystemHelpers';
+import { audioModeManager } from './audioModeManager';
 
 /**
  * Common phrases to pre-cache for instant playback
@@ -536,6 +537,14 @@ export class TTSQueue {
         console.log(`[TTSQueue] 🔊 Playing ${item.id}: "${item.text}"`);
         item.status = 'playing';
 
+        // Fix: Set audio mode to playback to increase volume
+        // This prevents iOS from using the earpiece and ensures louder speaker output
+        try {
+          await audioModeManager.setPlaybackMode();
+        } catch (error) {
+          console.warn('[TTSQueue] Failed to set playback mode:', error);
+        }
+
         // Callback: Playback started
         if (this.config.onPlayStart) {
           this.config.onPlayStart(item.text);
@@ -549,6 +558,13 @@ export class TTSQueue {
             // Callback: Playback ended
             if (this.config.onPlayEnd) {
               this.config.onPlayEnd(item.text);
+            }
+
+            // Fix: Restore audio mode to idle after playback
+            try {
+              await audioModeManager.setIdleMode();
+            } catch (error) {
+              console.warn('[TTSQueue] Failed to restore idle mode:', error);
             }
 
             this.currentIndex++;
@@ -614,6 +630,13 @@ export class TTSQueue {
       } catch (e) {
         // Ignore errors during cleanup
       }
+    }
+
+    // Fix: Restore audio mode to idle after cancellation
+    try {
+      await audioModeManager.setIdleMode();
+    } catch (error) {
+      console.warn('[TTSQueue] Failed to restore idle mode after cancellation:', error);
     }
 
     // Cleanup all audio resources

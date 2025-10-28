@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import * as Speech from 'expo-speech';
+import { audioModeManager } from './audioModeManager';
 
 export interface TTSConfig {
   language?: string;
@@ -66,6 +67,13 @@ export const useTTS = (initialConfig?: TTSConfig): UseTTSReturn => {
         };
       }
 
+      // Fix: Set audio mode to playback to increase volume
+      try {
+        await audioModeManager.setPlaybackMode();
+      } catch (error) {
+        console.warn('[ExpoTTS] Failed to set playback mode:', error);
+      }
+
       // 语音合成选项
       const speechOptions: Speech.SpeechOptions = {
         language: finalConfig.language,
@@ -75,15 +83,33 @@ export const useTTS = (initialConfig?: TTSConfig): UseTTSReturn => {
         onStart: () => {
           setIsSpeaking(true);
         },
-        onDone: () => {
+        onDone: async () => {
           setIsSpeaking(false);
+          // Fix: Restore audio mode to idle after playback
+          try {
+            await audioModeManager.setIdleMode();
+          } catch (error) {
+            console.warn('[ExpoTTS] Failed to restore idle mode:', error);
+          }
         },
-        onStopped: () => {
+        onStopped: async () => {
           setIsSpeaking(false);
+          // Fix: Restore audio mode to idle after stopping
+          try {
+            await audioModeManager.setIdleMode();
+          } catch (error) {
+            console.warn('[ExpoTTS] Failed to restore idle mode after stopping:', error);
+          }
         },
-        onError: (error) => {
+        onError: async (error) => {
           setError(`语音播放失败: ${error.message || error}`);
           setIsSpeaking(false);
+          // Fix: Restore audio mode to idle on error
+          try {
+            await audioModeManager.setIdleMode();
+          } catch (restoreError) {
+            console.warn('[ExpoTTS] Failed to restore idle mode after error:', restoreError);
+          }
         },
       };
 
@@ -96,11 +122,18 @@ export const useTTS = (initialConfig?: TTSConfig): UseTTSReturn => {
     }
   }, [initialConfig]);
 
-  const stop = useCallback(() => {
+  const stop = useCallback(async () => {
     try {
       Speech.stop();
       setIsSpeaking(false);
       setError(null);
+
+      // Fix: Restore audio mode to idle when manually stopping
+      try {
+        await audioModeManager.setIdleMode();
+      } catch (error) {
+        console.warn('[ExpoTTS] Failed to restore idle mode after manual stop:', error);
+      }
     } catch (err) {
       // TTS stop error handled silently
       setError('停止语音播放失败');

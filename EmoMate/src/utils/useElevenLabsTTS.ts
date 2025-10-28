@@ -9,6 +9,7 @@ import {
   preprocessTextForNaturalSpeech
 } from '../constants/ai';
 import { base64ToUint8Array, safeDeleteFile } from './fileSystemHelpers';
+import { audioModeManager } from './audioModeManager';
 
 export interface UseElevenLabsTTSReturn {
   isSpeaking: boolean;
@@ -259,18 +260,27 @@ export const useElevenLabsTTS = (): UseElevenLabsTTSReturn => {
   useEffect(() => {
     // 更新 isSpeaking 状态
     setIsSpeaking(audioPlayer.playing);
-    
+
     // 检查音频是否播放完成
     if (!audioPlayer.playing && audioPlayer.duration > 0) {
       setIsSpeaking(false);
       setCurrentSegment('');
-      
+
       // 清理计时器
       if (playbackTimer) {
         clearInterval(playbackTimer);
         setPlaybackTimer(null);
       }
-      
+
+      // Fix: Restore audio mode to idle after playback completes
+      (async () => {
+        try {
+          await audioModeManager.setIdleMode();
+        } catch (error) {
+          console.warn('[ElevenLabsTTS] Failed to restore idle mode after playback:', error);
+        }
+      })();
+
       // 延迟清理音频文件
       if (!isGenerating && audioUri && audioPlayer.currentTime > 0) {
         setTimeout(async () => {
@@ -311,7 +321,14 @@ export const useElevenLabsTTS = (): UseElevenLabsTTSReturn => {
       setAudioUri(newAudioUri);
 
       // 等待音频加载完成后播放
-      setTimeout(() => {
+      setTimeout(async () => {
+        // Fix: Set audio mode to playback to increase volume
+        try {
+          await audioModeManager.setPlaybackMode();
+        } catch (error) {
+          console.warn('[ElevenLabsTTS] Failed to set playback mode:', error);
+        }
+
         // Fix: Set volume to maximum (1.0) to ensure proper playback volume
         audioPlayer.volume = 1.0;
         audioPlayer.play();
@@ -375,18 +392,25 @@ export const useElevenLabsTTS = (): UseElevenLabsTTSReturn => {
         audioPlayer.pause();
         audioPlayer.seekTo(0);
       }
-      
+
       // 停止所有状态
       setIsGenerating(false);
       setIsSpeaking(false);
       setCurrentSegment(''); // 清空当前段落
-      
+
       // 清理备用定时器
       if (playbackTimer) {
         clearInterval(playbackTimer);
         setPlaybackTimer(null);
       }
-      
+
+      // Fix: Restore audio mode to idle after stopping
+      try {
+        await audioModeManager.setIdleMode();
+      } catch (error) {
+        console.warn('[ElevenLabsTTS] Failed to restore idle mode after stopping:', error);
+      }
+
       // 清理临时音频文件
       if (audioUri) {
         await safeDeleteFile(audioUri);
