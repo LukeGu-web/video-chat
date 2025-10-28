@@ -40,7 +40,10 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
 
   // 权限管理 - 同时支持expo-camera和react-native-vision-camera
   const [expoPermission, requestExpoPermission] = useCameraPermissions();
-  const { hasPermission: visionHasPermission, requestPermission: requestVisionPermission } = useCameraPermission();
+  const {
+    hasPermission: visionHasPermission,
+    requestPermission: requestVisionPermission,
+  } = useCameraPermission();
 
   // 获取相机设备
   const frontDevice = useCameraDevice('front');
@@ -64,13 +67,18 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
   // 动画值
   const scale = useSharedValue(1);
 
-  // MLKit face detection options (1.9.0)
-  const faceDetectionOptions = React.useMemo<FaceDetectionOptions>(() => ({
-    performanceMode: 'fast',
-    classificationMode: 'all',
-    minFaceSize: 0.15,
-    trackingEnabled: false,
-  }), []);
+  // MLKit face detection options - Full power mode with landmarks and contours
+  const faceDetectionOptions = React.useMemo<FaceDetectionOptions>(
+    () => ({
+      performanceMode: 'accurate', // Use accurate mode for better emotion detection
+      classificationMode: 'all', // Enable smiling and eye open probabilities
+      landmarkMode: 'all', // Enable facial landmarks detection
+      contourMode: 'all', // Enable facial contours detection
+      minFaceSize: 0.15, // Minimum face size ratio
+      trackingEnabled: false, // Disabled because contourMode is enabled (conflict)
+    }),
+    []
+  );
 
   // Use the hook to get detectFaces function
   const { detectFaces } = useFaceDetector(faceDetectionOptions);
@@ -85,7 +93,10 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
         if (enableMLKit && visionHasPermission) {
           setUseMLKit(true);
           setDetectionMode('mlkit');
-          debugLog('BasicEmotionDetector', 'MLKit面部检测已启用 (v1.9.0 - Callback方式)');
+          debugLog(
+            'BasicEmotionDetector',
+            'MLKit面部检测已启用 (v1.9.0 - Callback方式)'
+          );
           return;
         }
 
@@ -108,75 +119,167 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
   }, [visionHasPermission]);
 
   // Callback to update emotion on JS thread
-  const updateEmotionCallback = useCallback((emotion: EmotionType, confidence: number) => {
-    setCurrentEmotion(emotion);
-    setFaceDetected(true);
-    onEmotionDetected(emotion);
-    debugLog('BasicEmotionDetector', `MLKit detected emotion: ${emotion}`, { confidence });
+  const updateEmotionCallback = useCallback(
+    (emotion: EmotionType, confidence: number) => {
+      setCurrentEmotion(emotion);
+      setFaceDetected(true);
+      onEmotionDetected(emotion);
+      debugLog('BasicEmotionDetector', `MLKit detected emotion: ${emotion}`, {
+        confidence,
+      });
 
-    // Clear existing timeout to prevent memory leak
-    if (faceDetectedTimeoutRef.current) {
-      clearTimeout(faceDetectedTimeoutRef.current);
-    }
+      // Clear existing timeout to prevent memory leak
+      if (faceDetectedTimeoutRef.current) {
+        clearTimeout(faceDetectedTimeoutRef.current);
+      }
 
-    // Set new timeout with ref tracking
-    faceDetectedTimeoutRef.current = setTimeout(() => {
-      setFaceDetected(false);
-      faceDetectedTimeoutRef.current = null;
-    }, 1000);
-  }, [onEmotionDetected]);
+      // Set new timeout with ref tracking
+      faceDetectedTimeoutRef.current = setTimeout(() => {
+        setFaceDetected(false);
+        faceDetectedTimeoutRef.current = null;
+      }, 1000);
+    },
+    [onEmotionDetected]
+  );
 
   // Create worklet-compatible callback
   const updateEmotionWorklet = Worklets.createRunOnJS(updateEmotionCallback);
 
-  // Frame processor for face detection
-  const frameProcessor = useFrameProcessor((frame) => {
+  // Helper function to calculate distance between two points
+  const calculateDistance = (p1: any, p2: any): number => {
     'worklet';
+    if (!p1 || !p2) return 0;
+    const dx = p1.x - p2.x;
+    const dy = p1.y - p2.y;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
 
-    try {
-      const faces = detectFaces(frame);
+  // Frame processor for face detection with Plutchik's 8 emotions
+  const frameProcessor = useFrameProcessor(
+    (frame) => {
+      'worklet';
 
-      if (faces && faces.length > 0) {
-        const face = faces[0];
-        const smilingProb = face.smilingProbability ?? 0;
-        const leftEyeProb = face.leftEyeOpenProbability ?? 0.5;
-        const rightEyeProb = face.rightEyeOpenProbability ?? 0.5;
-        const avgEyeOpen = (leftEyeProb + rightEyeProb) / 2;
+      try {
+        const faces = detectFaces(frame);
 
-        let emotion: EmotionType = 'neutral';
-        let confidence = 0.5;
+        if (faces && faces.length > 0) {
+          const face = faces[0];
 
-        if (smilingProb > 0.6) {
-          emotion = 'happy';
-          confidence = Math.min(smilingProb, 0.95);
-        } else if (avgEyeOpen > 0.8 && smilingProb < 0.3) {
-          emotion = 'surprised';
-          confidence = Math.min(avgEyeOpen, 0.85);
-        } else if (avgEyeOpen < 0.4 && smilingProb < 0.2) {
-          emotion = 'sad';
-          confidence = Math.min(1.0 - avgEyeOpen, 0.8);
-        } else if (smilingProb < 0.1 && avgEyeOpen > 0.5) {
-          emotion = 'angry';
-          confidence = Math.min(1.0 - smilingProb, 0.75);
+          // Basic classification probabilities
+          const smilingProb = face.smilingProbability ?? 0;
+          const leftEyeProb = face.leftEyeOpenProbability ?? 0.5;
+          const rightEyeProb = face.rightEyeOpenProbability ?? 0.5;
+          const avgEyeOpen = (leftEyeProb + rightEyeProb) / 2;
+
+          // Landmarks-based features
+          const landmarks = face.landmarks as any; // MLKit landmarks structure
+          let mouthAspectRatio = 1.0;
+
+          // Calculate mouth aspect ratio from landmarks if available
+          if (landmarks) {
+            // Try to access mouth landmarks (property names may vary by MLKit version)
+            const leftMouth = landmarks.MOUTH_LEFT || landmarks.leftMouth;
+            const rightMouth = landmarks.MOUTH_RIGHT || landmarks.rightMouth;
+            const bottomMouth = landmarks.MOUTH_BOTTOM || landmarks.bottomMouth;
+
+            if (leftMouth && rightMouth && bottomMouth) {
+              const mouthWidth = calculateDistance(leftMouth, rightMouth);
+              const mouthHeight = calculateDistance(
+                {
+                  x: (leftMouth.x + rightMouth.x) / 2,
+                  y: (leftMouth.y + rightMouth.y) / 2,
+                },
+                bottomMouth
+              );
+              mouthAspectRatio =
+                mouthHeight > 0 ? mouthWidth / mouthHeight : 1.0;
+            }
+          }
+
+          // Head pose angles
+          const pitchAngle = face.pitchAngle ?? 0;
+          const yawAngle = face.yawAngle ?? 0;
+
+          // Plutchik's 8 basic emotions detection
+          let emotion: EmotionType = 'neutral';
+          let confidence = 0.5;
+
+          // 1. Joy (喜悦) - High smile + moderate eye open + wide mouth
+          if (smilingProb > 0.7 && avgEyeOpen > 0.5) {
+            emotion = 'joy';
+            confidence = Math.min((smilingProb + avgEyeOpen) / 2, 0.95);
+          }
+          // 2. Sadness (悲伤) - Low smile + eyes partially closed + head down
+          else if (avgEyeOpen < 0.4 && smilingProb < 0.2) {
+            emotion = 'sadness';
+            confidence = Math.min(1.0 - avgEyeOpen, 0.85);
+          }
+          // 3. Anger (愤怒) - No smile + eyes wide + tight mouth
+          else if (
+            smilingProb < 0.15 &&
+            avgEyeOpen > 0.6 &&
+            mouthAspectRatio > 2.5
+          ) {
+            emotion = 'anger';
+            confidence = Math.min((1.0 - smilingProb + avgEyeOpen) / 2, 0.8);
+          }
+          // 4. Fear (恐惧) - Eyes very wide + mouth open + no smile
+          else if (
+            avgEyeOpen > 0.85 &&
+            smilingProb < 0.3 &&
+            mouthAspectRatio < 2.0
+          ) {
+            emotion = 'fear';
+            confidence = Math.min(avgEyeOpen, 0.8);
+          }
+          // 5. Surprise (惊讶) - Eyes very wide + mouth very open
+          else if (avgEyeOpen > 0.8 && mouthAspectRatio < 1.5) {
+            emotion = 'surprise';
+            confidence = Math.min(avgEyeOpen, 0.85);
+          }
+          // 6. Disgust (厌恶) - Eyes partially closed + nose wrinkle + slight frown
+          else if (avgEyeOpen < 0.5 && smilingProb < 0.2) {
+            emotion = 'disgust';
+            confidence = 0.7;
+          }
+          // 7. Trust (信任) - Moderate smile + relaxed eyes + direct gaze
+          else if (
+            smilingProb > 0.4 &&
+            smilingProb < 0.7 &&
+            avgEyeOpen > 0.5 &&
+            Math.abs(yawAngle) < 15
+          ) {
+            emotion = 'trust';
+            confidence = 0.75;
+          }
+          // 8. Anticipation (期待) - Eyes wide + slight smile + head slightly forward
+          else if (avgEyeOpen > 0.7 && smilingProb > 0.3 && smilingProb < 0.6) {
+            emotion = 'anticipation';
+            confidence = 0.7;
+          }
+
+          const now = Date.now();
+          const lastTime = lastMLKitDetection.current;
+
+          if (now - lastTime >= detectionInterval && confidence > 0.6) {
+            lastMLKitDetection.current = now;
+
+            // Call JS function from worklet context
+            updateEmotionWorklet(emotion, confidence);
+          }
         }
-
-        const now = Date.now();
-        const lastTime = lastMLKitDetection.current;
-
-        if (now - lastTime >= detectionInterval && confidence > 0.6) {
-          lastMLKitDetection.current = now;
-
-          // Call JS function from worklet context
-          updateEmotionWorklet(emotion, confidence);
+      } catch (error) {
+        // Log frame processing errors in debug mode
+        if (isDebugMode()) {
+          console.error(
+            '[BasicEmotionDetector] Frame processing error:',
+            error
+          );
         }
       }
-    } catch (error) {
-      // Log frame processing errors in debug mode
-      if (isDebugMode()) {
-        console.error('[BasicEmotionDetector] Frame processing error:', error);
-      }
-    }
-  }, [detectFaces, detectionInterval, updateEmotionWorklet]);
+    },
+    [detectFaces, detectionInterval, updateEmotionWorklet]
+  );
 
   // 创建PanResponder处理拖拽
   const panResponder = PanResponder.create({
@@ -224,33 +327,45 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
     const hour = new Date().getHours();
     let emotionWeights: Record<EmotionType, number>;
 
-    // 根据时间段调整情绪概率
+    // 根据时间段调整情绪概率（Plutchik 8种基本情绪）
     if (hour >= 6 && hour < 12) {
       // 早上：更积极的情绪
       emotionWeights = {
-        happy: 0.4,
-        neutral: 0.4,
-        surprised: 0.15,
-        sad: 0.03,
-        angry: 0.02,
+        joy: 0.35,
+        trust: 0.2,
+        anticipation: 0.15,
+        neutral: 0.2,
+        surprise: 0.05,
+        sadness: 0.02,
+        fear: 0.01,
+        anger: 0.01,
+        disgust: 0.01,
       };
     } else if (hour >= 12 && hour < 18) {
       // 下午：平衡情绪
       emotionWeights = {
-        happy: 0.3,
-        neutral: 0.5,
-        surprised: 0.1,
-        sad: 0.07,
-        angry: 0.03,
+        joy: 0.25,
+        trust: 0.15,
+        anticipation: 0.1,
+        neutral: 0.3,
+        surprise: 0.08,
+        sadness: 0.05,
+        fear: 0.02,
+        anger: 0.03,
+        disgust: 0.02,
       };
     } else {
       // 晚上：较为平静
       emotionWeights = {
-        happy: 0.25,
-        neutral: 0.6,
-        surprised: 0.08,
-        sad: 0.05,
-        angry: 0.02,
+        joy: 0.2,
+        trust: 0.25,
+        anticipation: 0.05,
+        neutral: 0.35,
+        surprise: 0.05,
+        sadness: 0.05,
+        fear: 0.02,
+        anger: 0.02,
+        disgust: 0.01,
       };
     }
 
@@ -272,11 +387,15 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
       setCurrentEmotion(selectedEmotion);
       setFaceDetected(true);
 
-      debugLog('BasicEmotionDetector', `Intelligent emotion simulation: ${selectedEmotion}`, {
-        timeOfDay: hour,
-        probability: emotionWeights[selectedEmotion],
-        mode: 'simulation',
-      });
+      debugLog(
+        'BasicEmotionDetector',
+        `Intelligent emotion simulation: ${selectedEmotion}`,
+        {
+          timeOfDay: hour,
+          probability: emotionWeights[selectedEmotion],
+          mode: 'simulation',
+        }
+      );
       onEmotionDetected(selectedEmotion);
 
       // Clear existing timeout to prevent memory leak
@@ -321,7 +440,13 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
     };
 
     requestPermissions();
-  }, [useMLKit, visionHasPermission, expoPermission, requestExpoPermission, requestVisionPermission]);
+  }, [
+    useMLKit,
+    visionHasPermission,
+    expoPermission,
+    requestExpoPermission,
+    requestVisionPermission,
+  ]);
 
   // Cleanup timeout on component unmount
   useEffect(() => {
@@ -432,43 +557,9 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
       <View style={styles.dragIndicator}>
         <View style={styles.dragHandle} />
       </View>
-
-      {/* 情绪显示指示器 */}
-      <View style={styles.emotionDisplay}>
-        <View
-          style={[
-            styles.emotionIndicator,
-            currentEmotion !== 'neutral' && styles.activeIndicator,
-          ]}
-        >
-          <Text style={styles.emotionText}>
-            {currentEmotion === 'happy' && '😊'}
-            {currentEmotion === 'sad' && '😔'}
-            {currentEmotion === 'surprised' && '😮'}
-            {currentEmotion === 'angry' && '😤'}
-            {currentEmotion === 'neutral' && '😐'}
-          </Text>
-        </View>
-        {faceDetected && (
-          <View style={styles.detectingIndicator}>
-            <Text style={styles.detectingText}>●</Text>
-          </View>
-        )}
-      </View>
-
-      {isDebugMode() && (
-        <View style={styles.debugOverlay}>
-          <Text style={styles.debugText}>Emotion: {currentEmotion}</Text>
-          <Text style={styles.debugText}>Mode: {detectionMode}</Text>
-          <Text style={styles.debugText}>
-            MLKit: {useMLKit ? 'Enabled' : 'Disabled'}
-          </Text>
-          <Text style={styles.debugText}>
-            Detecting: {faceDetected ? 'Yes' : 'No'}
-          </Text>
-          <Text style={styles.debugText}>
-            X: {position.x.toFixed(0)}, Y: {position.y.toFixed(0)}
-          </Text>
+      {faceDetected && (
+        <View className='absolute bottom-2 left-3'>
+          <Text style={styles.detectingText}>●</Text>
         </View>
       )}
     </AnimatedView>
@@ -494,7 +585,7 @@ const styles = StyleSheet.create({
   },
   camera: {
     width: '100%',
-    height: '65%',
+    height: '100%',
   },
   dragIndicator: {
     position: 'absolute',
@@ -508,22 +599,6 @@ const styles = StyleSheet.create({
     height: 3,
     backgroundColor: 'rgba(255,255,255,0.7)',
     borderRadius: 1.5,
-  },
-  emotionDisplay: {
-    position: 'absolute',
-    bottom: 6,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 6,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-  },
-  emotionIndicator: {
-    padding: 4,
-    borderRadius: 4,
-    backgroundColor: 'rgba(0,0,0,0.05)',
   },
   activeIndicator: {
     backgroundColor: 'rgba(59, 130, 246, 0.2)',

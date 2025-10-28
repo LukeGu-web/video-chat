@@ -47,33 +47,44 @@ enum MotionPriority {
 // ==================== Emotion to Motion Mapping ====================
 
 /**
- * Enhanced emotion mapping with context awareness
+ * Enhanced emotion mapping with Plutchik's 8 basic emotions
  */
 const emotionMotionMap: Record<EmotionType, HiyoriMotion> = {
-  happy: 'Happy',
-  sad: 'Sleepy',
-  angry: 'Surprised',  // Use Surprised as angry isn't available
-  surprised: 'Surprised',
-  neutral: 'Idle'
+  joy: 'Happy',                 // Joy → Happy
+  sadness: 'Sleepy',            // Sadness → Sleepy
+  anger: 'Surprised',           // Anger → Surprised (no angry motion available)
+  fear: 'Shy',                  // Fear → Shy
+  surprise: 'Surprised',        // Surprise → Surprised
+  disgust: 'Thinking',          // Disgust → Thinking (contemplative)
+  trust: 'Happy',               // Trust → Happy (positive emotion)
+  anticipation: 'Excited',      // Anticipation → Excited
+  neutral: 'Idle'               // Neutral → Idle
 };
 
 /**
  * Context-specific motion overrides for emotions
  */
 const contextualEmotionMotions: Partial<Record<EmotionType, Partial<Record<string, HiyoriMotion>>>> = {
-  happy: {
+  joy: {
     celebration: 'Dance',      // Celebrating → Dance
     laugh: 'Laugh',           // Laughing → Laugh
     greeting: 'Wave',          // Happy greeting → Wave
     excited: 'Excited',        // Very happy → Excited
+  },
+  trust: {
+    greeting: 'Wave',          // Trust greeting → Wave
+    speaking: 'Speaking',      // Trust speaking → Speaking
   },
   neutral: {
     thinking: 'Thinking',      // Neutral + thinking → Thinking
     speaking: 'Speaking',      // Neutral + speaking → Speaking
     greeting: 'Wave',          // Neutral greeting → Wave
   },
-  surprised: {
+  surprise: {
     shy: 'Shy',               // Surprised + shy context → Shy
+  },
+  anticipation: {
+    greeting: 'Wave',          // Anticipation greeting → Wave
   }
 };
 
@@ -170,7 +181,7 @@ export function selectMotion(context: ConversationContext): MotionSelection {
   }
 
   if (context.isEncouragement && priority < MotionPriority.SPECIAL) {
-    if (context.emotion === 'happy') {
+    if (context.emotion === 'joy') {
       selectedMotion = 'Excited';
     } else {
       selectedMotion = 'Happy';
@@ -191,7 +202,7 @@ export function selectMotion(context: ConversationContext): MotionSelection {
   }
 
   if (context.isEmpathy && priority < MotionPriority.CONTEXT) {
-    if (context.emotion === 'sad') {
+    if (context.emotion === 'sadness') {
       selectedMotion = 'Sleepy';  // Empathetic sad response
     } else {
       selectedMotion = 'Thinking'; // Thoughtful empathy
