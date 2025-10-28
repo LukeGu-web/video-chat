@@ -1,11 +1,10 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   Modal,
   Pressable,
-  Animated,
 } from 'react-native';
 import { isDebugMode } from '../utils/debug';
 
@@ -16,11 +15,11 @@ interface HeaderProps {
   onGoToEmotionTest?: () => void;
 }
 
-interface DropdownOption {
+interface MenuOption {
   id: string;
   label: string;
   onPress: () => void;
-  icon?: string;
+  icon: string;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -29,18 +28,15 @@ const Header: React.FC<HeaderProps> = ({
   onGoToChatHistory,
   onGoToEmotionTest,
 }) => {
-  const [isDropdownVisible, setIsDropdownVisible] = useState(false);
-  const [dropdownPosition, setDropdownPosition] = useState({ x: 0, y: 0 });
-  const settingsButtonRef = useRef<View>(null);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const [isModalVisible, setIsModalVisible] = useState(false);
 
-  const dropdownOptions: DropdownOption[] = [
+  const menuOptions: MenuOption[] = [
     {
       id: 'chatHistory',
       label: '聊天记录',
       icon: '💬',
       onPress: () => {
-        setIsDropdownVisible(false);
+        setIsModalVisible(false);
         onGoToChatHistory?.();
       },
     },
@@ -50,7 +46,7 @@ const Header: React.FC<HeaderProps> = ({
         label: '情绪测试',
         icon: '🧪',
         onPress: () => {
-          setIsDropdownVisible(false);
+          setIsModalVisible(false);
           onGoToEmotionTest?.();
         },
       },
@@ -58,92 +54,86 @@ const Header: React.FC<HeaderProps> = ({
   ];
 
   const handleSettingsPress = () => {
-    settingsButtonRef.current?.measure(
-      (_x, _y, _width, height, pageX, pageY) => {
-        setDropdownPosition({
-          x: pageX - 120, // 调整位置让下拉菜单在按钮左边
-          y: pageY + height + 8,
-        });
-        setIsDropdownVisible(true);
-
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }).start();
-      }
-    );
+    setIsModalVisible(true);
   };
 
-  const hideDropdown = () => {
-    Animated.timing(fadeAnim, {
-      toValue: 0,
-      duration: 150,
-      useNativeDriver: true,
-    }).start(() => {
-      setIsDropdownVisible(false);
-    });
+  const hideModal = () => {
+    setIsModalVisible(false);
   };
 
   return (
     <>
       <View className='flex-row items-center justify-end'>
-        {/* 右侧设置按钮 */}
-        <View ref={settingsButtonRef} collapsable={false}>
-          <TouchableOpacity
-            onPress={handleSettingsPress}
-            className='items-center justify-center w-10 h-10 mr-4 rounded-full opacity-60'
-          >
-            <Text className='text-3xl'>⚙️</Text>
-          </TouchableOpacity>
-        </View>
+        {/* Settings button */}
+        <TouchableOpacity
+          onPress={handleSettingsPress}
+          className='items-center justify-center w-10 h-10 mr-4 rounded-full opacity-60'
+        >
+          <Text className='text-3xl'>⚙️</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* 下拉菜单 Modal */}
+      {/* Full-screen settings modal */}
       <Modal
-        visible={isDropdownVisible}
+        visible={isModalVisible}
         transparent={true}
-        animationType='none'
-        onRequestClose={hideDropdown}
+        animationType='fade'
+        onRequestClose={hideModal}
       >
-        <Pressable className='flex-1 bg-black/10' onPress={hideDropdown}>
-          <Animated.View
-            className='absolute bg-white rounded-xl min-w-[160px] py-2 shadow-lg border border-gray-200'
+        <Pressable
+          className='flex-1 items-center justify-center'
+          onPress={hideModal}
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+        >
+          <View
+            className='bg-white rounded-3xl w-[85%] max-w-[400px] overflow-hidden'
             style={{
-              opacity: fadeAnim,
-              transform: [
-                {
-                  scale: fadeAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0.95, 1],
-                  }),
-                },
-              ],
-              left: dropdownPosition.x,
-              top: dropdownPosition.y,
               shadowColor: '#000',
-              shadowOffset: {
-                width: 0,
-                height: 4,
-              },
-              shadowOpacity: 0.15,
-              shadowRadius: 12,
-              elevation: 8,
+              shadowOffset: { width: 0, height: 10 },
+              shadowOpacity: 0.3,
+              shadowRadius: 20,
+              elevation: 10,
             }}
+            onStartShouldSetResponder={() => true}
           >
-            {dropdownOptions.map((option) => (
+            {/* Modal header */}
+            <View className='items-center pt-6 pb-4 border-b border-gray-100'>
+              <Text className='text-2xl font-bold text-gray-800'>设置</Text>
+            </View>
+
+            {/* Menu list */}
+            <View className='py-2'>
+              {menuOptions.map((option, index) => (
+                <TouchableOpacity
+                  key={option.id}
+                  className='flex-row items-center px-6 py-4 active:bg-gray-50'
+                  onPress={option.onPress}
+                  style={{
+                    borderTopWidth: index > 0 ? 1 : 0,
+                    borderTopColor: '#f3f4f6',
+                  }}
+                >
+                  <View className='items-center justify-center w-12 h-12 mr-4 bg-gray-100 rounded-2xl'>
+                    <Text className='text-2xl'>{option.icon}</Text>
+                  </View>
+                  <Text className='flex-1 text-lg font-medium text-gray-800'>
+                    {option.label}
+                  </Text>
+                  <Text className='text-xl text-gray-400'>›</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Close button */}
+            <View className='px-6 py-4 border-t border-gray-100'>
               <TouchableOpacity
-                key={option.id}
-                className='flex-row items-center px-4 py-3'
-                onPress={option.onPress}
+                className='items-center justify-center py-3 bg-gray-100 rounded-2xl active:bg-gray-200'
+                onPress={hideModal}
               >
-                <Text className='mr-3 text-base'>{option.icon}</Text>
-                <Text className='text-base font-medium text-gray-700'>
-                  {option.label}
-                </Text>
+                <Text className='text-base font-semibold text-gray-700'>关闭</Text>
               </TouchableOpacity>
-            ))}
-          </Animated.View>
+            </View>
+          </View>
         </Pressable>
       </Modal>
     </>

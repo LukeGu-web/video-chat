@@ -1,5 +1,11 @@
 import React, { useEffect, useCallback, useState } from 'react';
-import { View, TouchableOpacity, Text, ImageBackground, ActivityIndicator } from 'react-native';
+import {
+  View,
+  TouchableOpacity,
+  Text,
+  ImageBackground,
+  ActivityIndicator,
+} from 'react-native';
 import { SafeAreaView as SafeAreaViewRN } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useUserStore, ChatMessage, useAIStatus } from '../store';
@@ -16,7 +22,10 @@ import {
   BasicEmotionDetector,
 } from '../components';
 import { useBackgroundContext } from '../hooks/useBackgroundContext';
-import { getBackgroundImageSource, formatStoryForAI } from '../utils/backgroundStory';
+import {
+  getBackgroundImageSource,
+  formatStoryForAI,
+} from '../utils/backgroundStory';
 import { isDebugMode } from '../utils/debug';
 
 type RootStackParamList = {
@@ -251,7 +260,7 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
   // Show loading indicator while background is loading
   if (isBackgroundLoading) {
     return (
-      <View className='flex-1 items-center justify-center bg-background'>
+      <View className='items-center justify-center flex-1 bg-background'>
         <ActivityIndicator size='large' color='#3B82F6' />
         <Text className='mt-4 text-gray-600'>加载背景场景...</Text>
       </View>
@@ -280,38 +289,40 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
           onGoToEmotionTest={handleGoToEmotionTest}
         />
 
-        {/* Main Content Area */}
-        <View className='justify-center flex-1 '>
-          {/* Live2D Character with Emotion Awareness */}
-          <View className='items-center'>
+        {/* Main Content Area - Full screen with character at bottom */}
+        <View className='justify-end flex-1'>
+          {/* Current Speech Bubble - Above character's head */}
+          <View className='min-h-[120px] justify-end px-4'>
+            {isSpeaking && currentSegment && (
+              <CurrentSpeechBubble currentMessage={currentSegment} />
+            )}
+          </View>
+
+          {/* Live2D Character - Standing at the bottom, extends beyond bottom edge */}
+          <View className='items-center -mb-24'>
             <EmotionAwareCharacter
-              size={300}
+              size={450}
               loop={true}
               className='shadow-lg'
               enableEmotionMapping={true}
             />
           </View>
-
-          {/* Current Speech Bubble - Only show when AI is speaking */}
-          <View className='min-h-[100px] justify-end'>
-            {isSpeaking && currentSegment && (
-              <CurrentSpeechBubble currentMessage={currentSegment} />
-            )}
-          </View>
         </View>
 
-        {/* Voice Control */}
-        <VoiceControl
-          isListening={isListening}
-          isSupported={isSupported}
-          isAILoading={isAILoading}
-          isSpeaking={isSpeaking}
-          isGenerating={isGenerating}
-          error={error}
-          onStartListening={startListening}
-          onStopListening={stopListening}
-          onStopSpeaking={stopSpeaking}
-        />
+        {/* Voice Control - Floating over character's lower body */}
+        <View className='absolute px-4 right-8 bottom-8'>
+          <VoiceControl
+            isListening={isListening}
+            isSupported={isSupported}
+            isAILoading={isAILoading}
+            isSpeaking={isSpeaking}
+            isGenerating={isGenerating}
+            error={error}
+            onStartListening={startListening}
+            onStopListening={stopListening}
+            onStopSpeaking={stopSpeaking}
+          />
+        </View>
 
         {/* Facial Emotion Detection */}
         <BasicEmotionDetector
@@ -322,23 +333,24 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
 
         {/* Debug Background Info (only in debug mode) */}
         {isDebugMode() && backgroundContext && (
-          <View className='absolute top-20 left-4 right-4 bg-black/70 p-3 rounded-lg'>
-            <Text className='text-white text-xs font-bold mb-1'>
+          <View className='absolute p-3 rounded-lg top-20 left-4 right-4 bg-black/70'>
+            <Text className='mb-1 text-xs font-bold text-white'>
               背景场景调试信息
             </Text>
-            <Text className='text-white text-xs'>
+            <Text className='text-xs text-white'>
               场景ID: {backgroundContext.scene.id}
             </Text>
-            <Text className='text-white text-xs'>
-              类型: {backgroundContext.scene.dayType} - {backgroundContext.scene.timePeriod}
+            <Text className='text-xs text-white'>
+              类型: {backgroundContext.scene.dayType} -{' '}
+              {backgroundContext.scene.timePeriod}
             </Text>
-            <Text className='text-white text-xs'>
+            <Text className='text-xs text-white'>
               地点: {backgroundContext.scene.location}
             </Text>
-            <Text className='text-white text-xs'>
+            <Text className='text-xs text-white'>
               天气: {backgroundContext.weather}
             </Text>
-            <Text className='text-white text-xs' numberOfLines={2}>
+            <Text className='text-xs text-white' numberOfLines={2}>
               故事: {backgroundContext.story.substring(0, 60)}...
             </Text>
           </View>
