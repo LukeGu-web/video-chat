@@ -37,7 +37,9 @@ export const createPersonalitySystemPrompt = (): string => {
   const behavior = AI_PERSONALITY.behavior;
 
   return `# 角色设定
-你是${character.name}，${character.age}岁的${character.personality}，像《名侦探柯南》的毛利兰一样温柔体贴。你是用户的"${character.role}"。
+你是${character.name}，${character.age}岁的${
+    character.personality
+  }，像《名侦探柯南》的毛利兰一样温柔体贴。你是用户的"${character.role}"。
 
 ## 核心人格
 - 温柔体贴，善于倾听和共情
@@ -330,7 +332,7 @@ export const ELEVENLABS_CONFIG = {
 
   // 温柔姐姐型语音设置 - 优化自然度
   settings: {
-    stability: 0.5, // 降低稳定性，增加语调变化和自然感
+    stability: 0.7, // 降低稳定性，增加语调变化和自然感
     similarity_boost: 0.75, // 降低相似度，允许更多语音变化
     style: 0.3, // 提高风格化，增加情感表达
     use_speaker_boost: true, // 启用说话者增强
@@ -343,7 +345,7 @@ export const ELEVENLABS_CONFIG = {
   emotionalSettings: {
     // 温柔关心时的设置
     gentle: {
-      stability: 0.4, // 降低稳定性，增加自然变化
+      stability: 0.5, // 降低稳定性，增加自然变化
       similarity_boost: 0.7, // 允许更多变化
       style: 0.25, // 适度风格化，表现温柔
       use_speaker_boost: true,
@@ -352,7 +354,7 @@ export const ELEVENLABS_CONFIG = {
 
     // 开心时的设置
     happy: {
-      stability: 0.3, // 更低稳定性，增加活力和变化
+      stability: 0.4, // 更低稳定性，增加活力和变化
       similarity_boost: 0.65, // 允许更多情感变化
       style: 0.4, // 较高风格化，表现开心情绪
       use_speaker_boost: true,
@@ -361,7 +363,7 @@ export const ELEVENLABS_CONFIG = {
 
     // 难过/关心时的设置
     caring: {
-      stability: 0.6, // 适中稳定性，保持关怀语调
+      stability: 0.8, // 适中稳定性，保持关怀语调
       similarity_boost: 0.8, // 保持温柔特征
       style: 0.2, // 轻度风格化，自然关怀语调
       use_speaker_boost: true,
@@ -370,7 +372,7 @@ export const ELEVENLABS_CONFIG = {
 
     // 害羞时的设置
     shy: {
-      stability: 0.45, // 适度稳定性，保持害羞的自然感
+      stability: 0.5, // 适度稳定性，保持害羞的自然感
       similarity_boost: 0.75, // 保持害羞特征
       style: 0.35, // 较高风格化，表现害羞情绪
       use_speaker_boost: true,
@@ -379,7 +381,7 @@ export const ELEVENLABS_CONFIG = {
 
     // 思考时的设置
     thinking: {
-      stability: 0.5, // 中等稳定性，表现思考状态
+      stability: 0.6, // 中等稳定性，表现思考状态
       similarity_boost: 0.7, // 保持角色特征
       style: 0.25, // 适中风格化，表现思考
       use_speaker_boost: true,
