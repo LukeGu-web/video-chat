@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
+import { EnvironmentContext } from '../types/environment';
 
 export interface EmotionLog {
   date: string;
@@ -18,6 +19,9 @@ interface UserState {
   selectedCharacter: string;
   emotionLog: EmotionLog[];
   chatHistory: ChatMessage[]; // 聊天历史
+  // Environment detection state
+  currentEnvironment: EnvironmentContext | null;
+  environmentHistory: EnvironmentContext[];
 }
 
 interface UserActions {
@@ -25,6 +29,9 @@ interface UserActions {
   addEmotionLog: (log: EmotionLog) => void;
   addChatMessage: (message: ChatMessage) => void;
   clearChatHistory: () => void;
+  // Environment actions
+  setCurrentEnvironment: (environment: EnvironmentContext) => void;
+  addEnvironmentHistory: (environment: EnvironmentContext) => void;
   reset: () => void;
 }
 
@@ -34,6 +41,8 @@ const initialState: UserState = {
   selectedCharacter: '',
   emotionLog: [],
   chatHistory: [],
+  currentEnvironment: null,
+  environmentHistory: [],
 };
 
 export const useUserStore = create<UserStore>()(
@@ -63,12 +72,30 @@ export const useUserStore = create<UserStore>()(
         state.chatHistory = [];
       });
     },
-    
+
+    setCurrentEnvironment: (environment: EnvironmentContext) => {
+      set((state) => {
+        state.currentEnvironment = environment;
+      });
+    },
+
+    addEnvironmentHistory: (environment: EnvironmentContext) => {
+      set((state) => {
+        state.environmentHistory.push(environment);
+        // Keep only last 20 environment records to prevent memory issues
+        if (state.environmentHistory.length > 20) {
+          state.environmentHistory = state.environmentHistory.slice(-20);
+        }
+      });
+    },
+
     reset: () => {
       set((state) => {
         state.selectedCharacter = initialState.selectedCharacter;
         state.emotionLog = initialState.emotionLog;
         state.chatHistory = initialState.chatHistory;
+        state.currentEnvironment = initialState.currentEnvironment;
+        state.environmentHistory = initialState.environmentHistory;
       });
     },
   }))

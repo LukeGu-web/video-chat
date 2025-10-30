@@ -217,7 +217,8 @@ export const buildSystemPrompt = (
     | 'normal'
     | 'detailed'
     | 'storytelling' = 'normal',
-  backgroundStory?: string
+  backgroundStory?: string,
+  environmentContext?: string
 ): string => {
   const capabilityPrompt = generateCapabilityPrompt();
   const emotionalPrompt = generateEmotionalResponsePrompt(
@@ -228,9 +229,12 @@ export const buildSystemPrompt = (
   // Add background story if provided
   const backgroundSection = backgroundStory ? `\n\n${backgroundStory}` : '';
 
+  // Add environment context if provided
+  const environmentSection = environmentContext ? `\n\n# 环境感知\n${environmentContext}` : '';
+
   return `${personality}
 
-${capabilityPrompt}${emotionalPrompt}${backgroundSection}`;
+${capabilityPrompt}${emotionalPrompt}${backgroundSection}${environmentSection}`;
 };
 
 // 实用的能力查询函数
