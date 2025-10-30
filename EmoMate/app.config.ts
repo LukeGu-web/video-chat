@@ -4,7 +4,7 @@ dotenv.config();
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: 'EmoMate',
+  name: 'Yume',
   slug: 'EmoMate',
   version: '1.0.0',
   orientation: 'portrait',
@@ -22,11 +22,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
       NSCameraUsageDescription:
-        'EmoMate needs access to your camera to enable video conversations with your AI companion and analyze your emotional expressions for a personalized experience.',
+        'Yume needs access to your camera to enable video conversations with your AI companion and analyze your emotional expressions for a personalized experience.',
       NSMicrophoneUsageDescription:
-        'EmoMate needs access to your microphone to record your voice for speech recognition and enable audio conversations with your AI companion.',
+        'Yume needs access to your microphone to record your voice for speech recognition and enable audio conversations with your AI companion.',
       NSSpeechRecognitionUsageDescription:
-        'EmoMate uses speech recognition to convert your spoken words into text for better communication with your AI companion.',
+        'Yume uses speech recognition to convert your spoken words into text for better communication with your AI companion.',
     },
   },
   android: {
@@ -62,6 +62,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         ios: {
           deploymentTarget: '15.5',
         },
+      },
+    ],
+    [
+      'react-native-fast-tflite',
+      {
+        enableCoreMLDelegate: true, // iOS GPU 加速
+        enableAndroidGpuLibraries: true, // Android GPU 加速
       },
     ],
   ],

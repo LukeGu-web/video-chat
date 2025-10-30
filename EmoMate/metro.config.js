@@ -7,6 +7,8 @@ const config = getDefaultConfig(__dirname);
 // Add resolver configuration for react-native-vision-camera
 config.resolver.platforms = ['ios', 'android', 'native', 'web'];
 
+config.resolver.assetExts.push('tflite');
+
 // Optimize bundle for worklets and vision camera
 config.transformer = {
   ...config.transformer,
@@ -27,7 +29,9 @@ config.reporter = {
     } else if (event.type === 'transform_cache_reset') {
       console.log('[Metro] Transform cache reset');
     } else if (event.type === 'bundle_build_started') {
-      console.log(`[Metro] Bundle build started for ${event.bundleDetails.platform}`);
+      console.log(
+        `[Metro] Bundle build started for ${event.bundleDetails.platform}`
+      );
     } else if (event.type === 'bundle_build_done') {
       console.log(`[Metro] Bundle build done`);
     } else if (event.type === 'bundling_error') {

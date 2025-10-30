@@ -8,15 +8,17 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "package:check": "expo install --check",
-    "build:dev": "eas build --platform ios --profile development"
+    "build:dev": "eas build --platform ios --profile development",
+    "build:ios": "eas build --platform ios",
+    "submit:ios": "eas build -p ios --auto-submit"
   },
   "dependencies": {
     "@react-navigation/native": "^7.1.14",
     "@react-navigation/native-stack": "^7.5.1",
     "@types/react": "~19.1.10",
     "dotenv": "^17.1.0",
-    "expo": "^54",
-    "expo-audio": "~1.0.13",
+    "expo": "54.0.21",
+    "expo-audio": "~1.0.14",
     "expo-build-properties": "~1.0.9",
     "expo-camera": "~17.0.8",
     "expo-constants": "~18.0.10",
@@ -29,6 +31,7 @@
     "nativewind": "^4.1.23",
     "react": "19.1.0",
     "react-native": "0.81.5",
+    "react-native-fast-tflite": "^1.6.1",
     "react-native-gesture-handler": "~2.28.0",
     "react-native-reanimated": "~4.1.1",
     "react-native-safe-area-context": "~5.6.0",
@@ -41,6 +44,7 @@
     "react-native-worklets-core": "^1.6.2",
     "tailwindcss": "^3.4.17",
     "typescript": "~5.9.2",
+    "vision-camera-resize-plugin": "^3.2.0",
     "zustand": "^5.0.6"
   },
   "devDependencies": {
