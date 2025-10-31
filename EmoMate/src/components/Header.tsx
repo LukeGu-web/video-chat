@@ -1,11 +1,5 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  Modal,
-  Pressable,
-} from 'react-native';
+import { View, Text, TouchableOpacity, Modal, Pressable } from 'react-native';
 import { isDebugMode } from '../utils/debug';
 
 interface HeaderProps {
@@ -13,6 +7,7 @@ interface HeaderProps {
   onGoBack?: () => void;
   onGoToChatHistory?: () => void;
   onGoToEmotionTest?: () => void;
+  onGoToEnvironmentTest?: () => void;
 }
 
 interface MenuOption {
@@ -27,6 +22,7 @@ const Header: React.FC<HeaderProps> = ({
   onGoBack,
   onGoToChatHistory,
   onGoToEmotionTest,
+  onGoToEnvironmentTest,
 }) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
 
@@ -40,17 +36,28 @@ const Header: React.FC<HeaderProps> = ({
         onGoToChatHistory?.();
       },
     },
-    ...(isDebugMode() && onGoToEmotionTest ? [
-      {
-        id: 'emotionTest',
-        label: '情绪测试',
-        icon: '🧪',
-        onPress: () => {
-          setIsModalVisible(false);
-          onGoToEmotionTest?.();
-        },
-      },
-    ] : []),
+    ...(isDebugMode() && onGoToEmotionTest
+      ? [
+          {
+            id: 'emotionTest',
+            label: '情绪测试',
+            icon: '🧪',
+            onPress: () => {
+              setIsModalVisible(false);
+              onGoToEmotionTest?.();
+            },
+          },
+          {
+            id: 'environmentTest',
+            label: '环境测试',
+            icon: '🌳',
+            onPress: () => {
+              setIsModalVisible(false);
+              onGoToEnvironmentTest?.();
+            },
+          },
+        ]
+      : []),
   ];
 
   const handleSettingsPress = () => {
@@ -81,7 +88,7 @@ const Header: React.FC<HeaderProps> = ({
         onRequestClose={hideModal}
       >
         <Pressable
-          className='flex-1 items-center justify-center'
+          className='items-center justify-center flex-1'
           onPress={hideModal}
           style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
         >
@@ -130,7 +137,9 @@ const Header: React.FC<HeaderProps> = ({
                 className='items-center justify-center py-3 bg-gray-100 rounded-2xl active:bg-gray-200'
                 onPress={hideModal}
               >
-                <Text className='text-base font-semibold text-gray-700'>关闭</Text>
+                <Text className='text-base font-semibold text-gray-700'>
+                  关闭
+                </Text>
               </TouchableOpacity>
             </View>
           </View>

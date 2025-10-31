@@ -10,6 +10,7 @@ import {
   ChatHistoryScreen,
   HiyoriScreen,
   EmotionTestScreen,
+  EnvironmentTestScreen,
 } from './src/screens';
 import { isDebugMode } from './src/utils/debug';
 import { transitionAudio } from './src/utils/transitionAudio'; // Phase 1: 过渡语音预加载
@@ -22,6 +23,7 @@ export type RootStackParamList = {
   ChatHistory: undefined;
   Hiyori: undefined;
   EmotionTest: undefined;
+  EnvironmentTest: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -137,7 +139,10 @@ export default function App() {
           <Stack.Screen name='ChatHistory' component={ChatHistoryScreen} />
           <Stack.Screen name='Hiyori' component={HiyoriScreen} />
           {isDebugMode() && (
-            <Stack.Screen name='EmotionTest' component={EmotionTestScreen} />
+            <>
+              <Stack.Screen name='EmotionTest' component={EmotionTestScreen} />
+              <Stack.Screen name='EnvironmentTest' component={EnvironmentTestScreen} />
+            </>
           )}
         </Stack.Navigator>
         <StatusBar style='auto' />

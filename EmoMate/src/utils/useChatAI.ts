@@ -17,6 +17,8 @@ import { detectTransitionCategory, type Emotion } from './conversationAnalysis';
 import { SentenceBuffer, parseSSEChunk } from './sentenceDetector'; // Phase 2: 句子检测
 import { TTSQueue } from './ttsQueue'; // Phase 2: TTS队列管理
 import { SmartSentenceBuffer } from './smartSentenceBuffer'; // Phase 3: 智能句子过滤
+import { useUserStore } from '../store/userStore'; // Environment context
+import { buildEnvironmentPrompt } from './buildEnvironmentPrompt'; // Environment awareness
 
 export interface ChatMessage {
   id: string;
@@ -73,6 +75,9 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     initialConfig?.personality || createPersonalitySystemPrompt()
   );
   const [isProactiveModeEnabled, setIsProactiveModeEnabled] = useState(true);
+
+  // Get current environment context from store
+  const { currentEnvironment } = useUserStore();
 
   // 主动对话相关状态
   const lastUserMessageTime = useRef<number>(Date.now());
@@ -220,11 +225,16 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
 
     // 构建API消息格式，包含人格、情绪、上下文信息和背景故事
     const personalityText = config.personality || currentPersonality;
+
+    // Build environment context prompt
+    const environmentPrompt = buildEnvironmentPrompt(currentEnvironment, true, 5);
+
     const systemMessage = buildSystemPrompt(
       personalityText,
       config.userEmotion,
       conversationType,
-      config.backgroundStory
+      config.backgroundStory,
+      environmentPrompt // Add environment awareness
     );
 
     // 保留更多上下文消息以保持对话连贯性
@@ -288,11 +298,16 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
 
     const lengthConfig = getResponseLengthConfig(conversationType);
     const personalityText = config.personality || currentPersonality;
+
+    // Build environment context prompt for streaming
+    const environmentPrompt = buildEnvironmentPrompt(currentEnvironment, true, 5);
+
     const systemMessage = buildSystemPrompt(
       personalityText,
       config.userEmotion,
       conversationType,
-      config.backgroundStory
+      config.backgroundStory,
+      environmentPrompt // Add environment awareness
     );
 
     const contextMessages = messages

@@ -110,17 +110,66 @@ export function useEnvironmentDetection(options: UseEnvironmentDetectionOptions 
       lastObjectDetectionTime.current = now;
 
       try {
+        // Check if model is available
+        if (!objectModel.model) {
+          console.log('[useEnvironmentDetection] Model not loaded yet');
+          return null;
+        }
+
         // Resize frame for model (320x320 for EfficientDet)
-        const resizedFrame = resize(frame, {
+        const resized = resize(frame, {
           width: 320,
           height: 320,
           pixelFormat: 'rgb',
           dataType: 'uint8',
         });
 
+        console.log('[useEnvironmentDetection] Resized object:', typeof resized);
+        console.log('[useEnvironmentDetection] Resized keys:', Object.keys(resized || {}));
+
+        // Extract buffer from resize result with multiple fallback strategies
+        let resizedFrame: any;
+
+        if (resized?.buffer) {
+          // Strategy 1: buffer property (most likely)
+          resizedFrame = resized.buffer;
+          console.log('[useEnvironmentDetection] Using resized.buffer');
+        } else if (resized?.data) {
+          // Strategy 2: data property
+          resizedFrame = resized.data;
+          console.log('[useEnvironmentDetection] Using resized.data');
+        } else if (resized?.array) {
+          // Strategy 3: array property
+          resizedFrame = resized.array;
+          console.log('[useEnvironmentDetection] Using resized.array');
+        } else if (ArrayBuffer.isView(resized)) {
+          // Strategy 4: Direct TypedArray
+          resizedFrame = resized;
+          console.log('[useEnvironmentDetection] Resized is direct TypedArray');
+        } else {
+          // Strategy 5: Use as-is (original behavior)
+          resizedFrame = resized;
+          console.log('[useEnvironmentDetection] Using resized as-is');
+        }
+
+        console.log('[useEnvironmentDetection] Resized frame:', typeof resizedFrame, resizedFrame?.length || resizedFrame?.byteLength);
+
+        // Validate buffer size before inference
+        const expectedSize = 320 * 320 * 3; // 307200
+        const actualSize = resizedFrame?.length || resizedFrame?.byteLength || 0;
+
+        if (actualSize !== expectedSize) {
+          console.log(`[useEnvironmentDetection] WARNING: Buffer size mismatch! Expected: ${expectedSize}, Actual: ${actualSize}`);
+          // Continue anyway to get detailed error from TFLite
+        }
+
         // Run inference
         const outputs = objectModel.model.run([resizedFrame]);
+
+        console.log('[useEnvironmentDetection] Model output:', typeof outputs, outputs?.length);
+
         if (!outputs || outputs.length < 4) {
+          console.log('[useEnvironmentDetection] Invalid output from model');
           return null;
         }
 
@@ -158,7 +207,11 @@ export function useEnvironmentDetection(options: UseEnvironmentDetectionOptions 
 
         return filterObjectsByConfidence(detectedObjects, MIN_CONFIDENCE);
       } catch (error) {
-        debugLog('useEnvironmentDetection', 'Object detection error', error);
+        // Note: debugLog is not available in worklet context
+        // Use console.log for debugging in worklet
+        console.log('[useEnvironmentDetection] Object detection error:', JSON.stringify(error));
+        console.log('[useEnvironmentDetection] Error message:', error?.message);
+        console.log('[useEnvironmentDetection] Error stack:', error?.stack);
         return null;
       }
     },
@@ -188,13 +241,43 @@ export function useEnvironmentDetection(options: UseEnvironmentDetectionOptions 
 
       try {
         // Resize frame for model (224x224 for MobileNetV3)
-        const resizedFrame = resize(frame, {
+        const resized = resize(frame, {
           width: 224,
           height: 224,
           pixelFormat: 'rgb',
           dataType: 'float32',
           normalize: true,
         });
+
+        // Extract buffer from resize result with multiple fallback strategies
+        let resizedFrame: any;
+
+        if (resized?.buffer) {
+          resizedFrame = resized.buffer;
+          console.log('[useEnvironmentDetection] Scene: Using resized.buffer');
+        } else if (resized?.data) {
+          resizedFrame = resized.data;
+          console.log('[useEnvironmentDetection] Scene: Using resized.data');
+        } else if (resized?.array) {
+          resizedFrame = resized.array;
+          console.log('[useEnvironmentDetection] Scene: Using resized.array');
+        } else if (ArrayBuffer.isView(resized)) {
+          resizedFrame = resized;
+          console.log('[useEnvironmentDetection] Scene: Resized is direct TypedArray');
+        } else {
+          resizedFrame = resized;
+          console.log('[useEnvironmentDetection] Scene: Using resized as-is');
+        }
+
+        console.log('[useEnvironmentDetection] Scene resized frame:', typeof resizedFrame, resizedFrame?.length || resizedFrame?.byteLength);
+
+        // Validate buffer size for scene model
+        const expectedSize = 224 * 224 * 3 * 4; // float32 = 4 bytes per value
+        const actualSize = resizedFrame?.length || resizedFrame?.byteLength || 0;
+
+        if (actualSize !== expectedSize) {
+          console.log(`[useEnvironmentDetection] Scene WARNING: Buffer size mismatch! Expected: ${expectedSize}, Actual: ${actualSize}`);
+        }
 
         // Run inference
         const outputs = sceneModel.model.run([resizedFrame]);
@@ -226,7 +309,11 @@ export function useEnvironmentDetection(options: UseEnvironmentDetectionOptions 
 
         return { scene, confidence: maxProb };
       } catch (error) {
-        debugLog('useEnvironmentDetection', 'Scene classification error', error);
+        // Note: debugLog is not available in worklet context
+        // Use console.log for debugging in worklet
+        console.log('[useEnvironmentDetection] Scene classification error:', JSON.stringify(error));
+        console.log('[useEnvironmentDetection] Error message:', error?.message);
+        console.log('[useEnvironmentDetection] Error stack:', error?.stack);
         return null;
       }
     },

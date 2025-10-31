@@ -34,6 +34,7 @@ type RootStackParamList = {
   ChatHistory: undefined;
   Hiyori: undefined;
   EmotionTest: undefined;
+  EnvironmentTest: undefined;
 };
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<
@@ -148,6 +149,10 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
 
   const handleGoToEmotionTest = () => {
     navigation.navigate('EmotionTest');
+  };
+
+  const handleGoToEnvironmentTest = () => {
+    navigation.navigate('EnvironmentTest');
   };
 
   // 生成唯一消息ID
@@ -287,6 +292,7 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
           onGoBack={handleGoBack}
           onGoToChatHistory={handleGoToChatHistory}
           onGoToEmotionTest={handleGoToEmotionTest}
+          onGoToEnvironmentTest={handleGoToEnvironmentTest}
         />
 
         {/* Main Content Area - Full screen with character at bottom */}
@@ -333,7 +339,7 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
 
         {/* Debug Background Info (only in debug mode) */}
         {isDebugMode() && backgroundContext && (
-          <View className='absolute p-3 rounded-lg top-20 left-4 right-4 bg-black/70'>
+          <View className='absolute left-0 w-4/5 p-3 rounded-lg top-10 bg-black/70'>
             <Text className='mb-1 text-xs font-bold text-white'>
               背景场景调试信息
             </Text>
