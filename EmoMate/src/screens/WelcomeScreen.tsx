@@ -66,7 +66,7 @@ const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
     return (
       <SafeAreaView className='items-center justify-center flex-1 px-4 bg-background'>
         <Text className='mb-4 text-4xl font-bold text-center text-primary'>
-          Welcome to EmoMate
+          Welcome
         </Text>
         <Text className='mb-12 text-lg text-center text-gray-500'>
           正在检查权限...
@@ -78,12 +78,20 @@ const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <SafeAreaView className='items-center justify-center flex-1 px-4 bg-background'>
       <Text className='mb-4 text-4xl font-bold text-center text-primary'>
-        Welcome to EmoMate
+        Welcome, Human!
       </Text>
-      <Text className='mb-12 text-lg text-center text-gray-500'>
-        Your emotional companion
-      </Text>
-
+      <Text className='mb-8 text-2xl text-center text-gray-500'>💕</Text>
+      <View>
+        <Text className='mb-2 text-lg text-left text-gray-500'>
+          I’m here to listen, laugh,
+        </Text>
+        <Text className='mb-2 text-lg text-left text-gray-500'>
+          and keep you company.
+        </Text>
+        <Text className='mb-12 text-lg text-left text-gray-500'>
+          So, what’s on your mind today?
+        </Text>
+      </View>
       {!permissionStatus.allGranted && (
         <View className='items-center p-4 mb-8 bg-white rounded-lg'>
           <Text className='mb-4 text-base text-center text-black'>
@@ -113,7 +121,7 @@ const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
         onPress={handleGetStarted}
       >
         <Text className='text-lg font-semibold text-center text-white'>
-          {permissionStatus.allGranted ? 'Get Started' : '请求权限'}
+          {permissionStatus.allGranted ? "Let's chat" : '请求权限'}
         </Text>
       </TouchableOpacity>
     </SafeAreaView>
