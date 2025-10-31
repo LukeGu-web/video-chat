@@ -13,7 +13,12 @@ import {
   ScrollView,
   SafeAreaView,
 } from 'react-native';
-import { Camera, useCameraDevice, useCameraPermission, useFrameProcessor } from 'react-native-vision-camera';
+import {
+  Camera,
+  useCameraDevice,
+  useCameraPermission,
+  useFrameProcessor,
+} from 'react-native-vision-camera';
 import { Worklets } from 'react-native-worklets-core';
 import { useUserStore } from '../store/userStore';
 import { getEnvironmentDescription } from '../utils/environmentAnalysis';
@@ -31,12 +36,9 @@ export const EnvironmentTestScreen: React.FC = () => {
   const [testMessage, setTestMessage] = useState('');
 
   // AI chat integration
-  const {
-    messages,
-    sendMessage,
-    isLoading,
-    isSpeaking,
-  } = useChatAIWithLanLan({ enableTTS: true });
+  const { messages, sendMessage, isLoading, isSpeaking } = useChatAIWithLanLan({
+    enableTTS: true,
+  });
 
   // Environment detection hook (real or mock)
   const realDetection = useEnvironmentDetection({
@@ -68,28 +70,36 @@ export const EnvironmentTestScreen: React.FC = () => {
   );
 
   // Frame processor to detect objects and scenes
-  const frameProcessor = useFrameProcessor((frame) => {
-    'worklet';
+  const frameProcessor = useFrameProcessor(
+    (frame) => {
+      'worklet';
 
-    if (!isDetectionActive) {
-      return;
-    }
+      if (!isDetectionActive) {
+        return;
+      }
 
-    // Process frame for object detection
-    const detectedObjects = processFrameForObjects(frame);
+      // Process frame for object detection
+      const detectedObjects = processFrameForObjects(frame);
 
-    // Process frame for scene classification
-    const sceneResult = processFrameForScene(frame);
+      // Process frame for scene classification
+      const sceneResult = processFrameForScene(frame);
 
-    // Update environment context if we have results
-    if (detectedObjects && sceneResult) {
-      Worklets.runOnJS(handleEnvironmentUpdate)(
-        detectedObjects,
-        sceneResult.scene,
-        sceneResult.confidence
-      );
-    }
-  }, [isDetectionActive, processFrameForObjects, processFrameForScene, handleEnvironmentUpdate]);
+      // Update environment context if we have results
+      if (detectedObjects && sceneResult) {
+        Worklets.runOnJS(handleEnvironmentUpdate)(
+          detectedObjects,
+          sceneResult.scene,
+          sceneResult.confidence
+        );
+      }
+    },
+    [
+      isDetectionActive,
+      processFrameForObjects,
+      processFrameForScene,
+      handleEnvironmentUpdate,
+    ]
+  );
 
   // Request permission if not granted
   React.useEffect(() => {
@@ -157,7 +167,10 @@ export const EnvironmentTestScreen: React.FC = () => {
 
         {/* Mock/Real toggle */}
         <TouchableOpacity
-          style={[styles.button, useMockDetection ? styles.mockButton : styles.realButton]}
+          style={[
+            styles.button,
+            useMockDetection ? styles.mockButton : styles.realButton,
+          ]}
           onPress={() => setUseMockDetection(!useMockDetection)}
         >
           <Text style={styles.buttonText}>
@@ -177,7 +190,7 @@ export const EnvironmentTestScreen: React.FC = () => {
 
         {/* Environment info */}
         {currentEnvironment ? (
-          <View style={styles.infoPanel}>
+          <ScrollView style={styles.infoPanel}>
             <Text style={styles.infoTitle}>当前环境</Text>
             <Text style={styles.infoText}>
               📍 场景: {currentEnvironment.scene}
@@ -192,20 +205,22 @@ export const EnvironmentTestScreen: React.FC = () => {
               ✨ 置信度: {(currentEnvironment.confidence * 100).toFixed(0)}%
             </Text>
 
-            <Text style={styles.infoTitle}>检测到的物体 ({currentEnvironment.objects.length})</Text>
-            <ScrollView style={styles.objectList}>
+            <Text style={styles.infoTitle}>
+              检测到的物体 ({currentEnvironment.objects.length})
+            </Text>
+            <View style={styles.objectList}>
               {currentEnvironment.objects.slice(0, 10).map((obj, idx) => (
                 <Text key={idx} style={styles.objectText}>
                   {idx + 1}. {obj.label} ({(obj.confidence * 100).toFixed(0)}%)
                 </Text>
               ))}
-            </ScrollView>
+            </View>
 
             <Text style={styles.infoTitle}>自然语言描述</Text>
             <Text style={styles.descriptionText}>
               {getEnvironmentDescription(currentEnvironment)}
             </Text>
-          </View>
+          </ScrollView>
         ) : (
           <View style={styles.infoPanel}>
             <Text style={styles.waitingText}>等待环境检测...</Text>
@@ -219,14 +234,16 @@ export const EnvironmentTestScreen: React.FC = () => {
           disabled={!currentEnvironment || isLoading || isSpeaking}
         >
           <Text style={styles.buttonText}>
-            {isLoading ? '⏳ 思考中...' : isSpeaking ? '🔊 说话中...' : '🤖 测试AI识别'}
+            {isLoading
+              ? '⏳ 思考中...'
+              : isSpeaking
+              ? '🔊 说话中...'
+              : '🤖 测试AI识别'}
           </Text>
         </TouchableOpacity>
 
         {/* Test message */}
-        {testMessage && (
-          <Text style={styles.testMessage}>{testMessage}</Text>
-        )}
+        {testMessage && <Text style={styles.testMessage}>{testMessage}</Text>}
 
         {/* AI response */}
         {messages.length > 0 && (
@@ -320,7 +337,7 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
     marginBottom: 12,
-    maxHeight: 200,
+    maxHeight: 100,
   },
   infoTitle: {
     color: '#4CAF50',

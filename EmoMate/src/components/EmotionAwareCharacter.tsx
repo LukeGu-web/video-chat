@@ -11,7 +11,7 @@ import {
   ConversationContext,
   MotionSelection,
   calculateMotionTransition,
-  isTemporaryMotion
+  isTemporaryMotion,
 } from '../utils/motionMapper';
 
 interface EmotionAwareCharacterProps {
@@ -29,12 +29,13 @@ export const EmotionAwareCharacter: React.FC<EmotionAwareCharacterProps> = ({
   className = '',
   onMotionComplete,
   enableEmotionMapping = true,
-  currentText
+  currentText,
 }) => {
   const { combinedEmotion, facialEmotion, textEmotion } = useEmotionContext();
   const { aiStatus } = useAIStatus();
   const lastEmotionRef = useRef<EmotionType>('neutral');
-  const [motionSelection, setMotionSelection] = useState<MotionSelection | null>(null);
+  const [motionSelection, setMotionSelection] =
+    useState<MotionSelection | null>(null);
   const returnToIdleTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Determine the motion to play based on emotion, AI status, and context
@@ -48,21 +49,25 @@ export const EmotionAwareCharacter: React.FC<EmotionAwareCharacterProps> = ({
       text: currentText || '',
       emotion: combinedEmotion,
       aiSpeaking: aiStatus === 'Speaking',
-      aiThinking: aiStatus === 'Thinking'
+      aiThinking: aiStatus === 'Thinking',
     };
 
     // Use advanced motion mapper
     const selection = selectMotion(context);
 
-    console.log(`🎯 [EmotionAwareCharacter] Motion selected: ${selection.motion}`);
+    console.log(
+      `🎯 [EmotionAwareCharacter] Motion selected: ${selection.motion}`
+    );
     console.log(`   📝 Reason: ${selection.reason}`);
     console.log(`   ⭐ Priority: ${selection.priority}`);
-    console.log(`   🎭 Emotion: ${combinedEmotion} | AI Status: ${aiStatus || 'none'}`);
+    console.log(
+      `   🎭 Emotion: ${combinedEmotion} | AI Status: ${aiStatus || 'none'}`
+    );
 
     debugLog('EmotionAwareCharacter', `Motion selection`, {
       context,
       selection,
-      aiStatus
+      aiStatus,
     });
 
     return selection.motion;
@@ -79,7 +84,7 @@ export const EmotionAwareCharacter: React.FC<EmotionAwareCharacterProps> = ({
       text: currentText || '',
       emotion: combinedEmotion,
       aiSpeaking: aiStatus === 'Speaking',
-      aiThinking: aiStatus === 'Thinking'
+      aiThinking: aiStatus === 'Thinking',
     };
 
     const selection = selectMotion(context);
@@ -94,7 +99,10 @@ export const EmotionAwareCharacter: React.FC<EmotionAwareCharacterProps> = ({
       returnToIdleTimerRef.current = setTimeout(() => {
         // Only return to Idle if no new AI status
         if (!aiStatus || aiStatus === 'Idle') {
-          debugLog('EmotionAwareCharacter', `Returning to Idle after ${selection.motion}`);
+          debugLog(
+            'EmotionAwareCharacter',
+            `Returning to Idle after ${selection.motion}`
+          );
           // Don't set motion selection here, just let it naturally go to Idle
         }
       }, selection.duration);
@@ -110,21 +118,38 @@ export const EmotionAwareCharacter: React.FC<EmotionAwareCharacterProps> = ({
   // Handle emotion changes
   useEffect(() => {
     if (combinedEmotion !== lastEmotionRef.current) {
-      debugLog('EmotionAwareCharacter', `Emotion changed: ${lastEmotionRef.current} -> ${combinedEmotion}`, {
-        facialEmotion,
-        textEmotion,
-        aiStatus,
-        resultMotion: currentMotion,
-        selectionReason: motionSelection?.reason
-      });
+      debugLog(
+        'EmotionAwareCharacter',
+        `Emotion changed: ${lastEmotionRef.current} -> ${combinedEmotion}`,
+        {
+          facialEmotion,
+          textEmotion,
+          aiStatus,
+          resultMotion: currentMotion,
+          selectionReason: motionSelection?.reason,
+        }
+      );
       lastEmotionRef.current = combinedEmotion;
     }
-  }, [combinedEmotion, facialEmotion, textEmotion, aiStatus, currentMotion, motionSelection]);
+  }, [
+    combinedEmotion,
+    facialEmotion,
+    textEmotion,
+    aiStatus,
+    currentMotion,
+    motionSelection,
+  ]);
 
-  const handleMotionComplete = useCallback((motion: string, success: boolean) => {
-    debugLog('EmotionAwareCharacter', `Motion ${motion} completed: ${success ? 'success' : 'failed'}`);
-    onMotionComplete?.(motion, success);
-  }, [onMotionComplete]);
+  const handleMotionComplete = useCallback(
+    (motion: string, success: boolean) => {
+      debugLog(
+        'EmotionAwareCharacter',
+        `Motion ${motion} completed: ${success ? 'success' : 'failed'}`
+      );
+      onMotionComplete?.(motion, success);
+    },
+    [onMotionComplete]
+  );
 
   return (
     <View className={`relative ${className}`}>
@@ -136,42 +161,76 @@ export const EmotionAwareCharacter: React.FC<EmotionAwareCharacterProps> = ({
       />
 
       {isDebugMode() && (
-        <View className="absolute bottom-2 left-2 bg-black/80 rounded-md p-2 max-w-[240px]">
-          <Text className="text-white text-xs font-bold mb-1">Motion Selection</Text>
-          <View className="gap-0.5">
-            <View className="flex-row items-center">
-              <Text className="text-gray-400 text-xs font-mono w-12">Facial:</Text>
-              <Text className="text-gray-100 text-xs font-mono">{facialEmotion || 'none'}</Text>
+        <View className='absolute bottom-24 left-8 bg-black/80 rounded-lg p-2 max-w-[280px]'>
+          <Text className='mb-1 text-xs font-bold text-white'>
+            Motion Selection
+          </Text>
+          <View className='gap-0.5'>
+            <View className='flex-row items-center'>
+              <Text className='w-12 font-mono text-xs text-gray-400 min-w-20'>
+                Facial:
+              </Text>
+              <Text className='font-mono text-xs text-gray-100'>
+                {facialEmotion || 'none'}
+              </Text>
             </View>
-            <View className="flex-row items-center">
-              <Text className="text-gray-400 text-xs font-mono w-12">Text:</Text>
-              <Text className="text-gray-100 text-xs font-mono">{textEmotion || 'none'}</Text>
+            <View className='flex-row items-center'>
+              <Text className='w-12 font-mono text-xs text-gray-400 min-w-20'>
+                Text:
+              </Text>
+              <Text className='font-mono text-xs text-gray-100'>
+                {textEmotion || 'none'}
+              </Text>
             </View>
-            <View className="flex-row items-center">
-              <Text className="text-gray-400 text-xs font-mono w-12">Combined:</Text>
-              <Text className="text-green-300 text-xs font-mono font-bold">{combinedEmotion}</Text>
+            <View className='flex-row items-center'>
+              <Text className='w-12 font-mono text-xs text-gray-400 min-w-24'>
+                Combined:
+              </Text>
+              <Text className='font-mono text-xs font-bold text-green-300'>
+                {combinedEmotion}
+              </Text>
             </View>
-            <View className="flex-row items-center">
-              <Text className="text-gray-400 text-xs font-mono w-12">AI Status:</Text>
-              <Text className="text-blue-300 text-xs font-mono">{aiStatus || 'none'}</Text>
+            <View className='flex-row items-center'>
+              <Text className='w-12 font-mono text-xs text-gray-400 min-w-28'>
+                AI Status:
+              </Text>
+              <Text className='font-mono text-xs text-blue-300'>
+                {aiStatus || 'none'}
+              </Text>
             </View>
-            <View className="flex-row items-center">
-              <Text className="text-gray-400 text-xs font-mono w-12">Motion:</Text>
-              <Text className="text-yellow-300 text-xs font-mono font-bold">{currentMotion}</Text>
+            <View className='flex-row items-center'>
+              <Text className='w-12 font-mono text-xs text-gray-400 min-w-16'>
+                Motion:
+              </Text>
+              <Text className='font-mono text-xs font-bold text-yellow-300'>
+                {currentMotion}
+              </Text>
             </View>
-            <View className="flex-row items-center">
-              <Text className="text-gray-400 text-xs font-mono w-12">Priority:</Text>
-              <Text className="text-purple-300 text-xs font-mono">{motionSelection?.priority ?? '-'}</Text>
+            <View className='flex-row items-center'>
+              <Text className='w-12 font-mono text-xs text-gray-400 min-w-24'>
+                Priority:
+              </Text>
+              <Text className='font-mono text-xs text-purple-300'>
+                {motionSelection?.priority ?? '-'}
+              </Text>
             </View>
             {motionSelection?.reason && (
-              <View className="mt-1">
-                <Text className="text-gray-400 text-xs font-mono">Reason:</Text>
-                <Text className="text-gray-100 text-xs font-mono">{motionSelection.reason}</Text>
+              <View className='mt-1'>
+                <Text className='font-mono text-xs text-gray-400 min-w-16'>
+                  Reason:
+                </Text>
+                <Text className='font-mono text-xs text-gray-100'>
+                  {motionSelection.reason}
+                </Text>
               </View>
             )}
-            <View className="flex-row items-center">
-              <Text className="text-gray-400 text-xs font-mono w-12">Mapping:</Text>
-              <Text className="text-gray-100 text-xs font-mono">{enableEmotionMapping ? 'ON' : 'OFF'}</Text>
+            <View className='flex-row items-center'>
+              <Text className='w-12 font-mono text-xs text-gray-400 min-w-16'>
+                Mapping:
+              </Text>
+              <Text className='font-mono text-xs text-gray-100'>
+                {enableEmotionMapping ? 'ON' : 'OFF'}
+              </Text>
             </View>
           </View>
         </View>

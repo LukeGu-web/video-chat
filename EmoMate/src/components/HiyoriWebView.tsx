@@ -604,7 +604,7 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
         {/* Enhanced Status Indicator (debug mode only) */}
         {isDebugMode() && (
           <View
-            className='absolute top-2.5 right-2.5 flex-row items-center bg-white/95 px-3 py-1.5 rounded-2xl'
+            className='absolute top-0 right-12 flex-row items-center bg-white/95 px-3 py-1.5 rounded-2xl'
             style={{
               shadowColor: '#000',
               shadowOffset: { width: 0, height: 2 },
@@ -646,7 +646,7 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
 
         {/* Debug info (debug mode only) */}
         {isDebugMode() && (
-          <View className='absolute px-2 py-1 rounded bottom-2 left-2 bg-black/80'>
+          <View className='absolute px-2 py-1 rounded top-10 right-8 bg-black/80'>
             <Text className='font-mono text-xs text-white'>
               WebView: {state.isWebViewReady ? '✓' : '✗'} | Model:{' '}
               {state.isModelReady ? '✓' : '✗'} | Queue:{' '}

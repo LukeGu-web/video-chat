@@ -88,11 +88,17 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
   // 播放Live2D动作(单次)
   const playLive2DMotion = useCallback(
     (motionName: string, enableLoop: boolean = false) => {
-      console.log(`🎭 [Live2DCharacter] Playing motion: ${motionName}${enableLoop ? ' (loop enabled)' : ''}`);
+      console.log(
+        `🎭 [Live2DCharacter] Playing motion: ${motionName}${
+          enableLoop ? ' (loop enabled)' : ''
+        }`
+      );
       debugLog('Live2DCharacter', `Attempting to play motion: ${motionName}`);
 
       if (!isModelReady || !webViewRef.current?.hiyoriBridge) {
-        console.warn(`⚠️ [Live2DCharacter] Cannot play motion ${motionName} - model not ready`);
+        console.warn(
+          `⚠️ [Live2DCharacter] Cannot play motion ${motionName} - model not ready`
+        );
         debugWarn(
           'Live2DCharacter',
           `Cannot play motion ${motionName} - model not ready`
@@ -102,8 +108,14 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
       }
 
       // 如果是相同动作且在循环中,不需要重复启动
-      if (lastMotionRef.current === motionName && enableLoop && motionLoopIntervalRef.current) {
-        console.log(`🔄 [Live2DCharacter] Motion ${motionName} already looping, continuing`);
+      if (
+        lastMotionRef.current === motionName &&
+        enableLoop &&
+        motionLoopIntervalRef.current
+      ) {
+        console.log(
+          `🔄 [Live2DCharacter] Motion ${motionName} already looping, continuing`
+        );
         return;
       }
 
@@ -123,14 +135,19 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
 
       // 如果需要循环播放(Speaking/Thinking等持续动作)
       if (enableLoop) {
-        console.log(`🔁 [Live2DCharacter] Starting motion loop for: ${motionName}`);
+        console.log(
+          `🔁 [Live2DCharacter] Starting motion loop for: ${motionName}`
+        );
 
         // 停止之前的循环
         stopMotionLoop();
 
         // 设置循环播放(每3秒重复播放一次)
         motionLoopIntervalRef.current = setInterval(() => {
-          if (webViewRef.current?.hiyoriBridge && lastMotionRef.current === motionName) {
+          if (
+            webViewRef.current?.hiyoriBridge &&
+            lastMotionRef.current === motionName
+          ) {
             console.log(`🔄 [Live2DCharacter] Loop replay: ${motionName}`);
             webViewRef.current.hiyoriBridge.playMotion(motionName);
           }
@@ -172,7 +189,13 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
         }
       };
     }
-  }, [currentMotion, isModelReady, playLive2DMotion, shouldLoopMotion, stopMotionLoop]);
+  }, [
+    currentMotion,
+    isModelReady,
+    playLive2DMotion,
+    shouldLoopMotion,
+    stopMotionLoop,
+  ]);
 
   // 处理模型准备就绪
   const handleModelReady = useCallback(() => {
@@ -235,8 +258,8 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
   };
 
   return (
-    <View 
-      className="relative justify-center items-center"
+    <View
+      className='relative items-center justify-center'
       style={containerStyle}
     >
       <HiyoriWebView
@@ -248,28 +271,38 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
 
       {/* 状态指示器 */}
       {isDebugMode() && (
-        <View className="absolute top-2 left-2 flex-row items-center bg-black/80 rounded-md p-2">
+        <View className='absolute top-0 flex-row items-center w-48 p-2 rounded-lg left-8 bg-black/80'>
           <View
-            className="w-2 h-2 rounded-full mr-2"
+            className='w-2 h-2 mr-2 rounded-full'
             style={{
               backgroundColor: isModelReady ? '#10B981' : '#EF4444',
             }}
           />
-          <View className="flex-1">
-            <View className="gap-0.5">
-              <View className="flex-row items-center">
-                <Text className="text-gray-400 text-xs font-mono w-12">Motion:</Text>
-                <Text className="text-gray-100 text-xs font-mono font-bold">{currentMotion}</Text>
+          <View className='flex-1'>
+            <View className='gap-0.5'>
+              <View className='flex-row items-center'>
+                <Text className='w-12 font-mono text-xs text-gray-400 min-w-20'>
+                  Motion:
+                </Text>
+                <Text className='font-mono text-xs font-bold text-gray-100'>
+                  {currentMotion}
+                </Text>
               </View>
-              <View className="flex-row items-center">
-                <Text className="text-gray-400 text-xs font-mono w-12">Ready:</Text>
-                <Text className="text-gray-100 text-xs font-mono font-bold">
+              <View className='flex-row items-center'>
+                <Text className='w-12 font-mono text-xs text-gray-400'>
+                  Ready:
+                </Text>
+                <Text className='font-mono text-xs font-bold text-gray-100'>
                   {isModelReady ? '✓' : '✗'}
                 </Text>
               </View>
-              <View className="flex-row items-center">
-                <Text className="text-gray-400 text-xs font-mono w-12">Playing:</Text>
-                <Text className="text-gray-100 text-xs font-mono font-bold">{isPlaying ? '▶' : '⏸'}</Text>
+              <View className='flex-row items-center'>
+                <Text className='w-12 font-mono text-xs text-gray-400 min-w-20'>
+                  Playing:
+                </Text>
+                <Text className='font-mono text-xs font-bold text-gray-100'>
+                  {isPlaying ? '▶' : '⏸'}
+                </Text>
               </View>
             </View>
           </View>
@@ -278,7 +311,6 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
     </View>
   );
 };
-
 
 export default Live2DCharacter;
 

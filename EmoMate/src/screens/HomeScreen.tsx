@@ -339,7 +339,7 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
 
         {/* Debug Background Info (only in debug mode) */}
         {isDebugMode() && backgroundContext && (
-          <View className='absolute left-0 w-4/5 p-3 rounded-lg top-10 bg-black/70'>
+          <View className='absolute left-0 w-4/5 p-3 rounded-lg top-14 bg-black/70'>
             <Text className='mb-1 text-xs font-bold text-white'>
               背景场景调试信息
             </Text>
