@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   PanResponder,
   Dimensions,
+  Pressable,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import {
@@ -40,13 +41,14 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
 
   // 权限管理 - 同时支持expo-camera和react-native-vision-camera
   const [expoPermission, requestExpoPermission] = useCameraPermissions();
+  const [cameraPosition, setCameraPosition] = useState<string>('front');
   const {
     hasPermission: visionHasPermission,
     requestPermission: requestVisionPermission,
   } = useCameraPermission();
 
   // 获取相机设备
-  const frontDevice = useCameraDevice('front');
+  const frontDevice = useCameraDevice(cameraPosition as 'front' | 'back');
 
   // 状态管理
   const [currentEmotion, setCurrentEmotion] = useState<EmotionType>('neutral');
@@ -562,6 +564,14 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
           <Text style={styles.detectingText}>●</Text>
         </View>
       )}
+      <Pressable
+        className='absolute bottom-0 right-2'
+        onPress={() =>
+          setCameraPosition(cameraPosition === 'front' ? 'back' : 'front')
+        }
+      >
+        <Text className='text-2xl font-extrabold text-white'>↺</Text>
+      </Pressable>
     </AnimatedView>
   );
 };
