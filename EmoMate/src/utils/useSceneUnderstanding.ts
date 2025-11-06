@@ -80,6 +80,12 @@ interface SceneUnderstandingState {
     totalCaptures: number;
     /** Total number of analyses triggered by timer */
     totalTimerAnalyses: number;
+    /** Last scene change trigger time (for cooldown, Step 3.2) */
+    lastSceneChangeTime: number | null;
+    /** Total number of analyses triggered by scene change (Step 3.2) */
+    totalSceneChangeAnalyses: number;
+    /** Last trigger reason (timer/scene_change) */
+    lastTriggerReason: string | null;
   };
 }
 
@@ -151,13 +157,16 @@ export function useSceneUnderstanding(
     cacheMisses: 0,
   });
 
-  // Timer state (Step 3.1)
+  // Timer state (Step 3.1 & 3.2)
   const [timerState, setTimerState] = useState({
     enabled: false,
     nextCaptureIn: 30000, // 30 seconds
     nextAnalysisIn: 300000, // 5 minutes
     totalCaptures: 0,
     totalTimerAnalyses: 0,
+    lastSceneChangeTime: null as number | null, // Step 3.2: For cooldown mechanism
+    totalSceneChangeAnalyses: 0, // Step 3.2: Scene change trigger count
+    lastTriggerReason: null as string | null, // Step 3.2: Last trigger reason
   });
 
   // Refs for storing data that doesn't trigger re-renders
@@ -211,6 +220,59 @@ export function useSceneUnderstanding(
             const imageBase64 = await photoCaptureCallback.current();
             if (imageBase64) {
               console.log('[SceneUnderstanding] Timer: Photo captured');
+
+              // Step 3.2: Check for scene change
+              const hasSceneChanged = await checkSceneChange(imageBase64);
+
+              console.log('[SceneUnderstanding] 🔍 Scene change check result:', {
+                hasSceneChanged,
+                timerStateLastChangeTime: timerState.lastSceneChangeTime,
+              });
+
+              if (hasSceneChanged) {
+                console.log('[SceneUnderstanding] ✅ Scene change detected!');
+
+                // Check cooldown period (1 minute = 60000ms)
+                const now = Date.now();
+                const lastChangeTime = timerState.lastSceneChangeTime;
+                const cooldownPeriod = 60000; // 1 minute
+                const isInCooldown = lastChangeTime && (now - lastChangeTime) < cooldownPeriod;
+
+                console.log('[SceneUnderstanding] 🕐 Cooldown check:', {
+                  now,
+                  lastChangeTime,
+                  timeSinceLastChange: lastChangeTime ? now - lastChangeTime : 'N/A',
+                  cooldownPeriod,
+                  isInCooldown,
+                });
+
+                if (isInCooldown) {
+                  const remainingCooldown = Math.ceil((cooldownPeriod - (now - lastChangeTime!)) / 1000);
+                  console.log(`[SceneUnderstanding] ⏸️ Scene change cooldown active, ${remainingCooldown}s remaining - SKIPPING ANALYSIS`);
+                } else {
+                  console.log('[SceneUnderstanding] 🚀 Triggering scene change analysis...');
+
+                  // Trigger deep analysis due to scene change
+                  analyzeScene(imageBase64, undefined, false, true).catch(error => {
+                    console.error('[SceneUnderstanding] ❌ Scene change analysis failed:', error);
+                  });
+
+                  // Update state: record scene change trigger and reset timer
+                  setTimerState(prev => ({
+                    ...prev,
+                    lastSceneChangeTime: now,
+                    totalSceneChangeAnalyses: prev.totalSceneChangeAnalyses + 1,
+                    lastTriggerReason: 'scene_change',
+                    nextAnalysisIn: 300000, // Reset to 5 minutes (user requirement)
+                  }));
+
+                  console.log('[SceneUnderstanding] ✅ Scene change state updated, timer reset to 5 minutes');
+                }
+              } else {
+                console.log('[SceneUnderstanding] ⏭️ Scene unchanged, skipping analysis');
+              }
+
+              // Store captured image
               lastImageBase64.current = imageBase64;
 
               // Update capture count
@@ -354,9 +416,18 @@ export function useSceneUnderstanding(
 
   /**
    * Analyze scene using Claude Vision API
+   * @param imageBase64 - Base64 encoded image
+   * @param userQuestion - Optional user question for keyword-triggered analysis
+   * @param isTimerTriggered - Whether triggered by timer (Step 3.1)
+   * @param isSceneChangeTriggered - Whether triggered by scene change (Step 3.2)
    */
   const analyzeScene = useCallback(
-    async (imageBase64: string, userQuestion?: string, isTimerTriggered: boolean = false): Promise<void> => {
+    async (
+      imageBase64: string,
+      userQuestion?: string,
+      isTimerTriggered: boolean = false,
+      isSceneChangeTriggered: boolean = false
+    ): Promise<void> => {
       if (!config.enabled) {
         console.log('[SceneUnderstanding] Feature disabled');
         return;
@@ -425,9 +496,16 @@ export function useSceneUnderstanding(
           setTimerState(prev => ({
             ...prev,
             totalTimerAnalyses: prev.totalTimerAnalyses + 1,
+            lastTriggerReason: 'timer',
             nextAnalysisIn: 300000, // Reset to 5 minutes
           }));
           shouldTriggerAnalysis.current = false;
+        }
+
+        // Update scene change analysis count if triggered by scene change (Step 3.2)
+        // Note: State update already done in timer callback, this is just for logging
+        if (isSceneChangeTriggered) {
+          console.log('[SceneUnderstanding] Scene change analysis completed');
         }
 
         // Save to cache
@@ -464,11 +542,12 @@ export function useSceneUnderstanding(
 
   /**
    * Check if scene has changed from previous image
+   * Note: Does NOT update lastImageBase64.current - that's done by the caller
    */
   const checkSceneChange = useCallback(
     async (imageBase64: string): Promise<boolean> => {
       if (!lastImageBase64.current) {
-        lastImageBase64.current = imageBase64;
+        console.log('[SceneUnderstanding] checkSceneChange: First image, treating as scene change');
         return true; // First image, consider it a change
       }
 
@@ -486,12 +565,13 @@ export function useSceneUnderstanding(
 
         const hasChanged = !comparison.isSameScene;
 
-        if (hasChanged) {
-          console.log('[SceneUnderstanding] Scene changed! Similarity:', comparison.similarity.toFixed(3));
-          lastImageBase64.current = imageBase64;
-        } else {
-          console.log('[SceneUnderstanding] Scene unchanged, similarity:', comparison.similarity.toFixed(3));
-        }
+        console.log('[SceneUnderstanding] checkSceneChange:', {
+          similarity: comparison.similarity.toFixed(3),
+          threshold: config.sceneChangeThreshold,
+          isSameScene: comparison.isSameScene,
+          hasChanged,
+          interpretation: hasChanged ? '❌ SCENE CHANGED' : '✅ SCENE UNCHANGED',
+        });
 
         return hasChanged;
       } catch (error) {

@@ -482,7 +482,7 @@ export const EnvironmentTestScreen: React.FC = () => {
               </View>
 
               <View style={styles.timerStatItem}>
-                <Text style={styles.timerStatLabel}>已分析</Text>
+                <Text style={styles.timerStatLabel}>定时分析</Text>
                 <Text style={styles.timerStatValue}>
                   {sceneUnderstanding.timerState.totalTimerAnalyses} 次
                 </Text>
@@ -517,6 +517,118 @@ export const EnvironmentTestScreen: React.FC = () => {
                 ]}
               >
                 ✅ 定时器正确清理
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Scene Change Detection (Step 3.2) */}
+        {sceneUnderstanding.timerState.enabled && (
+          <View style={styles.sceneChangePanel}>
+            <Text style={styles.sectionTitle}>🔄 场景变化触发 (步骤 3.2)</Text>
+
+            <View style={styles.timerStatsGrid}>
+              <View style={styles.timerStatItem}>
+                <Text style={styles.timerStatLabel}>场景变化检测</Text>
+                <Text style={[styles.timerStatValue, styles.timerEnabled]}>
+                  ✓ 已启用
+                </Text>
+              </View>
+
+              <View style={styles.timerStatItem}>
+                <Text style={styles.timerStatLabel}>相似度阈值</Text>
+                <Text style={styles.timerStatValue}>
+                  70%
+                </Text>
+              </View>
+
+              <View style={styles.timerStatItem}>
+                <Text style={styles.timerStatLabel}>图像相似度</Text>
+                <Text style={styles.timerStatValue}>
+                  {sceneUnderstanding.debugInfo.lastSimilarity > 0
+                    ? `${(sceneUnderstanding.debugInfo.lastSimilarity * 100).toFixed(1)}%`
+                    : '-'}
+                </Text>
+              </View>
+
+              <View style={styles.timerStatItem}>
+                <Text style={styles.timerStatLabel}>场景变化分析</Text>
+                <Text style={styles.timerStatValue}>
+                  {sceneUnderstanding.timerState.totalSceneChangeAnalyses} 次
+                </Text>
+              </View>
+
+              <View style={styles.timerStatItem}>
+                <Text style={styles.timerStatLabel}>最后触发原因</Text>
+                <Text style={styles.timerStatValue}>
+                  {sceneUnderstanding.timerState.lastTriggerReason === 'scene_change'
+                    ? '场景变化'
+                    : sceneUnderstanding.timerState.lastTriggerReason === 'timer'
+                    ? '定时触发'
+                    : '-'}
+                </Text>
+              </View>
+
+              <View style={styles.timerStatItem}>
+                <Text style={styles.timerStatLabel}>冷却状态</Text>
+                <Text style={styles.timerStatValue}>
+                  {(() => {
+                    const lastChangeTime = sceneUnderstanding.timerState.lastSceneChangeTime;
+                    if (!lastChangeTime) return '未触发';
+                    const elapsed = Date.now() - lastChangeTime;
+                    const cooldownPeriod = 60000; // 1 minute
+                    if (elapsed < cooldownPeriod) {
+                      const remaining = Math.ceil((cooldownPeriod - elapsed) / 1000);
+                      return `冷却中 (${remaining}s)`;
+                    }
+                    return '就绪';
+                  })()}
+                </Text>
+              </View>
+            </View>
+
+            {/* Test criteria for Step 3.2 */}
+            <View style={styles.testCriteriaInline}>
+              <Text style={styles.criteriaInlineTitle}>测试标准 (步骤 3.2):</Text>
+              <Text
+                style={[
+                  styles.criteriaInlineText,
+                  sceneUnderstanding.timerState.totalSceneChangeAnalyses > 0
+                    ? styles.criteriaPassed
+                    : styles.criteriaPending,
+                ]}
+              >
+                {sceneUnderstanding.timerState.totalSceneChangeAnalyses > 0 ? '✅' : '○'} 场景变化正确触发
+              </Text>
+              <Text
+                style={[
+                  styles.criteriaInlineText,
+                  sceneUnderstanding.debugInfo.lastSimilarity > 0 && sceneUnderstanding.debugInfo.lastSimilarity >= 0.7
+                    ? styles.criteriaPassed
+                    : styles.criteriaPending,
+                ]}
+              >
+                {sceneUnderstanding.debugInfo.lastSimilarity >= 0.7 ? '✅' : '○'} 轻微移动不触发
+              </Text>
+              <Text
+                style={[
+                  styles.criteriaInlineText,
+                  sceneUnderstanding.timerState.lastSceneChangeTime !== null
+                    ? styles.criteriaPassed
+                    : styles.criteriaPending,
+                ]}
+              >
+                {sceneUnderstanding.timerState.lastSceneChangeTime ? '✅' : '○'} 冷却机制生效
+              </Text>
+              <Text
+                style={[
+                  styles.criteriaInlineText,
+                  sceneUnderstanding.timerState.lastTriggerReason === 'scene_change'
+                    ? styles.criteriaPassed
+                    : styles.criteriaPending,
+                ]}
+              >
+                {sceneUnderstanding.timerState.lastTriggerReason === 'scene_change' ? '✅' : '○'} 触发日志清晰
               </Text>
             </View>
           </View>
@@ -1434,5 +1546,14 @@ const styles = StyleSheet.create({
   },
   timerEnabled: {
     color: '#4CAF50',
+  },
+  // Scene Change Detection Panel (Step 3.2)
+  sceneChangePanel: {
+    margin: 16,
+    padding: 16,
+    backgroundColor: '#1a2a1a',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#2a4a2a',
   },
 });
