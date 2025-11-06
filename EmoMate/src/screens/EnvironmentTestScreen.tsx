@@ -218,6 +218,35 @@ export const EnvironmentTestScreen: React.FC = () => {
     }
   };
 
+  // Format detail key for display (Step 2.2)
+  const formatDetailKey = (key: string): string => {
+    const keyMap: Record<string, string> = {
+      bookTitle: '书名',
+      bookAuthor: '作者',
+      bookList: '书籍列表',
+      productBrand: '品牌',
+      productCategory: '产品类别',
+      productList: '产品列表',
+      textContent: '文字内容',
+      textLanguage: '文字语言',
+      peopleCount: '人数',
+      peopleActivity: '活动',
+      computerType: '电脑类型',
+      mobileDevice: '移动设备',
+      displayInfo: '显示器',
+      foodType: '食物',
+      beverageType: '饮料',
+      timeOfDay: '时间',
+      weatherCondition: '天气',
+      indoorOutdoor: '室内/外',
+      otherDetails: '其他',
+      specialFeatures: '特殊特征',
+      parseError: '解析错误',
+    };
+
+    return keyMap[key] || key;
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView}>
@@ -423,6 +452,26 @@ export const EnvironmentTestScreen: React.FC = () => {
                   {(sceneAnalysisResult.scene.confidence * 100).toFixed(1)}%
                 </Text>
               </View>
+
+              {/* Step 2.2: Display structured details */}
+              {Object.keys(sceneAnalysisResult.scene.details).length > 0 && (
+                <View style={styles.detailsSection}>
+                  <Text style={styles.detailsSectionTitle}>📋 详细信息 (步骤 2.2)</Text>
+                  {Object.entries(sceneAnalysisResult.scene.details).map(([key, value]) => {
+                    // Format the key for display
+                    const displayKey = formatDetailKey(key);
+                    // Format the value for display
+                    const displayValue = value?.toString() || '未知';
+
+                    return (
+                      <View key={key} style={styles.detailItem}>
+                        <Text style={styles.detailLabel}>{displayKey}</Text>
+                        <Text style={styles.detailValue}>{displayValue}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
 
               {sceneAnalysisResult.cost && (
                 <View style={styles.resultItem}>
@@ -1102,5 +1151,40 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: 'bold',
     color: '#64B5F6',
+  },
+  // Step 2.2: Structured details display styles
+  detailsSection: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#2a2a3a',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#3a3a4a',
+  },
+  detailsSectionTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#81C784',
+    marginBottom: 10,
+  },
+  detailItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#3a3a4a',
+  },
+  detailLabel: {
+    fontSize: 13,
+    color: '#aaa',
+    flex: 0.4,
+  },
+  detailValue: {
+    fontSize: 13,
+    color: '#fff',
+    fontWeight: '500',
+    flex: 0.6,
+    textAlign: 'right',
   },
 });

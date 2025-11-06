@@ -5,9 +5,76 @@
 
 /**
  * Scene details - stores specific object information
- * Can be extended to store any additional detected information
+ *
+ * Optimized for Step 2.2: Structured Scene Data
+ * - Defines common optional fields for better type safety
+ * - Maintains flexibility with index signature
+ * - Provides clear documentation for each field
+ *
+ * All fields are optional and will only be present if detected with confidence
  */
 export interface SceneDetails {
+  // === Book Information ===
+  /** Title of detected book(s) */
+  bookTitle?: string;
+  /** Author of detected book(s) */
+  bookAuthor?: string;
+  /** Multiple books detected (comma-separated) */
+  bookList?: string;
+
+  // === Product/Brand Information ===
+  /** Detected brand name(s) */
+  productBrand?: string;
+  /** Detected product category */
+  productCategory?: string;
+  /** Multiple products (comma-separated) */
+  productList?: string;
+
+  // === Text Content ===
+  /** Visible text content on screens, signs, etc. */
+  textContent?: string;
+  /** Language of detected text */
+  textLanguage?: string;
+
+  // === People Information (not identifying, just activity) ===
+  /** Number of people detected */
+  peopleCount?: number;
+  /** What people are doing */
+  peopleActivity?: string;
+
+  // === Technology/Devices ===
+  /** Computer/laptop brand or type */
+  computerType?: string;
+  /** Phone/tablet brand or type */
+  mobileDevice?: string;
+  /** Monitor/display information */
+  displayInfo?: string;
+
+  // === Food/Beverage ===
+  /** Type of food detected */
+  foodType?: string;
+  /** Type of beverage detected */
+  beverageType?: string;
+
+  // === Environment Specifics ===
+  /** Time of day indicator (morning, afternoon, evening, night) */
+  timeOfDay?: string;
+  /** Weather condition (if outdoor scene) */
+  weatherCondition?: string;
+  /** Indoor/outdoor indicator */
+  indoorOutdoor?: 'indoor' | 'outdoor';
+
+  // === Other Notable Details ===
+  /** Any other significant details worth noting */
+  otherDetails?: string;
+  /** Special observations or unique features */
+  specialFeatures?: string;
+
+  // === Parsing/Error Information ===
+  /** Error message if parsing failed */
+  parseError?: string;
+
+  // === Flexibility: Allow any additional string/number/boolean fields ===
   [key: string]: string | number | boolean | undefined;
 }
 

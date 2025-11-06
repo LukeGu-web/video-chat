@@ -18,7 +18,9 @@ const CLAUDE_API_CONFIG = {
   endpoint: 'https://api.anthropic.com/v1/messages',
 
   // Model to use for vision analysis
-  model: 'claude-sonnet-4-5-20250929',
+  // claude-sonnet-4-5-20250929 $3 / MTok
+  // claude-haiku-4-5-20251001  $1 / MTok
+  model: 'claude-haiku-4-5-20251001',
 
   // Maximum tokens for response
   maxTokens: 1024,
@@ -48,22 +50,54 @@ export async function compressImage(
 /**
  * Build prompt for Claude Vision API based on trigger type
  *
+ * Optimized for Step 2.2: Structured Scene Data
+ * - Ensures reliable JSON output
+ * - Provides clear field definitions
+ * - Includes concrete examples
+ * - Specifies confidence calculation criteria
+ *
  * @param request - Scene analysis request
  * @returns Prompt string for Claude API
  */
 function buildAnalysisPrompt(request: SceneAnalysisRequest): string {
-  const basePrompt = `请分析这张图片中的场景，提供以下信息（请用JSON格式返回）：
+  const basePrompt = `请仔细分析这张图片中的场景。你的回复必须是一个有效的JSON对象，不要包含任何其他文字或解释。
+
+请严格按照以下JSON格式返回：
 
 {
-  "location": "场景位置/类型（如：咖啡馆、图书馆、办公室、户外等）",
-  "objects": ["检测到的主要物体列表"],
+  "location": "场景位置/类型（室内：如咖啡馆、图书馆、办公室、卧室、客厅；户外：如公园、街道、校园等）",
+  "objects": ["主要物体1", "主要物体2", "主要物体3", ...],
   "details": {
-    "特定物体的详细信息": "如书名、品牌等"
+    // 如果识别到书籍，添加：
+    "bookTitle": "书名",
+    "bookAuthor": "作者",
+    // 如果识别到品牌产品，添加：
+    "productBrand": "品牌名称",
+    // 如果看到屏幕或文字，添加：
+    "textContent": "可见的文字内容",
+    // 如果识别到人物（但不包括具体身份），添加：
+    "peopleCount": 数字,
+    "peopleActivity": "正在做什么",
+    // 其他特定物体的详细信息
+    "otherDetails": "其他值得注意的细节"
   },
-  "atmosphere": "整体氛围描述",
-  "lighting": "光线情况描述",
-  "confidence": 0.0到1.0之间的置信度分数
-}`;
+  "atmosphere": "整体氛围描述（如：安静学习氛围、热闹社交氛围、专业工作氛围、轻松休闲氛围等）",
+  "lighting": "光线情况（如：明亮自然光、柔和室内灯光、昏暗环境、强烈阳光等）",
+  "confidence": 0.85
+}
+
+关于置信度(confidence)的计算标准：
+- 0.9-1.0: 场景非常清晰，物体识别准确，光线充足
+- 0.75-0.89: 场景清晰，大部分物体可识别，光线良好
+- 0.5-0.74: 场景模糊或光线不佳，部分物体可识别
+- 0-0.49: 场景很模糊，物体难以识别
+
+重要提示：
+1. objects 数组中只列出可以清楚识别的物体
+2. details 对象中只添加你能确认的信息，不确定的字段请省略
+3. 如果图片中没有文字、书籍或品牌产品，details 可以是空对象 {}
+4. 回复只能是纯JSON，不要添加任何解释文字
+5. 确保JSON格式完全正确，可以被 JSON.parse() 解析`;
 
   // Add specific question if keyword-triggered
   if (
@@ -72,20 +106,20 @@ function buildAnalysisPrompt(request: SceneAnalysisRequest): string {
   ) {
     return `${basePrompt}
 
-用户问题：${request.userQuestion}
+用户问题：「${request.userQuestion}」
 
-请特别关注用户问题相关的物体，并在details中提供详细信息。`;
+请特别关注与用户问题相关的物体，在 details 中提供更详细的信息。如果用户问的是具体某个物体，请重点描述该物体的特征。`;
   }
 
   // Add context if there's a previous scene
   if (request.previousScene) {
     return `${basePrompt}
 
-上一次场景分析：
+上一次场景分析结果：
 - 位置：${request.previousScene.location}
-- 物体：${request.previousScene.objects.join('、')}
+- 主要物体：${request.previousScene.objects.join('、')}
 
-如果场景基本相同，请保持一致的描述。`;
+如果当前场景与上次基本相同，请在描述中保持一致性（使用相同的 location 描述）。如果场景明显不同，请如实描述新场景。`;
   }
 
   return basePrompt;
@@ -94,23 +128,104 @@ function buildAnalysisPrompt(request: SceneAnalysisRequest): string {
 /**
  * Parse Claude API response to extract scene data
  *
+ * Optimized for Step 2.2: Structured Scene Data
+ * - Multiple JSON extraction strategies
+ * - Strict field validation with type checking
+ * - Data cleaning and normalization
+ * - Detailed error messages
+ * - Smart fallback mechanisms
+ *
  * @param responseText - Raw text response from Claude API
  * @returns Parsed scene data
  */
 function parseSceneData(responseText: string): SceneData {
   try {
-    // Try to extract JSON from response
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('No JSON found in response');
+    console.log('[ClaudeVision] Parsing response text...');
+
+    // Strategy 1: Try to extract JSON from code block (```json ... ```)
+    let jsonText: string | null = null;
+    const codeBlockMatch = responseText.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+    if (codeBlockMatch) {
+      jsonText = codeBlockMatch[1];
+      console.log('[ClaudeVision] Found JSON in code block');
     }
 
-    const sceneData = JSON.parse(jsonMatch[0]);
-
-    // Validate required fields
-    if (!sceneData.location || !sceneData.objects || !sceneData.atmosphere) {
-      throw new Error('Missing required fields in scene data');
+    // Strategy 2: Try to extract first complete JSON object
+    if (!jsonText) {
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        jsonText = jsonMatch[0];
+        console.log('[ClaudeVision] Found JSON object');
+      }
     }
+
+    // Strategy 3: Try to find JSON between specific markers
+    if (!jsonText) {
+      const markerMatch = responseText.match(/(?:JSON|json|结果|分析)[:：]\s*(\{[\s\S]*\})/);
+      if (markerMatch) {
+        jsonText = markerMatch[1];
+        console.log('[ClaudeVision] Found JSON after marker');
+      }
+    }
+
+    if (!jsonText) {
+      throw new Error('No JSON found in response (tried 3 extraction strategies)');
+    }
+
+    // Remove comments from JSON (Claude might include them despite instructions)
+    jsonText = jsonText.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+
+    // Parse JSON
+    const sceneData = JSON.parse(jsonText);
+    console.log('[ClaudeVision] JSON parsed successfully');
+
+    // === Strict field validation ===
+
+    // Validate and clean location (required string)
+    if (typeof sceneData.location !== 'string' || !sceneData.location.trim()) {
+      throw new Error('Invalid or missing "location" field (must be non-empty string)');
+    }
+    sceneData.location = sceneData.location.trim();
+
+    // Validate and clean objects array (required array of strings)
+    if (!Array.isArray(sceneData.objects)) {
+      throw new Error('Invalid "objects" field (must be array)');
+    }
+    sceneData.objects = sceneData.objects
+      .filter((obj: any) => typeof obj === 'string' && obj.trim())
+      .map((obj: string) => obj.trim());
+
+    // Validate details object (required object, can be empty)
+    if (typeof sceneData.details !== 'object' || sceneData.details === null || Array.isArray(sceneData.details)) {
+      console.warn('[ClaudeVision] Invalid details field, using empty object');
+      sceneData.details = {};
+    }
+
+    // Validate and clean atmosphere (required string)
+    if (typeof sceneData.atmosphere !== 'string' || !sceneData.atmosphere.trim()) {
+      throw new Error('Invalid or missing "atmosphere" field (must be non-empty string)');
+    }
+    sceneData.atmosphere = sceneData.atmosphere.trim();
+
+    // Validate and clean lighting (required string)
+    if (typeof sceneData.lighting !== 'string' || !sceneData.lighting.trim()) {
+      console.warn('[ClaudeVision] Missing "lighting" field, using default');
+      sceneData.lighting = '未知光线';
+    } else {
+      sceneData.lighting = sceneData.lighting.trim();
+    }
+
+    // Validate and normalize confidence (required number 0-1)
+    if (typeof sceneData.confidence !== 'number') {
+      console.warn('[ClaudeVision] Invalid confidence field, attempting conversion');
+      sceneData.confidence = parseFloat(sceneData.confidence);
+    }
+    if (isNaN(sceneData.confidence)) {
+      console.warn('[ClaudeVision] Cannot parse confidence, using default 0.5');
+      sceneData.confidence = 0.5;
+    }
+    // Clamp confidence to [0, 1]
+    sceneData.confidence = Math.max(0, Math.min(1, sceneData.confidence));
 
     // Add timestamp
     sceneData.timestamp = Date.now();
@@ -118,17 +233,28 @@ function parseSceneData(responseText: string): SceneData {
     // Store raw response for debugging
     sceneData.rawResponse = responseText;
 
+    // Log parsed data summary
+    console.log('[ClaudeVision] Parsed scene data:', {
+      location: sceneData.location,
+      objectCount: sceneData.objects.length,
+      detailKeys: Object.keys(sceneData.details),
+      confidence: sceneData.confidence,
+    });
+
     return sceneData as SceneData;
   } catch (error) {
     console.error('[ClaudeVision] Failed to parse scene data:', error);
+    console.error('[ClaudeVision] Raw response:', responseText);
 
-    // Return fallback scene data
+    // Return comprehensive fallback scene data
     return {
-      location: '未知场景',
+      location: '解析失败',
       objects: [],
-      details: {},
-      atmosphere: '无法分析',
-      lighting: '未知',
+      details: {
+        parseError: error instanceof Error ? error.message : 'Unknown parsing error',
+      },
+      atmosphere: '无法分析场景氛围',
+      lighting: '无法确定光线情况',
       confidence: 0,
       timestamp: Date.now(),
       rawResponse: responseText,
