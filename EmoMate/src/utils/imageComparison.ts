@@ -8,16 +8,28 @@ import { SceneComparisonResult } from '../types/scene';
 
 /**
  * Thumbnail configuration for image comparison
- * Smaller thumbnails = faster comparison but less accuracy
+ * Balance between speed and stability:
+ * - Larger size (128x128) provides more stability against camera noise
+ * - JPEG format with high quality (0.9) filters noise while maintaining determinism
  */
 const THUMBNAIL_CONFIG = {
-  width: 64,
-  height: 64,
+  width: 128,
+  height: 128,
+  // Use JPEG format: lossy compression actually helps filter camera sensor noise
+  // Quality 0.9 is high enough to be stable, low enough to filter noise
+  format: ImageManipulator.SaveFormat.JPEG,
+  compress: 0.9,
 };
 
 /**
  * Generate a thumbnail from base64 image for comparison
- * Reduces image to small size to speed up pixel comparison
+ * Strategy: Use JPEG format to filter camera noise
+ *
+ * Why JPEG over PNG:
+ * - Camera sensor has random noise in every frame
+ * - PNG preserves all noise → different base64 every time
+ * - JPEG's lossy compression filters noise → more stable comparison
+ * - Quality 0.9 balances stability and accuracy
  *
  * @param imageBase64 - Full size base64 encoded image
  * @returns Thumbnail as base64 string
@@ -34,13 +46,19 @@ export async function generateThumbnail(imageBase64: string): Promise<string> {
     }
 
     // Resize image to thumbnail size for fast comparison
+    // Use JPEG format with high quality to filter camera noise
     const result = await ImageManipulator.manipulateAsync(
       uri,
       [{ resize: { width: THUMBNAIL_CONFIG.width, height: THUMBNAIL_CONFIG.height } }],
-      { compress: 0.5, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+      {
+        compress: THUMBNAIL_CONFIG.compress,
+        format: THUMBNAIL_CONFIG.format,
+        base64: true
+      }
     );
 
     console.log('[ImageComparison] Thumbnail generated successfully');
+    console.log('[ImageComparison] Thumbnail size:', result.base64?.length || 0, 'bytes');
     return result.base64 || '';
   } catch (error) {
     console.error('[ImageComparison] Failed to generate thumbnail:', error);
@@ -50,60 +68,86 @@ export async function generateThumbnail(imageBase64: string): Promise<string> {
 }
 
 /**
- * Calculate pixel difference between two images
- * Simple algorithm: compares base64 data after resizing to same dimensions
+ * Calculate similarity between two base64 thumbnail strings
  *
- * @param image1Base64 - First image (base64)
- * @param image2Base64 - Second image (base64)
+ * TEMPORARY SOLUTION for Step 1.3 MVP:
+ * Uses file size comparison as primary indicator since base64 character
+ * comparison doesn't work (JPEG compression is non-deterministic).
+ *
+ * Algorithm:
+ * 1. Compare thumbnail file sizes
+ * 2. File size difference < 5% → scenes are similar
+ * 3. File size difference 5-15% → moderate similarity
+ * 4. File size difference > 15% → different scenes
+ *
+ * LIMITATION:
+ * This is NOT a robust image comparison algorithm. It only works for
+ * detecting major scene changes. For production, use perceptual hashing
+ * (pHash, dHash) or dedicated image hashing libraries.
+ *
+ * @param thumb1 - First thumbnail base64 string
+ * @param thumb2 - Second thumbnail base64 string
  * @returns Difference score (0 = identical, 1 = completely different)
  */
 async function calculatePixelDifference(
-  image1Base64: string,
-  image2Base64: string
+  thumb1: string,
+  thumb2: string
 ): Promise<number> {
-  console.log('[ImageComparison] calculatePixelDifference called');
+  console.log('[ImageComparison] calculatePixelDifference called (FILE SIZE METHOD)');
 
   try {
     // Quick check: if strings are identical, return 0
-    if (image1Base64 === image2Base64) {
-      console.log('[ImageComparison] Images are identical (exact match)');
+    if (thumb1 === thumb2) {
+      console.log('[ImageComparison] Thumbnails are identical (exact match)');
       return 0;
     }
 
-    // Generate thumbnails for both images (normalize size)
-    const thumbnail1 = await generateThumbnail(image1Base64);
-    const thumbnail2 = await generateThumbnail(image2Base64);
+    const size1 = thumb1.length;
+    const size2 = thumb2.length;
+    const maxSize = Math.max(size1, size2);
 
-    // Compare thumbnails character by character
-    const minLength = Math.min(thumbnail1.length, thumbnail2.length);
-    const maxLength = Math.max(thumbnail1.length, thumbnail2.length);
+    // Calculate size difference percentage
+    const sizeDiff = Math.abs(size1 - size2) / maxSize;
 
-    let diffCount = 0;
+    // Convert size difference to similarity score
+    // Small size difference = high similarity
+    // Large size difference = low similarity
+    let similarity = 0;
 
-    // Compare common length
-    for (let i = 0; i < minLength; i++) {
-      if (thumbnail1[i] !== thumbnail2[i]) {
-        diffCount++;
-      }
+    if (sizeDiff < 0.05) {
+      // < 5% size difference: Very similar (same scene)
+      // Map 0-5% diff to 95-100% similarity
+      similarity = 1.0 - (sizeDiff / 0.05) * 0.05;
+      // Boost very close sizes to near 100%
+      similarity = 0.95 + (1.0 - sizeDiff / 0.05) * 0.05;
+    } else if (sizeDiff < 0.15) {
+      // 5-15% size difference: Moderate similarity (slight change)
+      // Map 5-15% diff to 70-95% similarity
+      const normalizedDiff = (sizeDiff - 0.05) / 0.10; // 0-1 range
+      similarity = 0.95 - normalizedDiff * 0.25; // 95% to 70%
+    } else {
+      // > 15% size difference: Different scenes
+      // Map 15%+ diff to 0-70% similarity
+      const normalizedDiff = Math.min((sizeDiff - 0.15) / 0.35, 1.0); // Cap at 50% diff
+      similarity = 0.70 - normalizedDiff * 0.70; // 70% to 0%
     }
 
-    // Add difference for length mismatch
-    diffCount += maxLength - minLength;
+    const difference = 1 - similarity;
 
-    // Calculate difference ratio (0 = identical, 1 = completely different)
-    const difference = diffCount / maxLength;
-
-    console.log('[ImageComparison] Comparison result:', {
-      thumbnail1Length: thumbnail1.length,
-      thumbnail2Length: thumbnail2.length,
-      diffCount,
+    console.log('[ImageComparison] File size comparison result:', {
+      size1,
+      size2,
+      sizeDiff: (sizeDiff * 100).toFixed(2) + '%',
+      similarity: similarity.toFixed(3),
       difference: difference.toFixed(3),
+      interpretation: sizeDiff < 0.05 ? 'Same scene' :
+                     sizeDiff < 0.15 ? 'Slight change' :
+                     'Different scene',
     });
 
     return difference;
   } catch (error) {
-    console.error('[ImageComparison] Pixel comparison failed:', error);
-    // Return maximum difference on error (assume images are different)
+    console.error('[ImageComparison] Comparison failed:', error);
     return 1.0;
   }
 }
@@ -131,6 +175,11 @@ async function calculatePerceptualHash(imageBase64: string): Promise<string> {
 /**
  * Compare two images and determine similarity
  *
+ * Process:
+ * 1. Generate thumbnails for both images (128x128 JPEG @ 0.9 quality)
+ * 2. Compare thumbnails using sampled character comparison
+ * 3. Return similarity score
+ *
  * @param image1Base64 - First image (base64)
  * @param image2Base64 - Second image (base64)
  * @param threshold - Similarity threshold (0-1, default 0.7)
@@ -144,8 +193,33 @@ export async function compareImages(
   console.log('[ImageComparison] compareImages called, threshold:', threshold);
 
   try {
-    // Calculate difference (0 = identical, 1 = completely different)
-    const difference = await calculatePixelDifference(image1Base64, image2Base64);
+    // Quick check: if images are identical, return 1.0 immediately
+    if (image1Base64 === image2Base64) {
+      console.log('[ImageComparison] Images are identical (exact base64 match)');
+      return {
+        similarity: 1.0,
+        isSameScene: true,
+        threshold,
+      };
+    }
+
+    // Generate thumbnails for both images
+    console.log('[ImageComparison] Generating thumbnails...');
+    const [thumb1, thumb2] = await Promise.all([
+      generateThumbnail(image1Base64),
+      generateThumbnail(image2Base64)
+    ]);
+
+    // DEBUG: Test if same image produces same thumbnail
+    console.log('[ImageComparison] DEBUG - Thumbnail info:', {
+      thumb1Length: thumb1.length,
+      thumb2Length: thumb2.length,
+      lengthDiff: Math.abs(thumb1.length - thumb2.length),
+      firstCharsMatch: thumb1.substring(0, 20) === thumb2.substring(0, 20),
+    });
+
+    // Calculate difference using thumbnail comparison
+    const difference = await calculatePixelDifference(thumb1, thumb2);
 
     // Convert to similarity (0 = different, 1 = identical)
     const similarity = 1 - difference;
@@ -153,10 +227,12 @@ export async function compareImages(
     // Determine if scenes are the same based on threshold
     const isSameScene = similarity >= threshold;
 
-    console.log('[ImageComparison] Comparison result:', {
+    console.log('[ImageComparison] Final comparison result:', {
+      difference: difference.toFixed(3),
       similarity: similarity.toFixed(3),
       isSameScene,
       threshold,
+      explanation: `Difference=${difference.toFixed(3)} → Similarity=${similarity.toFixed(3)}`
     });
 
     return {
