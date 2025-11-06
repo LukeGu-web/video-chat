@@ -1,0 +1,65 @@
+# =========================================================
+# Global Git Ignore for Monorepo (EmoMate + Character)
+# =========================================================
+# Learn more: https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# ----------------------------
+# Node & Dependencies
+# ----------------------------
+**/node_modules/
+
+# ----------------------------
+# Expo & React Native (EmoMate)
+# ----------------------------
+**/.expo/
+**/dist/
+**/web-build/
+**/expo-env.d.ts
+**/.metro-health-check*
+**/ios/
+**/android/
+**/.kotlin/
+**/*.tsbuildinfo
+
+# ----------------------------
+# Web (Character)
+# ----------------------------
+**/.cache/
+**/build/
+**/.vercel/
+
+# ----------------------------
+# Environment Files
+# ----------------------------
+**/.env
+**/.env*.local
+
+# ----------------------------
+# Keys & Certificates
+# ----------------------------
+**/*.jks
+**/*.p8
+**/*.p12
+**/*.key
+**/*.mobileprovision
+**/*.pem
+
+# ----------------------------
+# Debug / Logs
+# ----------------------------
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+**/*.log
+
+# ----------------------------
+# OS / Editor Artifacts
+# ----------------------------
+.DS_Store
+*.orig.*
+
+# ----------------------------
+# Coverage / Testing
+# ----------------------------
+**/coverage/
+**/.nyc_output/

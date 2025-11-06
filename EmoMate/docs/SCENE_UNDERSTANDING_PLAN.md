@@ -332,7 +332,7 @@ EmoMate/
 **目标**：保存最近的场景分析结果，避免重复分析
 
 **任务**：
-- 使用 AsyncStorage 持久化场景数据
+- 使用 react-native-mmkv 持久化场景数据
 - 缓存最近 3 个场景
 - 显示历史场景列表
 - 实现场景过期机制（30 分钟）
@@ -601,7 +601,7 @@ AI: "当然知道！《人类简史》是尤瓦尔·赫拉利的经典作品，
 - `react-native-worklets-core`: Frame Processor 支持（已安装）
 - `@anthropic-ai/sdk`: Claude API 调用
 - `expo-image-manipulator`: 图片压缩和处理
-- `react-native-mmkv`: 场景数据持久化（已安装，替代 AsyncStorage）
+- `react-native-mmkv`: 场景数据持久化
 
 ### **可选依赖（图像相似度）**
 - `react-native-image-hash`: 计算感知哈希

@@ -71,6 +71,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         enableAndroidGpuLibraries: true, // Android GPU 加速
       },
     ],
+    'expo-asset',
   ],
   extra: {
     eas: {
