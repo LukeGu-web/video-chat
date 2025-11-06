@@ -10,10 +10,8 @@ import {
   PROACTIVE_CONVERSATION_CONFIG,
   selectProactiveTopic,
   detectConversationType,
-  getResponseLengthConfig
+  getResponseLengthConfig,
 } from '../constants/ai';
-import { transitionAudio } from './transitionAudio'; // Phase 1: 过渡语音管理
-import { detectTransitionCategory, type Emotion } from './conversationAnalysis'; // Phase 1: 对话分析
 import { SentenceBuffer, parseSSEChunk } from './sentenceDetector'; // Phase 2: 句子检测
 import { TTSQueue } from './ttsQueue'; // Phase 2: TTS队列管理
 import { SmartSentenceBuffer } from './smartSentenceBuffer'; // Phase 3: 智能句子过滤
@@ -59,11 +57,13 @@ export interface UseChatAIReturn {
 // 预设人格模板和API配置现在从 constants/ai.ts 导入
 
 // 使用兰兰人格的便捷函数
-export const useChatAIWithLanLan = (initialConfig?: Omit<ChatAIConfig, 'personality'>) => {
+export const useChatAIWithLanLan = (
+  initialConfig?: Omit<ChatAIConfig, 'personality'>
+) => {
   return useChatAI({
     ...initialConfig,
     personality: createPersonalitySystemPrompt(),
-    voiceId: 'hkfHEbBvdQFNX4uWHqRF' // 使用兰兰的专用语音
+    voiceId: 'hkfHEbBvdQFNX4uWHqRF', // 使用兰兰的专用语音
   });
 };
 
@@ -101,10 +101,10 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     error: ttsError,
     currentProvider,
     switchProvider,
-    currentSegment
+    currentSegment,
   } = useHybridTTS({
     preferredProvider: initialConfig?.ttsProvider || 'elevenlabs',
-    fallbackToExpo: true
+    fallbackToExpo: true,
   });
 
   const generateMessageId = () => {
@@ -114,31 +114,53 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
   // 简单的情绪检测函数
   const detectUserEmotion = (userMessage: string): string => {
     const message = userMessage.toLowerCase();
-    
+
     // 开心相关词汇
-    if (message.includes('开心') || message.includes('高兴') || message.includes('快乐') || 
-        message.includes('哈哈') || message.includes('嘿嘿') || message.includes('棒')) {
+    if (
+      message.includes('开心') ||
+      message.includes('高兴') ||
+      message.includes('快乐') ||
+      message.includes('哈哈') ||
+      message.includes('嘿嘿') ||
+      message.includes('棒')
+    ) {
       return 'happy';
     }
-    
+
     // 难过相关词汇
-    if (message.includes('难过') || message.includes('伤心') || message.includes('沮丧') || 
-        message.includes('哭') || message.includes('郁闷') || message.includes('失落')) {
+    if (
+      message.includes('难过') ||
+      message.includes('伤心') ||
+      message.includes('沮丧') ||
+      message.includes('哭') ||
+      message.includes('郁闷') ||
+      message.includes('失落')
+    ) {
       return 'sad';
     }
-    
+
     // 困惑相关词汇
-    if (message.includes('困惑') || message.includes('不明白') || message.includes('不懂') || 
-        message.includes('？') || message.includes('怎么')) {
+    if (
+      message.includes('困惑') ||
+      message.includes('不明白') ||
+      message.includes('不懂') ||
+      message.includes('？') ||
+      message.includes('怎么')
+    ) {
       return 'confused';
     }
-    
+
     // 紧张相关词汇
-    if (message.includes('紧张') || message.includes('害怕') || message.includes('担心') || 
-        message.includes('不安') || message.includes('焦虑')) {
+    if (
+      message.includes('紧张') ||
+      message.includes('害怕') ||
+      message.includes('担心') ||
+      message.includes('不安') ||
+      message.includes('焦虑')
+    ) {
       return 'nervous';
     }
-    
+
     return 'neutral';
   };
 
@@ -153,23 +175,23 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
   // 启动主动对话检测
   const startProactiveConversation = useCallback(() => {
     if (!isProactiveModeEnabled || isLoading || isSpeaking) return;
-    
+
     clearProactiveTimer();
     hasShownProactiveMessage.current = false;
-    
+
     // 设置短暂停顿检测
     proactiveTimer.current = setTimeout(() => {
       if (!hasShownProactiveMessage.current && isProactiveModeEnabled) {
         hasShownProactiveMessage.current = true;
         const topic = selectProactiveTopic('short', messages);
         sendProactiveMessage(topic);
-        
+
         // 设置中等停顿检测
         proactiveTimer.current = setTimeout(() => {
           if (isProactiveModeEnabled) {
             const mediumTopic = selectProactiveTopic('medium', messages);
             sendProactiveMessage(mediumTopic);
-            
+
             // 设置长时间停顿检测
             proactiveTimer.current = setTimeout(() => {
               if (isProactiveModeEnabled) {
@@ -184,32 +206,39 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
   }, [isProactiveModeEnabled, isLoading, isSpeaking]);
 
   // 发送主动消息
-  const sendProactiveMessage = useCallback(async (content: string) => {
-    if (!content.trim() || !isProactiveModeEnabled) return;
+  const sendProactiveMessage = useCallback(
+    async (content: string) => {
+      if (!content.trim() || !isProactiveModeEnabled) return;
 
-    const proactiveMessage: ChatMessage = {
-      id: generateMessageId(),
-      role: 'assistant',
-      content: content.trim(),
-      timestamp: Date.now(),
-    };
+      const proactiveMessage: ChatMessage = {
+        id: generateMessageId(),
+        role: 'assistant',
+        content: content.trim(),
+        timestamp: Date.now(),
+      };
 
-    setMessages(prev => [...prev, proactiveMessage]);
+      setMessages((prev) => [...prev, proactiveMessage]);
 
-    // 自动播放主动消息
-    setTimeout(() => {
-      const voiceId = 'hkfHEbBvdQFNX4uWHqRF';
-      speak(content, voiceId, 'caring').catch(() => {
-        // TTS error handled silently
-      });
-    }, 300);
-  }, [isProactiveModeEnabled, speak]);
+      // 自动播放主动消息
+      setTimeout(() => {
+        const voiceId = 'hkfHEbBvdQFNX4uWHqRF';
+        speak(content, voiceId, 'caring').catch(() => {
+          // TTS error handled silently
+        });
+      }, 300);
+    },
+    [isProactiveModeEnabled, speak]
+  );
 
   // Phase 1: Non-streaming API call (kept for fallback)
   const callClaudeAPI = async (
     messages: ChatMessage[],
     config: ChatAIConfig,
-    conversationType: 'simple' | 'normal' | 'detailed' | 'storytelling' = 'normal'
+    conversationType:
+      | 'simple'
+      | 'normal'
+      | 'detailed'
+      | 'storytelling' = 'normal'
   ): Promise<string> => {
     const apiKey = config.apiKey || getClaudeApiKey();
     if (!apiKey) {
@@ -227,7 +256,11 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     const personalityText = config.personality || currentPersonality;
 
     // Build environment context prompt
-    const environmentPrompt = buildEnvironmentPrompt(currentEnvironment, true, 5);
+    const environmentPrompt = buildEnvironmentPrompt(
+      currentEnvironment,
+      true,
+      5
+    );
 
     const systemMessage = buildSystemPrompt(
       personalityText,
@@ -251,7 +284,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       max_tokens: lengthConfig.maxTokens, // 使用动态token配置
       system: systemMessage,
       messages: contextMessages,
-      stop_sequences: ["用户:", "User:", "---"], // Phase 1: 添加停止序列优化 (移除 \n\n)
+      stop_sequences: ['用户:', 'User:', '---'], // Phase 1: 添加停止序列优化 (移除 \n\n)
     };
 
     const response = await fetch(CLAUDE_API_CONFIG.baseURL, {
@@ -284,7 +317,11 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
   const callClaudeAPIStreaming = async (
     messages: ChatMessage[],
     config: ChatAIConfig,
-    conversationType: 'simple' | 'normal' | 'detailed' | 'storytelling' = 'normal',
+    conversationType:
+      | 'simple'
+      | 'normal'
+      | 'detailed'
+      | 'storytelling' = 'normal',
     onSentence: (sentence: string) => void
   ): Promise<string> => {
     const apiKey = config.apiKey || getClaudeApiKey();
@@ -300,7 +337,11 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     const personalityText = config.personality || currentPersonality;
 
     // Build environment context prompt for streaming
-    const environmentPrompt = buildEnvironmentPrompt(currentEnvironment, true, 5);
+    const environmentPrompt = buildEnvironmentPrompt(
+      currentEnvironment,
+      true,
+      5
+    );
 
     const systemMessage = buildSystemPrompt(
       personalityText,
@@ -323,7 +364,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       max_tokens: lengthConfig.maxTokens,
       system: systemMessage,
       messages: contextMessages,
-      stop_sequences: ["用户:", "User:", "---"],
+      stop_sequences: ['用户:', 'User:', '---'],
       stream: true, // Enable streaming
     };
 
@@ -343,7 +384,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       // Phase 3: Create SMART sentence buffer with intelligent filtering
       const smartBuffer = new SmartSentenceBuffer({
         conversationType,
-        debug: true // Enable debug logging to see filtering decisions
+        debug: true, // Enable debug logging to see filtering decisions
       });
 
       // Track processed lines to avoid duplicates
@@ -373,7 +414,9 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
 
               // Only call onSentence for sentences that passed filtering
               for (const sentence of sentencesToPlay) {
-                console.log(`[ChatAI] Phase 3: Playing filtered sentence: "${sentence}"`);
+                console.log(
+                  `[ChatAI] Phase 3: Playing filtered sentence: "${sentence}"`
+                );
                 onSentence(sentence);
                 fullText += sentence;
               }
@@ -389,7 +432,9 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
             // Phase 3: Flush remaining content from SmartBuffer
             const finalSentence = smartBuffer.flush();
             if (finalSentence) {
-              console.log(`[ChatAI] Phase 3: Playing final sentence: "${finalSentence}"`);
+              console.log(
+                `[ChatAI] Phase 3: Playing final sentence: "${finalSentence}"`
+              );
               onSentence(finalSentence);
               fullText += finalSentence;
             }
@@ -397,19 +442,34 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
             // Phase 3: Log statistics
             const stats = smartBuffer.getStats();
             console.log(`[ChatAI] Phase 3 Statistics:`, stats);
-            console.log(`[ChatAI] Phase 3: Played ${stats.playedSentences}/${stats.totalSentences} sentences`);
-            console.log(`[ChatAI] Phase 3: Skipped ${stats.skippedSentences} sentences`);
-            console.log(`[ChatAI] Phase 3: Total length: ${stats.totalLength} chars`);
-            console.log(`[ChatAI] Phase 3: Average importance: ${stats.averageImportance.toFixed(2)}`);
+            console.log(
+              `[ChatAI] Phase 3: Played ${stats.playedSentences}/${stats.totalSentences} sentences`
+            );
+            console.log(
+              `[ChatAI] Phase 3: Skipped ${stats.skippedSentences} sentences`
+            );
+            console.log(
+              `[ChatAI] Phase 3: Total length: ${stats.totalLength} chars`
+            );
+            console.log(
+              `[ChatAI] Phase 3: Average importance: ${stats.averageImportance.toFixed(
+                2
+              )}`
+            );
 
             // Validate and optimize final response (Layer 3 safety check)
-            const optimizedResponse = validateAndOptimizeResponse(fullText, conversationType);
+            const optimizedResponse = validateAndOptimizeResponse(
+              fullText,
+              conversationType
+            );
             resolve(optimizedResponse);
           } catch (error) {
             reject(new Error(`Response processing failed: ${error}`));
           }
         } else {
-          reject(new Error(`${AI_ERROR_MESSAGES.API_CALL_FAILED}: ${xhr.status}`));
+          reject(
+            new Error(`${AI_ERROR_MESSAGES.API_CALL_FAILED}: ${xhr.status}`)
+          );
         }
       };
 
@@ -446,17 +506,14 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       lastUserMessageTime.current = Date.now();
       clearProactiveTimer();
 
-      // Detect emotion and transition category
+      // Detect emotion
       const detectedEmotion = detectUserEmotion(content);
-      const transitionCategory = detectTransitionCategory(
-        content,
-        detectedEmotion as Emotion
-      );
-      console.log(`[ChatAI] Phase 2: 过渡语音类别: ${transitionCategory}`);
 
       // Detect conversation type
       const conversationType = detectConversationType(content, updatedMessages);
-      console.log(`[ChatAI] Phase 2: 对话类型检测: "${content}" -> ${conversationType}`);
+      console.log(
+        `[ChatAI] Phase 2: 对话类型检测: "${content}" -> ${conversationType}`
+      );
 
       // Enhanced config with emotion
       const enhancedConfig = {
@@ -479,7 +536,11 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
         onPlayEnd: (text) => {
           // Check if there are more items in queue
           const status = ttsQueue.getStatus();
-          if (status.pending === 0 && status.ready === 0 && status.synthesizing === 0) {
+          if (
+            status.pending === 0 &&
+            status.ready === 0 &&
+            status.synthesizing === 0
+          ) {
             setCurrentStreamSegment('');
           }
         },
@@ -487,21 +548,9 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
 
       // Store current TTS queue for potential interruption
       currentTTSQueue.current = ttsQueue;
-
-      let transitionAudioPlayed = false;
       let firstSentenceReceived = false;
 
       try {
-        // Phase 2: Play transition audio immediately
-        // NOTE: Disabled temporarily as it doesn't blend well with actual response
-        // if (enhancedConfig?.enableTTS !== false) {
-        //   console.log('[ChatAI] 🔊 Phase 2: 播放过渡语音');
-        //   transitionAudio.playTransition(transitionCategory).catch((err) => {
-        //     console.warn('[ChatAI] 过渡语音播放失败:', err);
-        //   });
-        //   transitionAudioPlayed = true;
-        // }
-
         // Phase 3: Set generating state
         setIsStreamGenerating(true);
 
@@ -511,14 +560,6 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
           enhancedConfig,
           conversationType,
           async (sentence) => {
-            // Phase 2: Stop transition audio on first sentence
-            // NOTE: Disabled since transition audio is disabled
-            // if (!firstSentenceReceived && transitionAudioPlayed) {
-            //   console.log('[ChatAI] ⏸️ Phase 2: 停止过渡语音,开始真实回答');
-            //   await transitionAudio.stop(); // Stop transition audio
-            //   firstSentenceReceived = true;
-            // }
-
             // Enqueue sentence for TTS
             if (enhancedConfig?.enableTTS !== false) {
               console.log(`[ChatAI] 🎵 Phase 2: 加入TTS队列: "${sentence}"`);
@@ -579,7 +620,12 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
         setIsLoading(false);
       }
     },
-    [messages, currentPersonality, startProactiveConversation, clearProactiveTimer]
+    [
+      messages,
+      currentPersonality,
+      startProactiveConversation,
+      clearProactiveTimer,
+    ]
   );
 
   const clearMessages = useCallback(() => {
@@ -621,14 +667,6 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       currentTTSQueue.current = null;
     }
 
-    // 2. Stop transition audio if playing
-    try {
-      await transitionAudio.stop();
-      console.log('[ChatAI] ✅ Transition audio stopped');
-    } catch (error) {
-      console.error('[ChatAI] Error stopping transition audio:', error);
-    }
-
     // 3. Stop hybrid TTS (fallback, in case queue didn't work)
     try {
       stopTTS();
@@ -638,23 +676,29 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     }
   }, [stopTTS]);
 
-  const switchTTSProvider = useCallback((provider: TTSProvider) => {
-    switchProvider(provider);
-  }, [switchProvider]);
+  const switchTTSProvider = useCallback(
+    (provider: TTSProvider) => {
+      switchProvider(provider);
+    },
+    [switchProvider]
+  );
 
-  const enableProactiveMode = useCallback((enabled: boolean) => {
-    setIsProactiveModeEnabled(enabled);
-    if (!enabled) {
-      clearProactiveTimer();
-    } else {
-      // 如果启用且有消息，重新开始检测
-      if (messages.length > 0) {
-        setTimeout(() => {
-          startProactiveConversation();
-        }, 1000);
+  const enableProactiveMode = useCallback(
+    (enabled: boolean) => {
+      setIsProactiveModeEnabled(enabled);
+      if (!enabled) {
+        clearProactiveTimer();
+      } else {
+        // 如果启用且有消息，重新开始检测
+        if (messages.length > 0) {
+          setTimeout(() => {
+            startProactiveConversation();
+          }, 1000);
+        }
       }
-    }
-  }, [clearProactiveTimer, startProactiveConversation, messages.length]);
+    },
+    [clearProactiveTimer, startProactiveConversation, messages.length]
+  );
 
   // 组件卸载时清理定时器
   useEffect(() => {
@@ -665,14 +709,26 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
 
   // 当语音播放状态改变时，调整主动对话检测
   useEffect(() => {
-    if (!isSpeaking && !isLoading && isProactiveModeEnabled && messages.length > 0) {
+    if (
+      !isSpeaking &&
+      !isLoading &&
+      isProactiveModeEnabled &&
+      messages.length > 0
+    ) {
       setTimeout(() => {
         startProactiveConversation();
       }, 2000); // 语音结束后2秒开始检测
     } else if (isSpeaking || isLoading) {
       clearProactiveTimer();
     }
-  }, [isSpeaking, isLoading, isProactiveModeEnabled, messages.length, startProactiveConversation, clearProactiveTimer]);
+  }, [
+    isSpeaking,
+    isLoading,
+    isProactiveModeEnabled,
+    messages.length,
+    startProactiveConversation,
+    clearProactiveTimer,
+  ]);
 
   // 合并错误信息
   const combinedError = error || ttsError;

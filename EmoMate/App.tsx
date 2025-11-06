@@ -13,7 +13,6 @@ import {
   EnvironmentTestScreen,
 } from './src/screens';
 import { isDebugMode } from './src/utils/debug';
-import { transitionAudio } from './src/utils/transitionAudio'; // Phase 1: 过渡语音预加载
 import { TTSQueue, initializeTTSCache } from './src/utils/ttsQueue'; // Phase 3: TTS 预热 + 缓存
 import './global.css';
 
@@ -61,7 +60,9 @@ async function configureAudioSession(): Promise<void> {
       shouldRouteThroughEarpiece: false,
     });
 
-    console.log('[App] ✅ Audio session configured for optimal voice playback (allowsRecording: false)');
+    console.log(
+      '[App] ✅ Audio session configured for optimal voice playback (allowsRecording: false)'
+    );
   } catch (error) {
     console.error('[App] ❌ Failed to configure audio session:', error);
     throw error;
@@ -104,10 +105,6 @@ export default function App() {
         console.log('[App] 配置音频会话...');
         await configureAudioSession();
 
-        // 1. 预加载过渡语音
-        console.log('[App] 预加载过渡语音...');
-        await transitionAudio.preloadAll();
-
         // 2. 初始化 TTS 缓存目录 (Phase 3: 缓存系统)
         console.log('[App] 初始化 TTS 缓存系统...');
         await initializeTTSCache();
@@ -141,7 +138,10 @@ export default function App() {
           {isDebugMode() && (
             <>
               <Stack.Screen name='EmotionTest' component={EmotionTestScreen} />
-              <Stack.Screen name='EnvironmentTest' component={EnvironmentTestScreen} />
+              <Stack.Screen
+                name='EnvironmentTest'
+                component={EnvironmentTestScreen}
+              />
             </>
           )}
         </Stack.Navigator>
