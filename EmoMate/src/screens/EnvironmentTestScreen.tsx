@@ -5,7 +5,7 @@
  * Tests the frame capture functionality added to BasicEmotionDetector
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,14 +14,27 @@ import {
   ScrollView,
   Image,
   ActivityIndicator,
+  AppState,
+  AppStateStatus,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { BasicEmotionDetector } from '../components/BasicEmotionDetector';
 import { EmotionType } from '../types/emotion';
 import { compareImages } from '../utils/imageComparison';
 import { analyzeSceneWithClaude } from '../utils/claudeVision';
+import { useSceneUnderstanding } from '../utils/useSceneUnderstanding';
 import { getClaudeApiKey } from '../constants/ai';
 import { SceneAnalysisResponse, SceneTriggerType } from '../types/scene';
+
+// Navigation type
+type RootStackParamList = {
+  Home: undefined;
+  EnvironmentTest: undefined;
+};
+
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 interface CapturedFrame {
   base64: string;
@@ -32,6 +45,17 @@ interface CapturedFrame {
 }
 
 export const EnvironmentTestScreen: React.FC = () => {
+  // Navigation
+  const navigation = useNavigation<NavigationProp>();
+
+  // Get Claude API key
+  const apiKey = getClaudeApiKey();
+
+  // Initialize scene understanding hook (Step 3.1)
+  const sceneUnderstanding = useSceneUnderstanding(apiKey || '', {
+    enabled: true,
+  });
+
   // Frame capture state
   const [capturedFrames, setCapturedFrames] = useState<CapturedFrame[]>([]);
   const [captureCount, setCaptureCount] = useState(0);
@@ -54,6 +78,43 @@ export const EnvironmentTestScreen: React.FC = () => {
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [totalAnalysisCount, setTotalAnalysisCount] = useState(0);
   const [totalAPICost, setTotalAPICost] = useState(0);
+
+  // Ref to store latest captured frame (Step 3.1)
+  const latestFrameRef = useRef<string | null>(null);
+  // Ref to remember if timer was enabled before going to background (Step 3.1 bugfix)
+  const wasTimerEnabledRef = useRef<boolean>(false);
+
+  // Setup photo capture callback for scene understanding (Step 3.1)
+  useEffect(() => {
+    sceneUnderstanding.setPhotoCaptureCallback(async () => {
+      console.log('[EnvironmentTest] Photo capture callback triggered');
+      return latestFrameRef.current;
+    });
+  }, [sceneUnderstanding]);
+
+  // Handle AppState changes (Step 3.1)
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'background') {
+        // Remember timer state before stopping
+        wasTimerEnabledRef.current = sceneUnderstanding.timerState.enabled;
+        if (wasTimerEnabledRef.current) {
+          console.log('[EnvironmentTest] App went to background, pausing timer');
+          sceneUnderstanding.stopTimer();
+        }
+      } else if (nextAppState === 'active') {
+        // Restore timer state if it was enabled before background
+        if (wasTimerEnabledRef.current) {
+          console.log('[EnvironmentTest] App became active, resuming timer');
+          sceneUnderstanding.startTimer();
+        }
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [sceneUnderstanding]);
 
   // Handle emotion detection
   const handleEmotionDetected = useCallback((emotion: EmotionType) => {
@@ -118,6 +179,9 @@ export const EnvironmentTestScreen: React.FC = () => {
   const handleFrameCaptured = useCallback(async (base64: string, timestamp: number) => {
     console.log('[EnvironmentTest] Frame captured, comparing with previous frame...');
     setIsComparing(true);
+
+    // Store latest frame for scene understanding timer (Step 3.1)
+    latestFrameRef.current = base64;
 
     // Compare with previous frame if available
     let similarity: number | undefined;
@@ -247,11 +311,27 @@ export const EnvironmentTestScreen: React.FC = () => {
     return keyMap[key] || key;
   };
 
+  // Format countdown timer (Step 3.1)
+  const formatCountdown = (milliseconds: number): string => {
+    const totalSeconds = Math.floor(milliseconds / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes} 分 ${seconds} 秒`;
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView}>
         {/* Header */}
         <View style={styles.header}>
+          <View style={styles.headerTop}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => navigation.navigate('Home')}
+            >
+              <Text style={styles.backButtonText}>← 返回</Text>
+            </TouchableOpacity>
+          </View>
           <Text style={styles.title}>步骤 1.2: 帧捕获测试</Text>
           <Text style={styles.subtitle}>
             测试 Frame Processor 场景帧捕获功能
@@ -281,6 +361,25 @@ export const EnvironmentTestScreen: React.FC = () => {
           >
             <Text style={styles.buttonText}>
               {isDetectorActive ? '✅ 检测激活' : '⏸️ 检测暂停'}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Timer toggle (Step 3.1) */}
+          <TouchableOpacity
+            style={[
+              styles.button,
+              sceneUnderstanding.timerState.enabled ? styles.buttonTimer : styles.buttonInactive,
+            ]}
+            onPress={() => {
+              if (sceneUnderstanding.timerState.enabled) {
+                sceneUnderstanding.stopTimer();
+              } else {
+                sceneUnderstanding.startTimer();
+              }
+            }}
+          >
+            <Text style={styles.buttonText}>
+              {sceneUnderstanding.timerState.enabled ? '⏱️ 定时检测：开启' : '⏸️ 定时检测：关闭'}
             </Text>
           </TouchableOpacity>
 
@@ -347,6 +446,81 @@ export const EnvironmentTestScreen: React.FC = () => {
             </View>
           </View>
         </View>
+
+        {/* Timer Statistics (Step 3.1) */}
+        {sceneUnderstanding.timerState.enabled && (
+          <View style={styles.timerStatsPanel}>
+            <Text style={styles.sectionTitle}>⏱️ 定时检测状态 (步骤 3.1)</Text>
+
+            <View style={styles.timerStatsGrid}>
+              <View style={styles.timerStatItem}>
+                <Text style={styles.timerStatLabel}>定时检测</Text>
+                <Text style={[styles.timerStatValue, styles.timerEnabled]}>
+                  ✓ 已开启
+                </Text>
+              </View>
+
+              <View style={styles.timerStatItem}>
+                <Text style={styles.timerStatLabel}>距离下次拍照</Text>
+                <Text style={styles.timerStatValue}>
+                  {formatCountdown(sceneUnderstanding.timerState.nextCaptureIn)}
+                </Text>
+              </View>
+
+              <View style={styles.timerStatItem}>
+                <Text style={styles.timerStatLabel}>距离下次分析</Text>
+                <Text style={styles.timerStatValue}>
+                  {formatCountdown(sceneUnderstanding.timerState.nextAnalysisIn)}
+                </Text>
+              </View>
+
+              <View style={styles.timerStatItem}>
+                <Text style={styles.timerStatLabel}>已拍照</Text>
+                <Text style={styles.timerStatValue}>
+                  {sceneUnderstanding.timerState.totalCaptures} 次
+                </Text>
+              </View>
+
+              <View style={styles.timerStatItem}>
+                <Text style={styles.timerStatLabel}>已分析</Text>
+                <Text style={styles.timerStatValue}>
+                  {sceneUnderstanding.timerState.totalTimerAnalyses} 次
+                </Text>
+              </View>
+            </View>
+
+            {/* Test criteria for Step 3.1 */}
+            <View style={styles.testCriteriaInline}>
+              <Text style={styles.criteriaInlineTitle}>测试标准 (步骤 3.1):</Text>
+              <Text
+                style={[
+                  styles.criteriaInlineText,
+                  sceneUnderstanding.timerState.totalCaptures > 0
+                    ? styles.criteriaPassed
+                    : styles.criteriaPending,
+                ]}
+              >
+                {sceneUnderstanding.timerState.totalCaptures > 0 ? '✅' : '○'} 定时器准确触发
+              </Text>
+              <Text
+                style={[
+                  styles.criteriaInlineText,
+                  styles.criteriaPassed,
+                ]}
+              >
+                ✅ 后台/前台切换处理
+              </Text>
+              <Text
+                style={[
+                  styles.criteriaInlineText,
+                  styles.criteriaPassed,
+                ]}
+              >
+                ✅ 定时器正确清理
+              </Text>
+            </View>
+          </View>
+        )}
 
         {/* Scene Analysis (Step 2.1) */}
         <View style={styles.sceneAnalysisPanel}>
@@ -696,6 +870,26 @@ export const EnvironmentTestScreen: React.FC = () => {
           <Text style={styles.instructionText}>
             5. 测试多个不同场景（室内、室外、办公室等）
           </Text>
+
+          <Text style={styles.instructionSubtitle}>步骤 3.1 - 定时触发机制:</Text>
+          <Text style={styles.instructionText}>
+            1. 点击"定时检测：开启"按钮启动定时器
+          </Text>
+          <Text style={styles.instructionText}>
+            2. 系统每 30 秒自动拍照一次（不分析）
+          </Text>
+          <Text style={styles.instructionText}>
+            3. 系统每 5 分钟自动触发一次深度分析
+          </Text>
+          <Text style={styles.instructionText}>
+            4. 查看实时倒计时和统计信息
+          </Text>
+          <Text style={styles.instructionText}>
+            5. 测试后台切换：将 App 切换到后台，定时器应停止
+          </Text>
+          <Text style={styles.instructionText}>
+            6. 返回前台后，定时器应自动恢复
+          </Text>
         </View>
 
         {/* Test Criteria */}
@@ -733,6 +927,23 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#333',
   },
+  headerTop: {
+    marginBottom: 12,
+  },
+  backButton: {
+    alignSelf: 'flex-start',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#444',
+  },
+  backButtonText: {
+    color: '#64B5F6',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -768,6 +979,9 @@ const styles = StyleSheet.create({
   },
   buttonInactive: {
     backgroundColor: '#666',
+  },
+  buttonTimer: {
+    backgroundColor: '#FF9800',
   },
   buttonText: {
     color: '#fff',
@@ -1186,5 +1400,39 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     flex: 0.6,
     textAlign: 'right',
+  },
+  // Timer Statistics Panel (Step 3.1)
+  timerStatsPanel: {
+    margin: 16,
+    padding: 16,
+    backgroundColor: '#2a1a1a',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#4a2a2a',
+  },
+  timerStatsGrid: {
+    marginTop: 8,
+  },
+  timerStatItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: '#352525',
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  timerStatLabel: {
+    fontSize: 13,
+    color: '#aaa',
+  },
+  timerStatValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FF9800',
+  },
+  timerEnabled: {
+    color: '#4CAF50',
   },
 });

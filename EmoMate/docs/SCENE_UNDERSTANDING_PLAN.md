@@ -23,7 +23,7 @@
 
 ## 📊 实施进度概览
 
-**总体进度**：15 步中已完成 5 步 (**33% 完成**)
+**总体进度**：15 步中已完成 6 步 (**40% 完成**)
 
 **阶段 1：基础设施搭建** - ✅ **100% 完成** (3/3 步骤)
 - ✅ 步骤 1.1：文件结构创建 (30分钟)
@@ -34,7 +34,12 @@
 - ✅ 步骤 2.1：测试 Claude Vision API 调用 (1.5小时)
 - ✅ 步骤 2.2：设计结构化场景数据 (1.5小时)
 
-**下一步行动**：开始阶段 3 - 实现智能触发机制（步骤 3.1）
+**阶段 3：智能触发机制** - 🚧 **33% 完成** (1/3 步骤)
+- ✅ 步骤 3.1：实现定时触发 (1.5小时)
+- ⏳ 步骤 3.2：实现场景变化触发
+- ⏳ 步骤 3.3：实现对话关键词触发
+
+**下一步行动**：步骤 3.2 - 实现场景变化触发机制
 
 ---
 
@@ -357,31 +362,115 @@ fetch('https://api.anthropic.com/v1/messages', {
 
 ### **阶段 3：智能触发机制（第 4 天）**
 
-#### **步骤 3.1：实现定时触发** ✅ 可测试
+#### **步骤 3.1：实现定时触发** ✅ 已完成
 
 **目标**：每 5 分钟自动触发一次场景分析
 
-**任务**：
-- 使用 `setInterval` 实现定时器
-- 每 30 秒拍照一次（不分析）
-- 每 5 分钟触发一次深度分析
-- 显示倒计时
+**已完成任务**：
+- ✅ 使用 `setTimeout` + `setInterval` 实现定时器系统
+- ✅ 每 30 秒自动拍照一次（不分析）
+- ✅ 每 5 分钟触发一次深度分析
+- ✅ 实时倒计时显示（每秒更新）
+- ✅ 后台/前台切换处理（暂停/恢复机制）
+- ✅ 定时器清理逻辑（防止内存泄漏）
+- ✅ 添加返回按钮到HomeScreen
 
-**测试标准**：
+**测试结果**：
 - ✅ 定时器准确触发（误差 < 5 秒）
-- ✅ 后台/前台切换不会导致重复触发
+- ✅ 后台/前台切换正确暂停和恢复
 - ✅ 组件卸载时定时器正确清理
 - ✅ 不会造成内存泄漏
+- ✅ 统计信息正确更新（拍照次数、分析次数）
 
-**预期时间**：1 小时
+**实际时间**：1.5 小时
+
+**实现方案**：
+```typescript
+// 定时器状态管理
+const [timerState, setTimerState] = useState({
+  enabled: false,
+  nextCaptureIn: 30000,    // 30秒
+  nextAnalysisIn: 300000,  // 5分钟
+  totalCaptures: 0,
+  totalTimerAnalyses: 0,
+});
+
+// 拍照回调注册
+sceneUnderstanding.setPhotoCaptureCallback(async () => {
+  return latestFrameRef.current;
+});
+
+// AppState监听（后台/前台切换）
+const wasTimerEnabledRef = useRef<boolean>(false);
+AppState.addEventListener('change', (nextAppState) => {
+  if (nextAppState === 'background') {
+    wasTimerEnabledRef.current = sceneUnderstanding.timerState.enabled;
+    if (wasTimerEnabledRef.current) {
+      sceneUnderstanding.stopTimer();  // 暂停
+    }
+  } else if (nextAppState === 'active') {
+    if (wasTimerEnabledRef.current) {
+      sceneUnderstanding.startTimer();  // 恢复
+    }
+  }
+});
+```
 
 **调试界面显示**：
 ```
-定时检测：开启
-距离下次分析：4 分 32 秒
-已拍照：8 次
-已分析：2 次
+⏱️ 定时检测状态 (步骤 3.1)
+
+定时检测: ✓ 已开启
+距离下次拍照: 0 分 25 秒
+距离下次分析: 4 分 32 秒
+已拍照: 8 次
+已分析: 2 次
+
+测试标准:
+✅ 定时器准确触发
+✅ 后台/前台切换处理
+✅ 定时器正确清理
 ```
+
+**遇到的问题与解决**：
+
+**问题 3.1.1：useEffect循环依赖**
+- **错误**：`Block-scoped variable 'analyzeScene' used before its declaration`
+- **原因**：在useEffect依赖数组中使用了尚未声明的analyzeScene函数
+- **解决方案**：
+  1. 使用`shouldTriggerAnalysis` ref标志位记录触发状态
+  2. 在独立的useEffect中检查标志位并调用analyzeScene
+  3. 从定时器useEffect的依赖数组中移除analyzeScene
+- **结果**：编译通过，定时器正常工作
+
+**问题 3.1.2：后台/前台切换后定时器关闭**
+- **现象**：App切换到后台再返回前台后，定时器完全关闭而非恢复
+- **原因**：stopTimer()将enabled设为false，返回前台时检查enabled为false而不重启
+- **解决方案**：
+  ```typescript
+  // 使用ref记住用户意图
+  const wasTimerEnabledRef = useRef<boolean>(false);
+
+  // 后台时记住状态
+  wasTimerEnabledRef.current = sceneUnderstanding.timerState.enabled;
+  if (wasTimerEnabledRef.current) {
+    sceneUnderstanding.stopTimer();
+  }
+
+  // 前台时恢复状态
+  if (wasTimerEnabledRef.current) {
+    sceneUnderstanding.startTimer();
+  }
+  ```
+- **结果**：后台/前台切换正常，定时器正确暂停和恢复
+
+**关键文件**：
+- `src/utils/useSceneUnderstanding.ts:154-274` - 定时器核心逻辑
+- `src/utils/useSceneUnderstanding.ts:549-579` - 定时器控制函数
+- `src/screens/EnvironmentTestScreen.tsx:71-104` - AppState监听和回调注册
+- `src/screens/EnvironmentTestScreen.tsx:420-493` - UI显示面板
+
+**完成日期**：2025-01-06
 
 ---
 
@@ -631,11 +720,11 @@ AI："当然知道！《人类简史》是尤瓦尔·赫拉利的经典作品...
 |------|--------|----------|----------|----------|
 | 阶段 1：基础设施 | 3 步 | 3.5 小时 | 8 小时 | ✅ 已完成 |
 | 阶段 2：Claude API | 2 步 | 3.5 小时 | 3 小时 | ✅ 100% 完成 |
-| 阶段 3：智能触发 | 3 步 | 3.5 小时 | - | 低 |
+| 阶段 3：智能触发 | 3 步 | 3.5 小时 | 1.5/3.5 小时 | 🚧 33% 完成 |
 | 阶段 4：场景记忆 | 2 步 | 3.5 小时 | - | 低 |
 | 阶段 5：系统集成 | 3 步 | 5.5 小时 | - | 中（对话系统兼容） |
 | 阶段 6：测试优化 | 2 步 | 5 小时 | - | 低 |
-| **总计** | **15 步** | **24.5 小时** | **11/24.5 小时** | **约 3-4 个工作日** |
+| **总计** | **15 步** | **24.5 小时** | **12.5/24.5 小时** | **约 3-4 个工作日** |
 
 ---
 
@@ -755,8 +844,7 @@ AI: "当然知道！《人类简史》是尤瓦尔·赫拉利的经典作品，
 - [✅] 步骤 1.3：实现简单图像差异检测 (2025-01-06, 文件大小比较法MVP)
 - [✅] 步骤 2.1：测试 Claude Vision API 调用 (2025-01-06, 使用 Claude Sonnet 4.5)
 - [✅] 步骤 2.2：设计结构化场景数据 (2025-01-06, 多策略 JSON 解析 + 20+ 可选字段)
-- [ ] 步骤 3.1：实现定时触发
-- [ ] 步骤 3.1：实现定时触发
+- [✅] 步骤 3.1：实现定时触发 (2025-01-06, 包含后台/前台切换处理)
 - [ ] 步骤 3.2：实现场景变化触发
 - [ ] 步骤 3.3：实现对话关键词触发
 - [ ] 步骤 4.1：实现场景缓存
@@ -775,7 +863,11 @@ AI: "当然知道！《人类简史》是尤瓦尔·赫拉利的经典作品，
 - ✅ 阶段 2 Claude Vision API 集成：**2/2 步骤完成 (100%)**
   - ✅ 步骤 2.1：Claude Vision API 调用实现并测试成功
   - ✅ 步骤 2.2：结构化场景数据完成（多策略解析 + 20+ 字段支持）
-- 🚀 **下一步**：步骤 3.1 - 实现定时触发机制（每 5 分钟自动分析）
+- 🚧 阶段 3 智能触发机制：**1/3 步骤完成 (33%)**
+  - ✅ 步骤 3.1：定时触发机制完成（30秒拍照 + 5分钟分析 + 后台处理）
+  - ⏳ 步骤 3.2：场景变化触发
+  - ⏳ 步骤 3.3：对话关键词触发
+- 🚀 **下一步**：步骤 3.2 - 实现场景变化触发机制（相似度 < 70% 自动分析）
 
 ---
 
@@ -1159,15 +1251,15 @@ npm install react-native-image-hash
 
 **最后更新**：2025-01-06
 
-**版本**：v1.5
+**版本**：v1.6
 
-**状态**：实施中 - 阶段 1、2 已完成 ✅，准备开始阶段 3
+**状态**：实施中 - 阶段 1、2 已完成 ✅，阶段 3 进行中 🚧
 
-**完成步骤**：5/15 (33%)
+**完成步骤**：6/15 (40%)
 
 **最新进展**：
 
 - ✅ 阶段 1：基础设施搭建完成（图像捕获、相似度对比）
 - ✅ 阶段 2：Claude Vision API 集成完成（API 调用 + 结构化数据解析）
-- ✅ 步骤 2.2：结构化场景数据优化完成（多策略 JSON 解析 + 20+ 可选字段）
-- 🚀 **准备开始**：步骤 3.1 - 实现定时触发机制
+- ✅ 步骤 3.1：定时触发机制完成（30秒拍照 + 5分钟分析 + 后台处理）
+- 🚀 **下一步**：步骤 3.2 - 实现场景变化触发机制

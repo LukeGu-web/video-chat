@@ -67,6 +67,20 @@ interface SceneUnderstandingState {
     cacheHits: number;
     cacheMisses: number;
   };
+
+  /** Timer state (Step 3.1) */
+  timerState: {
+    /** Whether timer is enabled */
+    enabled: boolean;
+    /** Time until next photo capture (ms) */
+    nextCaptureIn: number;
+    /** Time until next deep analysis (ms) */
+    nextAnalysisIn: number;
+    /** Total number of photos captured */
+    totalCaptures: number;
+    /** Total number of analyses triggered by timer */
+    totalTimerAnalyses: number;
+  };
 }
 
 /**
@@ -90,6 +104,15 @@ interface UseSceneUnderstandingReturn extends SceneUnderstandingState {
 
   /** Reset statistics */
   resetStats: () => void;
+
+  /** Start timer-based scene monitoring (Step 3.1) */
+  startTimer: () => void;
+
+  /** Stop timer-based scene monitoring (Step 3.1) */
+  stopTimer: () => void;
+
+  /** Register a callback to capture photo from camera (Step 3.1) */
+  setPhotoCaptureCallback: (callback: () => Promise<string | null>) => void;
 }
 
 /**
@@ -128,10 +151,22 @@ export function useSceneUnderstanding(
     cacheMisses: 0,
   });
 
+  // Timer state (Step 3.1)
+  const [timerState, setTimerState] = useState({
+    enabled: false,
+    nextCaptureIn: 30000, // 30 seconds
+    nextAnalysisIn: 300000, // 5 minutes
+    totalCaptures: 0,
+    totalTimerAnalyses: 0,
+  });
+
   // Refs for storing data that doesn't trigger re-renders
   const sceneCache = useRef<SceneCacheEntry[]>([]);
   const lastImageBase64 = useRef<string | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const photoCaptureCallback = useRef<(() => Promise<string | null>) | null>(null);
+  const shouldTriggerAnalysis = useRef<boolean>(false);
 
   /**
    * Load cached data from AsyncStorage on mount
@@ -139,39 +174,86 @@ export function useSceneUnderstanding(
   useEffect(() => {
     loadCachedData();
     return () => {
-      // Cleanup timer on unmount
+      // Cleanup timers on unmount (Step 3.1)
       if (timerRef.current) {
         clearTimeout(timerRef.current);
+      }
+      if (countdownTimerRef.current) {
+        clearTimeout(countdownTimerRef.current);
       }
     };
   }, []);
 
   /**
-   * Setup timer for periodic scene analysis
+   * Setup timer for periodic scene capture and analysis (Step 3.1)
    */
   useEffect(() => {
-    if (!config.enabled || !config.timerInterval) {
+    if (!timerState.enabled) {
+      // Clear timers if disabled
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      if (countdownTimerRef.current) {
+        clearTimeout(countdownTimerRef.current);
+        countdownTimerRef.current = null;
+      }
       return;
     }
 
-    // Clear existing timer
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
+    // Schedule next photo capture (every 30 seconds)
+    if (timerState.nextCaptureIn > 0) {
+      timerRef.current = setTimeout(async () => {
+        console.log('[SceneUnderstanding] Timer: Capturing photo...');
+
+        if (photoCaptureCallback.current) {
+          try {
+            const imageBase64 = await photoCaptureCallback.current();
+            if (imageBase64) {
+              console.log('[SceneUnderstanding] Timer: Photo captured');
+              lastImageBase64.current = imageBase64;
+
+              // Update capture count
+              setTimerState(prev => ({
+                ...prev,
+                totalCaptures: prev.totalCaptures + 1,
+                nextCaptureIn: 30000, // Reset to 30 seconds
+              }));
+            }
+          } catch (error) {
+            console.error('[SceneUnderstanding] Timer: Photo capture failed:', error);
+          }
+        } else {
+          console.warn('[SceneUnderstanding] Timer: No photo capture callback registered');
+        }
+      }, timerState.nextCaptureIn);
     }
 
-    // Setup new timer
-    timerRef.current = setTimeout(() => {
-      console.log('[SceneUnderstanding] Timer triggered');
-      // TODO: Implement timer-based scene capture in Step 3.1
-      // This will need access to camera to capture current frame
-    }, config.timerInterval);
+    // Set flag for deep analysis (every 5 minutes)
+    if (timerState.nextAnalysisIn <= 0 && !shouldTriggerAnalysis.current) {
+      console.log('[SceneUnderstanding] Timer: Marking for deep analysis...');
+      shouldTriggerAnalysis.current = true;
+    }
+
+    // Setup countdown timer (updates every second)
+    countdownTimerRef.current = setInterval(() => {
+      setTimerState(prev => ({
+        ...prev,
+        nextCaptureIn: Math.max(0, prev.nextCaptureIn - 1000),
+        nextAnalysisIn: Math.max(0, prev.nextAnalysisIn - 1000),
+      }));
+    }, 1000);
 
     return () => {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
       }
+      if (countdownTimerRef.current) {
+        clearTimeout(countdownTimerRef.current);
+      }
     };
-  }, [config.enabled, config.timerInterval, lastAnalysisTime]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timerState.enabled, timerState.nextCaptureIn, timerState.nextAnalysisIn]);
 
   /**
    * Load cached scene data from MMKV storage
@@ -274,7 +356,7 @@ export function useSceneUnderstanding(
    * Analyze scene using Claude Vision API
    */
   const analyzeScene = useCallback(
-    async (imageBase64: string, userQuestion?: string): Promise<void> => {
+    async (imageBase64: string, userQuestion?: string, isTimerTriggered: boolean = false): Promise<void> => {
       if (!config.enabled) {
         console.log('[SceneUnderstanding] Feature disabled');
         return;
@@ -338,6 +420,16 @@ export function useSceneUnderstanding(
         setTotalAPICalls(prev => prev + 1);
         setTotalCost(prev => prev + (response.cost || 0));
 
+        // Update timer analysis count if triggered by timer (Step 3.1)
+        if (isTimerTriggered) {
+          setTimerState(prev => ({
+            ...prev,
+            totalTimerAnalyses: prev.totalTimerAnalyses + 1,
+            nextAnalysisIn: 300000, // Reset to 5 minutes
+          }));
+          shouldTriggerAnalysis.current = false;
+        }
+
         // Save to cache
         const thumbnail = await generateThumbnail(imageBase64);
         saveToCache(response.scene, thumbnail);
@@ -356,6 +448,19 @@ export function useSceneUnderstanding(
     },
     [config, isAnalyzing, currentScene, apiKey]
   );
+
+  /**
+   * Trigger deep analysis when timer flag is set (Step 3.1)
+   */
+  useEffect(() => {
+    if (shouldTriggerAnalysis.current && lastImageBase64.current && !isAnalyzing) {
+      console.log('[SceneUnderstanding] Triggering timer-based analysis...');
+      analyzeScene(lastImageBase64.current, undefined, true).catch(error => {
+        console.error('[SceneUnderstanding] Timer analysis failed:', error);
+        shouldTriggerAnalysis.current = false;
+      });
+    }
+  }, [timerState.nextAnalysisIn, isAnalyzing, analyzeScene]);
 
   /**
    * Check if scene has changed from previous image
@@ -444,6 +549,41 @@ export function useSceneUnderstanding(
     console.log('[SceneUnderstanding] Statistics reset');
   }, []);
 
+  /**
+   * Start timer-based scene monitoring (Step 3.1)
+   */
+  const startTimer = useCallback((): void => {
+    console.log('[SceneUnderstanding] Starting timer');
+    setTimerState(prev => ({
+      ...prev,
+      enabled: true,
+      nextCaptureIn: 30000, // 30 seconds
+      nextAnalysisIn: 300000, // 5 minutes
+    }));
+  }, []);
+
+  /**
+   * Stop timer-based scene monitoring (Step 3.1)
+   */
+  const stopTimer = useCallback((): void => {
+    console.log('[SceneUnderstanding] Stopping timer');
+    setTimerState(prev => ({
+      ...prev,
+      enabled: false,
+    }));
+  }, []);
+
+  /**
+   * Register a callback to capture photo from camera (Step 3.1)
+   */
+  const setPhotoCaptureCallback = useCallback(
+    (callback: () => Promise<string | null>): void => {
+      console.log('[SceneUnderstanding] Photo capture callback registered');
+      photoCaptureCallback.current = callback;
+    },
+    []
+  );
+
   return {
     // State
     currentScene,
@@ -454,6 +594,7 @@ export function useSceneUnderstanding(
     totalAPICalls,
     totalCost,
     debugInfo,
+    timerState,
 
     // Methods
     analyzeScene,
@@ -462,5 +603,8 @@ export function useSceneUnderstanding(
     updateConfig,
     getConfig,
     resetStats,
+    startTimer,
+    stopTimer,
+    setPhotoCaptureCallback,
   };
 }
