@@ -18,7 +18,7 @@ const CLAUDE_API_CONFIG = {
   endpoint: 'https://api.anthropic.com/v1/messages',
 
   // Model to use for vision analysis
-  model: 'claude-3-5-sonnet-20241022',
+  model: 'claude-sonnet-4-5-20250929',
 
   // Maximum tokens for response
   maxTokens: 1024,
@@ -66,7 +66,10 @@ function buildAnalysisPrompt(request: SceneAnalysisRequest): string {
 }`;
 
   // Add specific question if keyword-triggered
-  if (request.triggerType === SceneTriggerType.KEYWORD && request.userQuestion) {
+  if (
+    request.triggerType === SceneTriggerType.KEYWORD &&
+    request.userQuestion
+  ) {
     return `${basePrompt}
 
 用户问题：${request.userQuestion}
@@ -159,31 +162,96 @@ export async function analyzeSceneWithClaude(
     // Build prompt
     const prompt = buildAnalysisPrompt(request);
 
-    // TODO: Implement actual API call in Step 2.1
-    // For now, return mock response
-    console.log('[ClaudeVision] API call would be made here');
-    console.log('[ClaudeVision] Prompt:', prompt);
+    // Extract image data (remove data URL prefix if present)
+    let imageData = compressedImage;
+    if (imageData.startsWith('data:image')) {
+      // Remove "data:image/jpeg;base64," prefix
+      imageData = imageData.split(',')[1] || imageData;
+    }
 
-    // Mock response for now
-    const mockScene: SceneData = {
-      location: '测试场景',
-      objects: ['测试物体'],
-      details: { test: true },
-      atmosphere: '测试氛围',
-      lighting: '测试光线',
-      confidence: 0.5,
-      timestamp: Date.now(),
-      rawResponse: 'Mock response',
-    };
+    console.log('[ClaudeVision] Preparing API request...');
+    console.log(
+      '[ClaudeVision] Image size:',
+      Math.round((imageData.length * 0.75) / 1024),
+      'KB'
+    );
+
+    // Make API call to Claude Vision
+    const response = await fetch(CLAUDE_API_CONFIG.endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': CLAUDE_API_CONFIG.apiVersion,
+      },
+      body: JSON.stringify({
+        model: CLAUDE_API_CONFIG.model,
+        max_tokens: CLAUDE_API_CONFIG.maxTokens,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: {
+                  type: 'base64',
+                  media_type: 'image/jpeg',
+                  data: imageData,
+                },
+              },
+              {
+                type: 'text',
+                text: prompt,
+              },
+            ],
+          },
+        ],
+      }),
+    });
+
+    // Check if response is OK
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        `Claude API error: ${response.status} - ${
+          errorData.error?.message || response.statusText
+        }`
+      );
+    }
+
+    // Parse API response
+    const apiResponse = await response.json();
+    console.log('[ClaudeVision] API response received:', {
+      id: apiResponse.id,
+      model: apiResponse.model,
+      usage: apiResponse.usage,
+    });
+
+    // Extract text content from response
+    const responseText = apiResponse.content?.[0]?.text || 'No response text';
+
+    // Parse scene data from response
+    const scene = parseSceneData(responseText);
+
+    // Calculate actual cost
+    const cost = estimateAPICost(
+      compressedImage,
+      apiResponse.usage?.output_tokens || 300
+    );
 
     const duration = Date.now() - startTime;
     console.log(`[ClaudeVision] Analysis completed in ${duration}ms`);
+    console.log('[ClaudeVision] Detected scene:', {
+      location: scene.location,
+      objectCount: scene.objects.length,
+      confidence: scene.confidence,
+    });
 
     return {
-      scene: mockScene,
+      scene,
       success: true,
       triggerType: request.triggerType,
-      cost: 0.01, // Estimated cost, will calculate from actual API usage
+      cost,
     };
   } catch (error) {
     const duration = Date.now() - startTime;

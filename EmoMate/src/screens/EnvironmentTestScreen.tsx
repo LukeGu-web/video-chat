@@ -19,6 +19,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BasicEmotionDetector } from '../components/BasicEmotionDetector';
 import { EmotionType } from '../types/emotion';
 import { compareImages } from '../utils/imageComparison';
+import { analyzeSceneWithClaude } from '../utils/claudeVision';
+import { getClaudeApiKey } from '../constants/ai';
+import { SceneAnalysisResponse, SceneTriggerType } from '../types/scene';
 
 interface CapturedFrame {
   base64: string;
@@ -45,10 +48,71 @@ export const EnvironmentTestScreen: React.FC = () => {
   const [isComparing, setIsComparing] = useState(false);
   const [comparisonCount, setComparisonCount] = useState(0);
 
+  // Scene analysis state (Step 2.1)
+  const [sceneAnalysisResult, setSceneAnalysisResult] = useState<SceneAnalysisResponse | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [totalAnalysisCount, setTotalAnalysisCount] = useState(0);
+  const [totalAPICost, setTotalAPICost] = useState(0);
+
   // Handle emotion detection
   const handleEmotionDetected = useCallback((emotion: EmotionType) => {
     setCurrentEmotion(emotion);
   }, []);
+
+  // Handle scene analysis (Step 2.1)
+  const handleAnalyzeScene = useCallback(async () => {
+    // Check if we have a captured frame
+    if (capturedFrames.length === 0) {
+      setAnalysisError('没有可分析的图像，请等待帧捕获');
+      return;
+    }
+
+    // Get the latest frame
+    const latestFrame = capturedFrames[0];
+
+    // Get API key
+    const apiKey = getClaudeApiKey();
+    if (!apiKey) {
+      setAnalysisError('未配置 Claude API Key，请检查环境变量');
+      return;
+    }
+
+    console.log('[EnvironmentTest] Starting scene analysis...');
+    setIsAnalyzing(true);
+    setAnalysisError(null);
+
+    try {
+      // Call Claude Vision API
+      const result = await analyzeSceneWithClaude(
+        {
+          imageBase64: latestFrame.base64,
+          triggerType: SceneTriggerType.MANUAL,
+        },
+        apiKey
+      );
+
+      console.log('[EnvironmentTest] Scene analysis completed:', result);
+
+      // Update state with result
+      setSceneAnalysisResult(result);
+      setTotalAnalysisCount(prev => prev + 1);
+      if (result.cost !== undefined) {
+        setTotalAPICost(prev => prev + (result.cost || 0));
+      }
+
+      if (!result.success) {
+        setAnalysisError(result.error || '场景分析失败');
+      }
+    } catch (error) {
+      console.error('[EnvironmentTest] Scene analysis error:', error);
+      setAnalysisError(
+        error instanceof Error ? error.message : '场景分析失败，请检查网络连接和 API Key'
+      );
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }, [capturedFrames]);
 
   // Handle frame capture
   const handleFrameCaptured = useCallback(async (base64: string, timestamp: number) => {
@@ -255,6 +319,179 @@ export const EnvironmentTestScreen: React.FC = () => {
           </View>
         </View>
 
+        {/* Scene Analysis (Step 2.1) */}
+        <View style={styles.sceneAnalysisPanel}>
+          <Text style={styles.sectionTitle}>🧠 场景分析 (步骤 2.1)</Text>
+
+          {/* Analyze button */}
+          <TouchableOpacity
+            style={[
+              styles.analyzeButton,
+              isAnalyzing && styles.analyzeButtonDisabled,
+              capturedFrames.length === 0 && styles.analyzeButtonDisabled,
+            ]}
+            onPress={handleAnalyzeScene}
+            disabled={isAnalyzing || capturedFrames.length === 0}
+          >
+            {isAnalyzing ? (
+              <View style={styles.analyzingContainer}>
+                <ActivityIndicator size="small" color="#fff" />
+                <Text style={styles.analyzeButtonText}>正在分析场景...</Text>
+              </View>
+            ) : (
+              <Text style={styles.analyzeButtonText}>
+                🔍 分析当前场景
+                {capturedFrames.length === 0 && ' (等待帧捕获)'}
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          {/* Analysis stats */}
+          <View style={styles.analysisStats}>
+            <View style={styles.analysisStatItem}>
+              <Text style={styles.analysisStatLabel}>分析次数</Text>
+              <Text style={styles.analysisStatValue}>{totalAnalysisCount}</Text>
+            </View>
+            <View style={styles.analysisStatItem}>
+              <Text style={styles.analysisStatLabel}>总成本</Text>
+              <Text style={styles.analysisStatValue}>
+                ${totalAPICost.toFixed(4)}
+              </Text>
+            </View>
+          </View>
+
+          {/* Error message */}
+          {analysisError && (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorIcon}>⚠️</Text>
+              <Text style={styles.errorText}>{analysisError}</Text>
+            </View>
+          )}
+
+          {/* Analysis result */}
+          {sceneAnalysisResult && sceneAnalysisResult.success && (
+            <View style={styles.resultContainer}>
+              <Text style={styles.resultTitle}>✅ 分析结果</Text>
+
+              <View style={styles.resultItem}>
+                <Text style={styles.resultLabel}>场景位置</Text>
+                <Text style={styles.resultValue}>
+                  {sceneAnalysisResult.scene.location}
+                </Text>
+              </View>
+
+              <View style={styles.resultItem}>
+                <Text style={styles.resultLabel}>检测物品</Text>
+                <View style={styles.objectsContainer}>
+                  {sceneAnalysisResult.scene.objects.map((obj, idx) => (
+                    <View key={idx} style={styles.objectTag}>
+                      <Text style={styles.objectText}>{obj}</Text>
+                    </View>
+                  ))}
+                  {sceneAnalysisResult.scene.objects.length === 0 && (
+                    <Text style={styles.emptyObjectsText}>未检测到物品</Text>
+                  )}
+                </View>
+              </View>
+
+              <View style={styles.resultItem}>
+                <Text style={styles.resultLabel}>整体氛围</Text>
+                <Text style={styles.resultValue}>
+                  {sceneAnalysisResult.scene.atmosphere}
+                </Text>
+              </View>
+
+              <View style={styles.resultItem}>
+                <Text style={styles.resultLabel}>光线情况</Text>
+                <Text style={styles.resultValue}>
+                  {sceneAnalysisResult.scene.lighting}
+                </Text>
+              </View>
+
+              <View style={styles.resultItem}>
+                <Text style={styles.resultLabel}>置信度</Text>
+                <Text
+                  style={[
+                    styles.confidenceValue,
+                    sceneAnalysisResult.scene.confidence >= 0.8
+                      ? styles.confidenceHigh
+                      : sceneAnalysisResult.scene.confidence >= 0.5
+                        ? styles.confidenceMedium
+                        : styles.confidenceLow,
+                  ]}
+                >
+                  {(sceneAnalysisResult.scene.confidence * 100).toFixed(1)}%
+                </Text>
+              </View>
+
+              {sceneAnalysisResult.cost && (
+                <View style={styles.resultItem}>
+                  <Text style={styles.resultLabel}>本次成本</Text>
+                  <Text style={styles.costValue}>
+                    ${sceneAnalysisResult.cost.toFixed(4)}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Test criteria */}
+          <View style={styles.testCriteriaInline}>
+            <Text style={styles.criteriaInlineTitle}>测试标准 (步骤 2.1):</Text>
+            <Text
+              style={[
+                styles.criteriaInlineText,
+                sceneAnalysisResult?.success
+                  ? styles.criteriaPassed
+                  : styles.criteriaPending,
+              ]}
+            >
+              {sceneAnalysisResult?.success ? '✅' : '○'} API 调用成功返回描述
+            </Text>
+            <Text
+              style={[
+                styles.criteriaInlineText,
+                sceneAnalysisResult?.scene.objects &&
+                sceneAnalysisResult.scene.objects.length > 0
+                  ? styles.criteriaPassed
+                  : styles.criteriaPending,
+              ]}
+            >
+              {sceneAnalysisResult?.scene.objects &&
+              sceneAnalysisResult.scene.objects.length > 0
+                ? '✅'
+                : '○'}{' '}
+              能识别常见物品
+            </Text>
+            <Text
+              style={[
+                styles.criteriaInlineText,
+                sceneAnalysisResult?.scene.location &&
+                sceneAnalysisResult.scene.location !== '未知场景'
+                  ? styles.criteriaPassed
+                  : styles.criteriaPending,
+              ]}
+            >
+              {sceneAnalysisResult?.scene.location &&
+              sceneAnalysisResult.scene.location !== '未知场景'
+                ? '✅'
+                : '○'}{' '}
+              能理解场景类型
+            </Text>
+            <Text
+              style={[
+                styles.criteriaInlineText,
+                analysisError || sceneAnalysisResult?.error
+                  ? styles.criteriaPassed
+                  : styles.criteriaPending,
+              ]}
+            >
+              {analysisError || sceneAnalysisResult?.error ? '✅' : '○'}{' '}
+              错误处理正常
+            </Text>
+          </View>
+        </View>
+
         {/* Image Similarity (Step 1.3) */}
         <View style={styles.similarityPanel}>
           <Text style={styles.sectionTitle}>📊 图像相似度检测 (步骤 1.3)</Text>
@@ -378,7 +615,9 @@ export const EnvironmentTestScreen: React.FC = () => {
 
         {/* Instructions */}
         <View style={styles.instructions}>
-          <Text style={styles.instructionTitle}>📋 测试说明 (步骤 1.3)</Text>
+          <Text style={styles.instructionTitle}>📋 测试说明</Text>
+
+          <Text style={styles.instructionSubtitle}>步骤 1.3 - 图像相似度检测:</Text>
           <Text style={styles.instructionText}>
             1. BasicEmotionDetector 会每 {captureInterval / 1000} 秒自动捕获一帧
           </Text>
@@ -391,8 +630,22 @@ export const EnvironmentTestScreen: React.FC = () => {
           <Text style={styles.instructionText}>
             4. 测试方法：保持静止、轻微移动、完全换场景
           </Text>
+
+          <Text style={styles.instructionSubtitle}>步骤 2.1 - Claude Vision 场景分析:</Text>
           <Text style={styles.instructionText}>
-            5. 观察相似度和状态变化是否符合预期
+            1. 等待至少一帧被捕获
+          </Text>
+          <Text style={styles.instructionText}>
+            2. 点击"分析当前场景"按钮
+          </Text>
+          <Text style={styles.instructionText}>
+            3. Claude Vision API 将分析最新捕获的图像
+          </Text>
+          <Text style={styles.instructionText}>
+            4. 查看分析结果：场景位置、物品、氛围、光线
+          </Text>
+          <Text style={styles.instructionText}>
+            5. 测试多个不同场景（室内、室外、办公室等）
           </Text>
         </View>
 
@@ -595,6 +848,13 @@ const styles = StyleSheet.create({
     color: '#64B5F6',
     marginBottom: 8,
   },
+  instructionSubtitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#81C784',
+    marginTop: 12,
+    marginBottom: 6,
+  },
   instructionText: {
     fontSize: 13,
     color: '#aaa',
@@ -703,5 +963,144 @@ const styles = StyleSheet.create({
   },
   criteriaPending: {
     color: '#888',
+  },
+  // Scene Analysis Panel (Step 2.1)
+  sceneAnalysisPanel: {
+    margin: 16,
+    padding: 16,
+    backgroundColor: '#1a2a1a',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#2a4a2a',
+  },
+  analyzeButton: {
+    backgroundColor: '#4CAF50',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  analyzeButtonDisabled: {
+    backgroundColor: '#555',
+    opacity: 0.6,
+  },
+  analyzeButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  analyzingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  analysisStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 16,
+    padding: 12,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 8,
+  },
+  analysisStatItem: {
+    alignItems: 'center',
+  },
+  analysisStatLabel: {
+    fontSize: 12,
+    color: '#888',
+    marginBottom: 4,
+  },
+  analysisStatValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    backgroundColor: '#3a1a1a',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#6a2a2a',
+    marginBottom: 16,
+  },
+  errorIcon: {
+    fontSize: 20,
+    marginRight: 8,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#ff6b6b',
+    lineHeight: 18,
+  },
+  resultContainer: {
+    padding: 16,
+    backgroundColor: '#1a2a2a',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#2a4a4a',
+    marginBottom: 16,
+  },
+  resultTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+    marginBottom: 12,
+  },
+  resultItem: {
+    marginBottom: 12,
+  },
+  resultLabel: {
+    fontSize: 12,
+    color: '#888',
+    marginBottom: 4,
+  },
+  resultValue: {
+    fontSize: 15,
+    color: '#ddd',
+    lineHeight: 20,
+  },
+  objectsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 4,
+  },
+  objectTag: {
+    backgroundColor: '#2196F3',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  objectText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  emptyObjectsText: {
+    fontSize: 13,
+    color: '#666',
+    fontStyle: 'italic',
+  },
+  confidenceValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  confidenceHigh: {
+    color: '#4CAF50',
+  },
+  confidenceMedium: {
+    color: '#FF9800',
+  },
+  confidenceLow: {
+    color: '#f44336',
+  },
+  costValue: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#64B5F6',
   },
 });

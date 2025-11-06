@@ -2,11 +2,16 @@ import Constants from 'expo-constants';
 import { AI_PERSONALITY } from './personality';
 
 // Claude API 配置
+// Model 价格参考：
+// claude-sonnet-4-5-20250929 $3 / MTok
+// claude-haiku-4-5-20251001  $1 / MTok
+// claude-3-5-haiku-20241022  $0.80 / MTok
+// claude-3-haiku-20240307    $0.25 / MTok
 export const CLAUDE_API_CONFIG = {
   baseURL: 'https://api.anthropic.com/v1/messages',
   models: {
     haiku: 'claude-3-haiku-20240307',
-    sonnet: 'claude-3-sonnet-20240229',
+    sonnet: 'claude-sonnet-4-5-20250929',
   },
   maxTokens: 300, // 增加token数量以支持深度对话
   defaultModel: 'haiku' as const,
@@ -230,7 +235,9 @@ export const buildSystemPrompt = (
   const backgroundSection = backgroundStory ? `\n\n${backgroundStory}` : '';
 
   // Add environment context if provided
-  const environmentSection = environmentContext ? `\n\n# 环境感知\n${environmentContext}` : '';
+  const environmentSection = environmentContext
+    ? `\n\n# 环境感知\n${environmentContext}`
+    : '';
 
   return `${personality}
 
