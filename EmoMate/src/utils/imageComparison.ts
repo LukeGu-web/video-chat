@@ -3,6 +3,7 @@
  * Provides functions for comparing images to detect scene changes
  */
 
+import * as ImageManipulator from 'expo-image-manipulator';
 import { SceneComparisonResult } from '../types/scene';
 
 /**
@@ -22,20 +23,35 @@ const THUMBNAIL_CONFIG = {
  * @returns Thumbnail as base64 string
  */
 export async function generateThumbnail(imageBase64: string): Promise<string> {
-  // TODO: Implement actual thumbnail generation in Step 3.2
-  // This will use expo-image-manipulator or similar
-  // For now, return a placeholder
-
   console.log('[ImageComparison] generateThumbnail called');
   console.log('[ImageComparison] Input image size:', imageBase64.length, 'bytes');
 
-  // Return a marker that this is a mock thumbnail
-  return `THUMBNAIL_MOCK_${imageBase64.substring(0, 100)}`;
+  try {
+    // Ensure base64 string has data URI prefix
+    let uri = imageBase64;
+    if (!uri.startsWith('data:')) {
+      uri = `data:image/jpeg;base64,${imageBase64}`;
+    }
+
+    // Resize image to thumbnail size for fast comparison
+    const result = await ImageManipulator.manipulateAsync(
+      uri,
+      [{ resize: { width: THUMBNAIL_CONFIG.width, height: THUMBNAIL_CONFIG.height } }],
+      { compress: 0.5, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+    );
+
+    console.log('[ImageComparison] Thumbnail generated successfully');
+    return result.base64 || '';
+  } catch (error) {
+    console.error('[ImageComparison] Failed to generate thumbnail:', error);
+    // Return original image on error (will be slower but still works)
+    return imageBase64;
+  }
 }
 
 /**
  * Calculate pixel difference between two images
- * Simple algorithm: compares pixel-by-pixel differences
+ * Simple algorithm: compares base64 data after resizing to same dimensions
  *
  * @param image1Base64 - First image (base64)
  * @param image2Base64 - Second image (base64)
@@ -45,36 +61,51 @@ async function calculatePixelDifference(
   image1Base64: string,
   image2Base64: string
 ): Promise<number> {
-  // TODO: Implement actual pixel comparison in Step 3.2
-  // This will:
-  // 1. Decode both base64 images
-  // 2. Resize to thumbnail size
-  // 3. Compare pixel values
-  // 4. Calculate average difference
-
   console.log('[ImageComparison] calculatePixelDifference called');
 
-  // For now, return a mock difference based on string comparison
-  // This is temporary until we implement actual image comparison
-  if (image1Base64 === image2Base64) {
-    return 0; // Identical
-  }
-
-  // Simple mock: check if first 100 chars are similar
-  const sample1 = image1Base64.substring(0, 100);
-  const sample2 = image2Base64.substring(0, 100);
-
-  let diffCount = 0;
-  for (let i = 0; i < Math.min(sample1.length, sample2.length); i++) {
-    if (sample1[i] !== sample2[i]) {
-      diffCount++;
+  try {
+    // Quick check: if strings are identical, return 0
+    if (image1Base64 === image2Base64) {
+      console.log('[ImageComparison] Images are identical (exact match)');
+      return 0;
     }
+
+    // Generate thumbnails for both images (normalize size)
+    const thumbnail1 = await generateThumbnail(image1Base64);
+    const thumbnail2 = await generateThumbnail(image2Base64);
+
+    // Compare thumbnails character by character
+    const minLength = Math.min(thumbnail1.length, thumbnail2.length);
+    const maxLength = Math.max(thumbnail1.length, thumbnail2.length);
+
+    let diffCount = 0;
+
+    // Compare common length
+    for (let i = 0; i < minLength; i++) {
+      if (thumbnail1[i] !== thumbnail2[i]) {
+        diffCount++;
+      }
+    }
+
+    // Add difference for length mismatch
+    diffCount += maxLength - minLength;
+
+    // Calculate difference ratio (0 = identical, 1 = completely different)
+    const difference = diffCount / maxLength;
+
+    console.log('[ImageComparison] Comparison result:', {
+      thumbnail1Length: thumbnail1.length,
+      thumbnail2Length: thumbnail2.length,
+      diffCount,
+      difference: difference.toFixed(3),
+    });
+
+    return difference;
+  } catch (error) {
+    console.error('[ImageComparison] Pixel comparison failed:', error);
+    // Return maximum difference on error (assume images are different)
+    return 1.0;
   }
-
-  const mockDifference = diffCount / 100;
-  console.log('[ImageComparison] Mock difference:', mockDifference.toFixed(3));
-
-  return mockDifference;
 }
 
 /**
