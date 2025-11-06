@@ -8,7 +8,6 @@ import {
   Dimensions,
   Pressable,
 } from 'react-native';
-import { CameraView, useCameraPermissions } from 'expo-camera';
 import {
   Camera,
   useCameraDevice,
@@ -39,12 +38,11 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
     detectionInterval = 1000,
   } = props;
 
-  // 权限管理 - 同时支持expo-camera和react-native-vision-camera
-  const [expoPermission, requestExpoPermission] = useCameraPermissions();
+  // 权限管理 - 使用react-native-vision-camera
   const [cameraPosition, setCameraPosition] = useState<string>('front');
   const {
-    hasPermission: visionHasPermission,
-    requestPermission: requestVisionPermission,
+    hasPermission,
+    requestPermission,
   } = useCameraPermission();
 
   // 获取相机设备
@@ -92,7 +90,7 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
         // 启用真实面部检测 (react-native-vision-camera-face-detector 1.9.0)
         const enableMLKit = true; // 已升级到1.9.0，现在启用真实检测
 
-        if (enableMLKit && visionHasPermission) {
+        if (enableMLKit && hasPermission) {
           setUseMLKit(true);
           setDetectionMode('mlkit');
           debugLog(
@@ -118,7 +116,7 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
     };
 
     checkMLKitAvailability();
-  }, [visionHasPermission]);
+  }, [hasPermission]);
 
   // Callback to update emotion on JS thread
   const updateEmotionCallback = useCallback(
@@ -427,28 +425,21 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
     return () => clearInterval(interval);
   }, [isActive, simulateEmotionDetection, detectionInterval, useMLKit]);
 
-  // 请求摄像头权限 - 支持两种相机库
+  // 请求摄像头权限 - 使用react-native-vision-camera
   useEffect(() => {
     const requestPermissions = async () => {
-      if (useMLKit && !visionHasPermission) {
+      if (useMLKit && !hasPermission) {
         try {
-          await requestVisionPermission();
+          await requestPermission();
+          debugLog('BasicEmotionDetector', 'Camera permission requested');
         } catch (error) {
-          debugLog('BasicEmotionDetector', 'Vision Camera权限请求失败', error);
+          debugLog('BasicEmotionDetector', 'Camera permission request failed', error);
         }
-      } else if (!useMLKit && !expoPermission?.granted) {
-        await requestExpoPermission();
       }
     };
 
     requestPermissions();
-  }, [
-    useMLKit,
-    visionHasPermission,
-    expoPermission,
-    requestExpoPermission,
-    requestVisionPermission,
-  ]);
+  }, [useMLKit, hasPermission, requestPermission]);
 
   // Cleanup timeout on component unmount
   useEffect(() => {
@@ -492,37 +483,13 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
     animatedStyle,
   ];
 
-  // 权限检查 - 根据检测模式使用不同的权限
-  const hasPermission = useMLKit
-    ? visionHasPermission
-    : expoPermission?.granted;
-
-  const requestPermissionFn = useCallback(async () => {
-    if (useMLKit) {
-      try {
-        await requestVisionPermission();
-      } catch (error) {
-        debugLog('BasicEmotionDetector', '权限请求失败', error);
-      }
-    } else {
-      await requestExpoPermission();
-    }
-  }, [useMLKit, requestExpoPermission, requestVisionPermission]);
-
-  if (!expoPermission && !useMLKit) {
-    return (
-      <AnimatedView style={containerStyle}>
-        <Text style={styles.statusText}>Permission loading...</Text>
-      </AnimatedView>
-    );
-  }
-
+  // Render permission request UI if needed
   if (!hasPermission) {
     return (
       <AnimatedView style={containerStyle}>
         <Text style={styles.errorText}>Camera permission required</Text>
         <TouchableOpacity
-          onPress={requestPermissionFn}
+          onPress={requestPermission}
           style={styles.permissionButton}
         >
           <Text style={styles.permissionButtonText}>Grant Permission</Text>
@@ -543,16 +510,14 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
 
   return (
     <AnimatedView style={containerStyle} {...panResponder.panHandlers}>
-      {/* 根据检测模式渲染不同的相机组件 */}
-      {useMLKit && frontDevice ? (
+      {/* React Native Vision Camera */}
+      {frontDevice && (
         <Camera
           style={styles.camera}
           device={frontDevice}
           isActive={isActive && hasPermission}
-          frameProcessor={frameProcessor}
+          frameProcessor={useMLKit ? frameProcessor : undefined}
         />
-      ) : (
-        <CameraView style={styles.camera} facing='front' />
       )}
 
       {/* 拖拽指示器 */}

@@ -11,7 +11,12 @@
 - 场景上下文缓存与去重
 - 融入现有对话系统
 
-**技术方案**：避免使用 TFLite（稳定性问题），采用 Expo Camera + Claude Vision API
+**技术方案**：避免使用 TFLite（稳定性问题），采用 react-native-vision-camera + Claude Vision API
+
+**集成方式**：方案 A - 共享 Camera 实例
+- 复用 BasicEmotionDetector 的 camera 实例
+- 在同一个 Frame Processor 中同时处理情绪检测和场景理解
+- 节省资源，提升性能，用户体验更好
 
 ---
 
@@ -22,10 +27,12 @@
 │           EmoMate 场景理解系统                            │
 ├─────────────────────────────────────────────────────────┤
 │                                                          │
-│  📷 Expo Camera (稳定采集)                               │
+│  📷 react-native-vision-camera (共享实例)                │
+│     • BasicEmotionDetector 的 Frame Processor            │
+│     • 同时处理情绪检测 + 场景理解                         │
 │       ↓                                                  │
-│  🔍 轻量检测层 (本地)                                     │
-│     • 每 30 秒拍照一次                                    │
+│  🔍 轻量检测层 (本地 - Frame Processor)                  │
+│     • 每 30 秒捕获一帧 (无需"拍照")                       │
 │     • 图像相似度对比 (perceptual hash)                    │
 │     • 光线/运动变化检测                                   │
 │       ↓                                                  │
@@ -93,25 +100,30 @@ EmoMate/
 
 ---
 
-#### **步骤 1.2：集成 Expo Camera 基础拍照** ✅ 可测试
+#### **步骤 1.2：扩展 Frame Processor 实现帧捕获** ✅ 可测试
 
-**目标**：验证 Expo Camera 能稳定拍照并保存到临时文件
+**目标**：在 BasicEmotionDetector 的 Frame Processor 中添加场景帧捕获功能
 
 **任务**：
-- 在 `EnvironmentTestScreen.tsx` 中添加 Camera 组件
-- 实现"手动拍照"按钮
-- 拍照后显示图片预览
-- 保存到临时目录
+- 修改 `BasicEmotionDetector.tsx` 的 `frameProcessor`
+- 添加场景捕获逻辑（每 30 秒捕获一帧）
+- 将帧数据转换为 base64 格式
+- 验证捕获的帧可以正常使用
 
 **测试标准**：
-- ✅ 点击按钮成功拍照
-- ✅ 图片显示在界面上
-- ✅ 文件保存成功（检查文件路径）
-- ✅ 多次拍照不会崩溃
+- ✅ Frame Processor 不影响现有情绪检测功能
+- ✅ 每 30 秒成功捕获一帧
+- ✅ 帧数据正确转换为 base64
+- ✅ 性能无明显下降（仍保持 60fps）
 
-**预期时间**：1 小时
+**预期时间**：1.5 小时
 
-**代码示例位置**：`EnvironmentTestScreen.tsx`
+**实现要点**：
+- 使用 `Worklets.createRunInJS` 传递帧数据到 JS 线程
+- 在 worklet 中使用 `frame.toString()` 获取 base64
+- 添加时间间隔控制，避免频繁捕获影响性能
+
+**代码参考**：`BasicEmotionDetector.tsx` 第160-284行
 
 ---
 
@@ -564,14 +576,21 @@ AI: "当然知道！《人类简史》是尤瓦尔·赫拉利的经典作品，
 ## 🔧 技术栈
 
 ### **必需依赖**
-- `expo-camera`: 稳定的相机接口
+- `react-native-vision-camera`: 高性能相机接口（已安装 ^4.7.2）
+- `react-native-worklets-core`: Frame Processor 支持（已安装）
 - `@anthropic-ai/sdk`: Claude API 调用
 - `expo-image-manipulator`: 图片压缩和处理
-- `@react-native-async-storage/async-storage`: 场景数据持久化
+- `react-native-mmkv`: 场景数据持久化（已安装，替代 AsyncStorage）
 
 ### **可选依赖（图像相似度）**
 - `react-native-image-hash`: 计算感知哈希
 - 或者用 Canvas API 自己实现简单的像素差异算法
+
+### **技术优势**
+- ✅ **共享 Camera 实例**: 与 BasicEmotionDetector 共用，节省资源
+- ✅ **Frame Processor**: Native 性能，60fps 实时处理
+- ✅ **Worklet 架构**: UI 线程外处理，不阻塞界面
+- ✅ **MMKV 存储**: 比 AsyncStorage 快 10-30 倍
 
 ---
 

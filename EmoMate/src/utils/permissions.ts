@@ -1,4 +1,4 @@
-import { Camera } from 'expo-camera';
+import { Camera } from 'react-native-vision-camera';
 import { AudioModule } from 'expo-audio';
 
 export interface PermissionStatus {
@@ -7,12 +7,19 @@ export interface PermissionStatus {
   allGranted: boolean;
 }
 
+/**
+ * Request camera and microphone permissions
+ * Uses react-native-vision-camera for camera permissions
+ */
 export const requestCameraAndMicrophonePermissions = async (): Promise<PermissionStatus> => {
   try {
-    const cameraPermission = await Camera.requestCameraPermissionsAsync();
+    // Request camera permission using react-native-vision-camera
+    const cameraResult = await Camera.requestCameraPermission();
+
+    // Request microphone permission
     const microphonePermission = await AudioModule.requestRecordingPermissionsAsync();
 
-    const cameraGranted = cameraPermission.status === 'granted';
+    const cameraGranted = cameraResult === 'granted';
     const microphoneGranted = microphonePermission.granted;
 
     return {
@@ -21,7 +28,7 @@ export const requestCameraAndMicrophonePermissions = async (): Promise<Permissio
       allGranted: cameraGranted && microphoneGranted,
     };
   } catch (error) {
-    // Permission request error handled below
+    console.error('[Permissions] Error requesting permissions:', error);
     return {
       camera: false,
       microphone: false,
@@ -30,12 +37,19 @@ export const requestCameraAndMicrophonePermissions = async (): Promise<Permissio
   }
 };
 
+/**
+ * Check current camera and microphone permissions status
+ * Uses react-native-vision-camera for camera permissions
+ */
 export const checkCameraAndMicrophonePermissions = async (): Promise<PermissionStatus> => {
   try {
-    const cameraPermission = await Camera.getCameraPermissionsAsync();
+    // Check camera permission using react-native-vision-camera
+    const cameraStatus = Camera.getCameraPermissionStatus();
+
+    // Check microphone permission
     const microphonePermission = await AudioModule.getRecordingPermissionsAsync();
 
-    const cameraGranted = cameraPermission.status === 'granted';
+    const cameraGranted = cameraStatus === 'granted';
     const microphoneGranted = microphonePermission.granted;
 
     return {
@@ -44,7 +58,7 @@ export const checkCameraAndMicrophonePermissions = async (): Promise<PermissionS
       allGranted: cameraGranted && microphoneGranted,
     };
   } catch (error) {
-    // Permission check error handled below
+    console.error('[Permissions] Error checking permissions:', error);
     return {
       camera: false,
       microphone: false,

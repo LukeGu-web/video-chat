@@ -7,5 +7,4 @@ export * from './useHybridTTS';
 export * from './debug';
 export * from './emotionAnalysis';
 export * from './useEmotionState';
-export * from './useExpoCameraPermission';
 export * from './audioModeManager';
