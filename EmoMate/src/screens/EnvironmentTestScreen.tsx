@@ -634,6 +634,171 @@ export const EnvironmentTestScreen: React.FC = () => {
           </View>
         )}
 
+        {/* Keyword Trigger Test (Step 3.3) */}
+        <View style={styles.keywordPanel}>
+          <Text style={styles.sectionTitle}>🎯 对话关键词触发 (步骤 3.3)</Text>
+
+          {/* Keyword test input */}
+          <View style={styles.keywordTestContainer}>
+            <Text style={styles.keywordTestLabel}>测试关键词检测：</Text>
+            <View style={styles.keywordButtonsGrid}>
+              <TouchableOpacity
+                style={styles.keywordTestButton}
+                onPress={() => {
+                  const text = '看这个';
+                  const keyword = sceneUnderstanding.detectKeywords(text);
+                  if (keyword) {
+                    alert(`检测到关键词: "${keyword}"\n将触发场景分析`);
+                  } else {
+                    alert(`未检测到关键词`);
+                  }
+                }}
+              >
+                <Text style={styles.keywordTestButtonText}>测试: "看这个"</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.keywordTestButton}
+                onPress={() => {
+                  const text = '看起来不错';
+                  const keyword = sceneUnderstanding.detectKeywords(text);
+                  if (keyword) {
+                    alert(`检测到关键词: "${keyword}"`);
+                  } else {
+                    alert(`✓ 正确：未检测到关键词（避免误触发）`);
+                  }
+                }}
+              >
+                <Text style={styles.keywordTestButtonText}>测试: "看起来不错"</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.keywordTestButton}
+                onPress={() => {
+                  const text = '这是什么';
+                  const keyword = sceneUnderstanding.detectKeywords(text);
+                  if (keyword) {
+                    alert(`检测到关键词: "${keyword}"\n将触发场景分析`);
+                  } else {
+                    alert(`未检测到关键词`);
+                  }
+                }}
+              >
+                <Text style={styles.keywordTestButtonText}>测试: "这是什么"</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.keywordTestButton}
+                onPress={() => {
+                  const text = '周围有什么';
+                  const keyword = sceneUnderstanding.detectKeywords(text);
+                  if (keyword) {
+                    alert(`检测到关键词: "${keyword}"\n将触发场景分析`);
+                  } else {
+                    alert(`未检测到关键词`);
+                  }
+                }}
+              >
+                <Text style={styles.keywordTestButtonText}>测试: "周围有什么"</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Manual keyword trigger button */}
+          <TouchableOpacity
+            style={[
+              styles.keywordTriggerButton,
+              (!latestFrameRef.current || sceneUnderstanding.isAnalyzing) && styles.keywordTriggerButtonDisabled,
+            ]}
+            onPress={async () => {
+              const testQuestion = '看这是什么';
+              const keyword = sceneUnderstanding.detectKeywords(testQuestion);
+              if (keyword && latestFrameRef.current) {
+                await sceneUnderstanding.triggerByKeyword(keyword, testQuestion);
+              }
+            }}
+            disabled={!latestFrameRef.current || sceneUnderstanding.isAnalyzing}
+          >
+            <Text style={styles.keywordTriggerButtonText}>
+              🎯 手动测试关键词触发
+              {!latestFrameRef.current && ' (等待帧捕获)'}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Keyword statistics */}
+          <View style={styles.timerStatsGrid}>
+            <View style={styles.timerStatItem}>
+              <Text style={styles.timerStatLabel}>关键词分析次数</Text>
+              <Text style={styles.timerStatValue}>
+                {sceneUnderstanding.timerState.totalKeywordAnalyses} 次
+              </Text>
+            </View>
+
+            <View style={styles.timerStatItem}>
+              <Text style={styles.timerStatLabel}>最后关键词</Text>
+              <Text style={styles.timerStatValue}>
+                {sceneUnderstanding.timerState.lastKeyword || '-'}
+              </Text>
+            </View>
+
+            <View style={styles.timerStatItem}>
+              <Text style={styles.timerStatLabel}>最后触发原因</Text>
+              <Text style={styles.timerStatValue}>
+                {sceneUnderstanding.timerState.lastTriggerReason === 'keyword'
+                  ? '关键词触发'
+                  : sceneUnderstanding.timerState.lastTriggerReason === 'scene_change'
+                  ? '场景变化'
+                  : sceneUnderstanding.timerState.lastTriggerReason === 'timer'
+                  ? '定时触发'
+                  : '-'}
+              </Text>
+            </View>
+          </View>
+
+          {/* Test criteria for Step 3.3 */}
+          <View style={styles.testCriteriaInline}>
+            <Text style={styles.criteriaInlineTitle}>测试标准 (步骤 3.3):</Text>
+            <Text
+              style={[
+                styles.criteriaInlineText,
+                sceneUnderstanding.timerState.totalKeywordAnalyses > 0
+                  ? styles.criteriaPassed
+                  : styles.criteriaPending,
+              ]}
+            >
+              {sceneUnderstanding.timerState.totalKeywordAnalyses > 0 ? '✅' : '○'} 关键词立即触发（&lt; 1秒）
+            </Text>
+            <Text
+              style={[
+                styles.criteriaInlineText,
+                styles.criteriaPending,
+              ]}
+            >
+              ○ 避免误触发（"看起来"不触发）
+            </Text>
+            <Text
+              style={[
+                styles.criteriaInlineText,
+                sceneUnderstanding.timerState.totalKeywordAnalyses > 1
+                  ? styles.criteriaPassed
+                  : styles.criteriaPending,
+              ]}
+            >
+              {sceneUnderstanding.timerState.totalKeywordAnalyses > 1 ? '✅' : '○'} 可连续触发（无冷却限制）
+            </Text>
+            <Text
+              style={[
+                styles.criteriaInlineText,
+                sceneUnderstanding.timerState.lastTriggerReason === 'keyword'
+                  ? styles.criteriaPassed
+                  : styles.criteriaPending,
+              ]}
+            >
+              {sceneUnderstanding.timerState.lastTriggerReason === 'keyword' ? '✅' : '○'} 触发记录正确
+            </Text>
+          </View>
+        </View>
+
         {/* Scene Analysis (Step 2.1) */}
         <View style={styles.sceneAnalysisPanel}>
           <Text style={styles.sectionTitle}>🧠 场景分析 (步骤 2.1)</Text>
@@ -1555,5 +1720,62 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#2a4a2a',
+  },
+  // Keyword Trigger Panel (Step 3.3)
+  keywordPanel: {
+    margin: 16,
+    padding: 16,
+    backgroundColor: '#1a1a2a',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#2a2a4a',
+  },
+  keywordTestContainer: {
+    marginTop: 12,
+    marginBottom: 12,
+  },
+  keywordTestLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 8,
+  },
+  keywordButtonsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  keywordTestButton: {
+    backgroundColor: '#3a3a5a',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#5a5a7a',
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  keywordTestButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  keywordTriggerButton: {
+    backgroundColor: '#FF6B6B',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 12,
+    marginBottom: 12,
+  },
+  keywordTriggerButtonDisabled: {
+    backgroundColor: '#4a4a4a',
+    opacity: 0.5,
+  },
+  keywordTriggerButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

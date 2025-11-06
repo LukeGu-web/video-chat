@@ -19,6 +19,75 @@ import { analyzeSceneWithClaude } from './claudeVision';
 import { compareImages, generateThumbnail } from './imageComparison';
 
 /**
+ * Visual keywords that trigger scene analysis (Step 3.3)
+ * These keywords must match exactly to avoid false triggers
+ * E.g., "看" matches but "看起来" does not
+ */
+const VISUAL_KEYWORDS = [
+  '看',
+  '看见',
+  '看到',
+  '这是什么',
+  '周围',
+  '这个',
+  '那个',
+  '什么东西',
+  '哪里',
+  '在哪',
+  '附近',
+  '旁边',
+] as const;
+
+/**
+ * Detect visual keywords in user text (Step 3.3)
+ * Uses precise matching to avoid false triggers
+ * E.g., "看起来" won't trigger "看" keyword
+ *
+ * @param text - User input text
+ * @returns The detected keyword or null
+ */
+export function detectVisualKeywords(text: string): string | null {
+  if (!text || text.trim().length === 0) {
+    return null;
+  }
+
+  const trimmedText = text.trim();
+
+  // Check for exact phrase matches first (higher priority)
+  const exactPhrases = ['这是什么', '什么东西', '在哪'];
+  for (const phrase of exactPhrases) {
+    if (trimmedText.includes(phrase)) {
+      console.log(`[SceneUnderstanding] 🎯 Keyword detected: "${phrase}" in "${trimmedText}"`);
+      return phrase;
+    }
+  }
+
+  // Check for single character keywords with boundary detection
+  const singleCharKeywords = ['看', '看见', '看到', '周围', '这个', '那个', '哪里', '附近', '旁边'];
+
+  for (const keyword of singleCharKeywords) {
+    // For single character keywords like "看", ensure it's not part of a longer word
+    if (keyword.length === 1) {
+      // Check if keyword appears as standalone character or at word boundary
+      const regex = new RegExp(`(?:^|[^一-龥])${keyword}(?:[^一-龥起]|$)`);
+      if (regex.test(trimmedText)) {
+        console.log(`[SceneUnderstanding] 🎯 Keyword detected: "${keyword}" in "${trimmedText}"`);
+        return keyword;
+      }
+    } else {
+      // For multi-character keywords, simple includes check
+      if (trimmedText.includes(keyword)) {
+        console.log(`[SceneUnderstanding] 🎯 Keyword detected: "${keyword}" in "${trimmedText}"`);
+        return keyword;
+      }
+    }
+  }
+
+  console.log(`[SceneUnderstanding] ⏭️ No visual keyword detected in "${trimmedText}"`);
+  return null;
+}
+
+/**
  * MMKV Storage instance for scene understanding data
  */
 const storage = createMMKV({
@@ -84,8 +153,12 @@ interface SceneUnderstandingState {
     lastSceneChangeTime: number | null;
     /** Total number of analyses triggered by scene change (Step 3.2) */
     totalSceneChangeAnalyses: number;
-    /** Last trigger reason (timer/scene_change) */
+    /** Last trigger reason (timer/scene_change/keyword) */
     lastTriggerReason: string | null;
+    /** Total number of analyses triggered by keyword (Step 3.3) */
+    totalKeywordAnalyses: number;
+    /** Last keyword that triggered analysis (Step 3.3) */
+    lastKeyword: string | null;
   };
 }
 
@@ -119,6 +192,12 @@ interface UseSceneUnderstandingReturn extends SceneUnderstandingState {
 
   /** Register a callback to capture photo from camera (Step 3.1) */
   setPhotoCaptureCallback: (callback: () => Promise<string | null>) => void;
+
+  /** Detect visual keywords in user text (Step 3.3) */
+  detectKeywords: (text: string) => string | null;
+
+  /** Trigger analysis by keyword (Step 3.3) - High priority, bypasses cooldown */
+  triggerByKeyword: (keyword: string, userQuestion: string) => Promise<void>;
 }
 
 /**
@@ -157,7 +236,7 @@ export function useSceneUnderstanding(
     cacheMisses: 0,
   });
 
-  // Timer state (Step 3.1 & 3.2)
+  // Timer state (Step 3.1 & 3.2 & 3.3)
   const [timerState, setTimerState] = useState({
     enabled: false,
     nextCaptureIn: 30000, // 30 seconds
@@ -166,7 +245,9 @@ export function useSceneUnderstanding(
     totalTimerAnalyses: 0,
     lastSceneChangeTime: null as number | null, // Step 3.2: For cooldown mechanism
     totalSceneChangeAnalyses: 0, // Step 3.2: Scene change trigger count
-    lastTriggerReason: null as string | null, // Step 3.2: Last trigger reason
+    lastTriggerReason: null as string | null, // Step 3.2 & 3.3: Last trigger reason
+    totalKeywordAnalyses: 0, // Step 3.3: Keyword trigger count
+    lastKeyword: null as string | null, // Step 3.3: Last detected keyword
   });
 
   // Refs for storing data that doesn't trigger re-renders
@@ -664,6 +745,64 @@ export function useSceneUnderstanding(
     []
   );
 
+  /**
+   * Detect visual keywords in user text (Step 3.3)
+   * Wrapper for the exported detectVisualKeywords function
+   */
+  const detectKeywords = useCallback((text: string): string | null => {
+    return detectVisualKeywords(text);
+  }, []);
+
+  /**
+   * Trigger scene analysis by keyword (Step 3.3)
+   * High priority trigger that bypasses cooldown period
+   *
+   * @param keyword - The detected keyword
+   * @param userQuestion - The full user question text
+   */
+  const triggerByKeyword = useCallback(
+    async (keyword: string, userQuestion: string): Promise<void> => {
+      console.log('[SceneUnderstanding] 🎯 Keyword trigger:', keyword);
+      console.log('[SceneUnderstanding] 📝 User question:', userQuestion);
+
+      // Check if photo capture callback is registered
+      if (!photoCaptureCallback.current) {
+        console.warn('[SceneUnderstanding] ⚠️ No photo capture callback registered, cannot trigger keyword analysis');
+        return;
+      }
+
+      try {
+        // Capture photo immediately
+        console.log('[SceneUnderstanding] 📸 Capturing photo for keyword analysis...');
+        const imageBase64 = await photoCaptureCallback.current();
+
+        if (!imageBase64) {
+          console.error('[SceneUnderstanding] ❌ Failed to capture photo');
+          return;
+        }
+
+        console.log('[SceneUnderstanding] ✅ Photo captured, triggering analysis...');
+
+        // Trigger analysis with user question
+        // Note: This bypasses cooldown and cache (high priority)
+        await analyzeScene(imageBase64, userQuestion);
+
+        // Update statistics
+        setTimerState(prev => ({
+          ...prev,
+          totalKeywordAnalyses: prev.totalKeywordAnalyses + 1,
+          lastTriggerReason: 'keyword',
+          lastKeyword: keyword,
+        }));
+
+        console.log('[SceneUnderstanding] ✅ Keyword-triggered analysis completed');
+      } catch (error) {
+        console.error('[SceneUnderstanding] ❌ Keyword-triggered analysis failed:', error);
+      }
+    },
+    [analyzeScene]
+  );
+
   return {
     // State
     currentScene,
@@ -686,5 +825,7 @@ export function useSceneUnderstanding(
     startTimer,
     stopTimer,
     setPhotoCaptureCallback,
+    detectKeywords, // Step 3.3
+    triggerByKeyword, // Step 3.3
   };
 }
