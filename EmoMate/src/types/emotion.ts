@@ -82,6 +82,8 @@ export interface EmotionDetectorProps {
   onEmotionDetected: (emotion: EmotionType) => void;
   isActive?: boolean;
   detectionInterval?: number; // milliseconds, default 1000
+  onFrameCaptured?: (base64: string, timestamp: number) => void; // Scene understanding frame capture
+  frameCaptureInterval?: number; // milliseconds, default 30000 (30 seconds)
 }
 
 export interface EmotionState {

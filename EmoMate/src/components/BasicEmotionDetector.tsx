@@ -36,6 +36,8 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
     onEmotionDetected,
     isActive = true,
     detectionInterval = 1000,
+    onFrameCaptured,
+    frameCaptureInterval = 30000, // 30 seconds default
   } = props;
 
   // 权限管理 - 使用react-native-vision-camera
@@ -60,6 +62,7 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
   // Detection frequency control
   const lastDetectionTime = useRef(0);
   const lastMLKitDetection = useRef(0);
+  const lastFrameCapture = useRef(0); // Scene understanding frame capture timing
 
   // Timeout management for cleanup
   const faceDetectedTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -82,6 +85,9 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
 
   // Use the hook to get detectFaces function
   const { detectFaces } = useFaceDetector(faceDetectionOptions);
+
+  // Camera ref for taking snapshots
+  const cameraRef = useRef<Camera>(null);
 
   // 初始化检测模式和权限
   useEffect(() => {
@@ -144,6 +150,25 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
 
   // Create worklet-compatible callback
   const updateEmotionWorklet = Worklets.createRunOnJS(updateEmotionCallback);
+
+  // Callback to handle frame capture for scene understanding
+  const handleFrameCaptureCallback = useCallback(
+    (base64: string, timestamp: number) => {
+      if (onFrameCaptured) {
+        onFrameCaptured(base64, timestamp);
+        debugLog('BasicEmotionDetector', `Frame captured for scene understanding`, {
+          timestamp,
+          size: base64.length,
+        });
+      }
+    },
+    [onFrameCaptured]
+  );
+
+  // Create worklet-compatible callback for frame capture
+  const handleFrameCaptureWorklet = Worklets.createRunOnJS(
+    handleFrameCaptureCallback
+  );
 
   // Helper function to calculate distance between two points
   const calculateDistance = (p1: any, p2: any): number => {
@@ -441,6 +466,46 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
     requestPermissions();
   }, [useMLKit, hasPermission, requestPermission]);
 
+  // Scene understanding frame capture using takeSnapshot
+  useEffect(() => {
+    if (!isActive || !onFrameCaptured || !cameraRef.current) return;
+
+    const captureFrame = async () => {
+      try {
+        const snapshot = await cameraRef.current?.takeSnapshot({
+          quality: 85,
+        });
+
+        if (snapshot?.path) {
+          // Read the file and convert to base64
+          const base64 = await fetch(`file://${snapshot.path}`)
+            .then((res) => res.blob())
+            .then((blob) => {
+              return new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                  const result = reader.result as string;
+                  // Remove the data:image/...;base64, prefix
+                  const base64Data = result.split(',')[1];
+                  resolve(base64Data);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+              });
+            });
+
+          onFrameCaptured(base64, Date.now());
+          debugLog('BasicEmotionDetector', 'Frame captured via takeSnapshot');
+        }
+      } catch (error) {
+        debugLog('BasicEmotionDetector', 'Frame capture error', error);
+      }
+    };
+
+    const interval = setInterval(captureFrame, frameCaptureInterval);
+    return () => clearInterval(interval);
+  }, [isActive, onFrameCaptured, frameCaptureInterval]);
+
   // Cleanup timeout on component unmount
   useEffect(() => {
     return () => {
@@ -513,10 +578,12 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
       {/* React Native Vision Camera */}
       {frontDevice && (
         <Camera
+          ref={cameraRef}
           style={styles.camera}
           device={frontDevice}
           isActive={isActive && hasPermission}
           frameProcessor={useMLKit ? frameProcessor : undefined}
+          photo={true}
         />
       )}
 

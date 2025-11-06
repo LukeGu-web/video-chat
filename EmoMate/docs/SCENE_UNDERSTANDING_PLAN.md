@@ -13,10 +13,24 @@
 
 **技术方案**：避免使用 TFLite（稳定性问题），采用 react-native-vision-camera + Claude Vision API
 
-**集成方式**：方案 A - 共享 Camera 实例
+**集成方式**：共享 Camera 实例 + takeSnapshot
 - 复用 BasicEmotionDetector 的 camera 实例
-- 在同一个 Frame Processor 中同时处理情绪检测和场景理解
+- 使用 `Camera.takeSnapshot()` 定期捕获帧（不占用 Frame Processor）
+- Frame Processor 专注于情绪检测（60fps），快照捕获独立运行
 - 节省资源，提升性能，用户体验更好
+
+---
+
+## 📊 实施进度概览
+
+**总体进度**：15 步中已完成 2 步 (**13.3% 完成**)
+
+**阶段 1：基础设施搭建** - ✅ **67% 完成** (2/3 步骤)
+- ✅ 步骤 1.1：文件结构创建 (30分钟)
+- ✅ 步骤 1.2：帧捕获功能实现 (1.5小时)
+- ⏳ 步骤 1.3：图像差异检测 (待开始)
+
+**下一步行动**：实现简单图像差异检测（预计 2 小时）
 
 ---
 
@@ -28,11 +42,13 @@
 ├─────────────────────────────────────────────────────────┤
 │                                                          │
 │  📷 react-native-vision-camera (共享实例)                │
-│     • BasicEmotionDetector 的 Frame Processor            │
-│     • 同时处理情绪检测 + 场景理解                         │
+│     • BasicEmotionDetector 的 Camera 组件                │
+│     • Frame Processor: 专注情绪检测 (60fps)              │
+│     • takeSnapshot: 定期捕获场景 (每 30 秒)              │
 │       ↓                                                  │
-│  🔍 轻量检测层 (本地 - Frame Processor)                  │
-│     • 每 30 秒捕获一帧 (无需"拍照")                       │
+│  🔍 轻量检测层 (本地 - JS 线程)                          │
+│     • 每 30 秒通过 takeSnapshot() 捕获一帧               │
+│     • 转换为 base64 格式                                 │
 │     • 图像相似度对比 (perceptual hash)                    │
 │     • 光线/运动变化检测                                   │
 │       ↓                                                  │
@@ -45,7 +61,7 @@
 │     • Claude 3.5 Sonnet Vision API                       │
 │     • 深度场景理解 + 物品识别 + 氛围分析                   │
 │       ↓                                                  │
-│  💾 场景上下文缓存                                        │
+│  💾 场景上下文缓存 (MMKV)                                │
 │     • 当前场景描述                                        │
 │     • 识别物品列表                                        │
 │     • 场景氛围标签                                        │
@@ -100,30 +116,35 @@ EmoMate/
 
 ---
 
-#### **步骤 1.2：扩展 Frame Processor 实现帧捕获** ✅ 可测试
+#### **步骤 1.2：扩展 Frame Processor 实现帧捕获** ✅ 已完成
 
-**目标**：在 BasicEmotionDetector 的 Frame Processor 中添加场景帧捕获功能
+**目标**：在 BasicEmotionDetector 中添加场景帧捕获功能
 
-**任务**：
-- 修改 `BasicEmotionDetector.tsx` 的 `frameProcessor`
-- 添加场景捕获逻辑（每 30 秒捕获一帧）
-- 将帧数据转换为 base64 格式
-- 验证捕获的帧可以正常使用
+**已完成任务**：
+- ✅ 修改 `EmotionDetectorProps` 接口，添加 `onFrameCaptured` 和 `frameCaptureInterval` 参数
+- ✅ 使用 `Camera.takeSnapshot()` 实现帧捕获（每 5/10/30 秒可调）
+- ✅ 使用 FileReader 将快照转换为 base64 格式
+- ✅ 创建 `EnvironmentTestScreen.tsx` 测试界面
+- ✅ 验证捕获的帧可以正常显示
 
-**测试标准**：
+**测试结果**：
 - ✅ Frame Processor 不影响现有情绪检测功能
-- ✅ 每 30 秒成功捕获一帧
+- ✅ 每 N 秒成功捕获一帧（可调整间隔：5/10/30秒）
 - ✅ 帧数据正确转换为 base64
-- ✅ 性能无明显下降（仍保持 60fps）
+- ✅ 图像正常显示（真实图像，非灰色方块）
+- ✅ 性能无明显下降（情绪检测仍保持 60fps）
 
-**预期时间**：1.5 小时
+**实际时间**：1.5 小时
 
-**实现要点**：
-- 使用 `Worklets.createRunInJS` 传递帧数据到 JS 线程
-- 在 worklet 中使用 `frame.toString()` 获取 base64
-- 添加时间间隔控制，避免频繁捕获影响性能
+**实现方案**：
+- 使用 `useEffect` + `setInterval` 定时触发快照
+- 使用 `Camera.takeSnapshot()` API 获取图像文件
+- 使用 Fetch API + FileReader 转换为 base64
+- 独立于 Frame Processor，不影响情绪检测性能
 
-**代码参考**：`BasicEmotionDetector.tsx` 第160-284行
+**关键代码**：`BasicEmotionDetector.tsx` 第469-508行
+
+**测试界面**：`EnvironmentTestScreen.tsx` - 完整的测试UI，支持调整捕获间隔、实时显示捕获的帧
 
 ---
 
@@ -614,8 +635,8 @@ AI: "当然知道！《人类简史》是尤瓦尔·赫拉利的经典作品，
 ## 📝 进度追踪
 
 ### **已完成步骤**
-- [ ] 步骤 1.1：创建新文件结构
-- [ ] 步骤 1.2：集成 Expo Camera 基础拍照
+- [✅] 步骤 1.1：创建新文件结构 (2025-01-06)
+- [✅] 步骤 1.2：实现帧捕获功能 (2025-01-06)
 - [ ] 步骤 1.3：实现简单图像差异检测
 - [ ] 步骤 2.1：测试 Claude Vision API 调用
 - [ ] 步骤 2.2：设计结构化场景数据
@@ -631,8 +652,11 @@ AI: "当然知道！《人类简史》是尤瓦尔·赫拉利的经典作品，
 - [ ] 步骤 6.2：用户体验优化
 
 ### **当前进度**
-- 📋 计划阶段完成
-- 🚀 准备开始步骤 1.1
+- ✅ 阶段 1 基础设施搭建：**2/3 步骤完成 (67%)**
+  - ✅ 步骤 1.1：文件结构创建完成
+  - ✅ 步骤 1.2：帧捕获功能实现并测试通过
+  - ⏳ 步骤 1.3：待实现图像差异检测
+- 🚀 **下一步**：步骤 1.3 - 实现简单图像差异检测
 
 ---
 
@@ -645,6 +669,54 @@ AI: "当然知道！《人类简史》是尤瓦尔·赫拉利的经典作品，
 
 ---
 
-**最后更新**：2025-11-05
-**版本**：v1.0
-**状态**：计划阶段
+---
+
+## 📝 实施笔记
+
+### **步骤 1.2 技术决策**
+
+#### 问题：Frame Processor 中如何获取图像数据？
+
+**尝试方案**：
+1. ❌ `frame.toString()` - 仅返回描述字符串，不是图像数据
+2. ❌ `vision-camera-resize-plugin` - 返回 `Uint8Array`，需要复杂转换
+
+**最终方案**：✅ 使用 `Camera.takeSnapshot()`
+
+**选择理由**：
+- 场景理解不需要实时处理（每 30 秒一次）
+- 直接返回图像文件路径，轻松转换为 base64
+- 在 JS 线程运行，不占用 Frame Processor（60fps）
+- 不影响情绪检测性能
+- 代码更简洁易维护
+
+**实现细节**：
+```typescript
+// 使用 useEffect + setInterval 定期触发
+useEffect(() => {
+  const captureFrame = async () => {
+    const snapshot = await cameraRef.current?.takeSnapshot({ quality: 85 });
+    if (snapshot?.path) {
+      // 使用 Fetch + FileReader 转换为 base64
+      const base64 = await convertToBase64(snapshot.path);
+      onFrameCaptured(base64, Date.now());
+    }
+  };
+
+  const interval = setInterval(captureFrame, frameCaptureInterval);
+  return () => clearInterval(interval);
+}, [isActive, onFrameCaptured, frameCaptureInterval]);
+```
+
+**测试验证**：
+- ✅ 图像正常显示（真实图像，非灰色方块）
+- ✅ 捕获间隔准确（5/10/30秒可调）
+- ✅ 不影响情绪检测（仍保持 60fps）
+- ✅ 内存管理良好（最多保留3帧）
+
+---
+
+**最后更新**：2025-01-06
+**版本**：v1.1
+**状态**：实施中 - 阶段 1 (67% 完成)
+**完成步骤**：2/15 (13.3%)
