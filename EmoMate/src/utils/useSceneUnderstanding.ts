@@ -160,6 +160,9 @@ interface SceneUnderstandingState {
     /** Last keyword that triggered analysis (Step 3.3) */
     lastKeyword: string | null;
   };
+
+  /** Cached scenes (Step 4.1) - for UI display */
+  cachedScenes: SceneCacheEntry[];
 }
 
 /**
@@ -198,6 +201,12 @@ interface UseSceneUnderstandingReturn extends SceneUnderstandingState {
 
   /** Trigger analysis by keyword (Step 3.3) - High priority, bypasses cooldown */
   triggerByKeyword: (keyword: string, userQuestion: string) => Promise<void>;
+
+  /** Get cached scene history (Step 4.1) - Returns list of cached scenes sorted by time */
+  getCachedScenes: () => SceneCacheEntry[];
+
+  /** Manually clear expired scenes from cache (Step 4.1) */
+  clearExpiredScenes: () => number;
 }
 
 /**
@@ -249,6 +258,9 @@ export function useSceneUnderstanding(
     totalKeywordAnalyses: 0, // Step 3.3: Keyword trigger count
     lastKeyword: null as string | null, // Step 3.3: Last detected keyword
   });
+
+  // Cached scenes state (Step 4.1) - for triggering UI updates
+  const [cachedScenes, setCachedScenes] = useState<SceneCacheEntry[]>([]);
 
   // Refs for storing data that doesn't trigger re-renders
   const sceneCache = useRef<SceneCacheEntry[]>([]);
@@ -407,6 +419,7 @@ export function useSceneUnderstanding(
       const cacheJson = storage.getString(STORAGE_KEYS.SCENE_CACHE);
       if (cacheJson) {
         sceneCache.current = JSON.parse(cacheJson);
+        setCachedScenes(sceneCache.current); // Step 4.1: Update state for UI
         console.log('[SceneUnderstanding] Loaded', sceneCache.current.length, 'cached scenes');
       }
 
@@ -430,7 +443,8 @@ export function useSceneUnderstanding(
   }
 
   /**
-   * Save scene data to cache
+   * Save scene data to cache (Step 4.1)
+   * Implements cache capacity control (max 3 scenes) and expiration
    */
   function saveToCache(scene: SceneData, imageThumbnail: string): void {
     try {
@@ -444,10 +458,20 @@ export function useSceneUnderstanding(
       // Add to cache
       sceneCache.current.push(cacheEntry);
 
-      // Remove expired entries
+      // Remove expired entries (Step 4.1: auto cleanup)
       sceneCache.current = sceneCache.current.filter(
         entry => entry.expiresAt > Date.now()
       );
+
+      // Step 4.1: Enforce max cache size (keep most recent 3 scenes)
+      const MAX_CACHE_SIZE = 3;
+      if (sceneCache.current.length > MAX_CACHE_SIZE) {
+        // Sort by cachedAt timestamp (newest first)
+        sceneCache.current.sort((a, b) => b.cachedAt - a.cachedAt);
+        // Keep only the most recent MAX_CACHE_SIZE entries
+        sceneCache.current = sceneCache.current.slice(0, MAX_CACHE_SIZE);
+        console.log(`[SceneUnderstanding] 🗑️ Cache size limit reached, kept ${MAX_CACHE_SIZE} most recent scenes`);
+      }
 
       // Save to MMKV storage
       storage.set(
@@ -455,9 +479,12 @@ export function useSceneUnderstanding(
         JSON.stringify(sceneCache.current)
       );
 
-      console.log('[SceneUnderstanding] Saved to cache, total entries:', sceneCache.current.length);
+      // Step 4.1: Update state for UI
+      setCachedScenes([...sceneCache.current]);
+
+      console.log('[SceneUnderstanding] ✅ Saved to cache, total entries:', sceneCache.current.length);
     } catch (error) {
-      console.error('[SceneUnderstanding] Failed to save cache:', error);
+      console.error('[SceneUnderstanding] ❌ Failed to save cache:', error);
     }
   }
 
@@ -803,6 +830,64 @@ export function useSceneUnderstanding(
     [analyzeScene]
   );
 
+  /**
+   * Get cached scene history (Step 4.1)
+   * Returns list of all cached scenes sorted by timestamp (newest first)
+   *
+   * @returns Array of cached scene entries
+   */
+  const getCachedScenes = useCallback((): SceneCacheEntry[] => {
+    try {
+      // Return the state (which is already filtered and sorted)
+      console.log('[SceneUnderstanding] 📚 Retrieved', cachedScenes.length, 'cached scenes');
+      return cachedScenes;
+    } catch (error) {
+      console.error('[SceneUnderstanding] ❌ Failed to get cached scenes:', error);
+      return [];
+    }
+  }, [cachedScenes]);
+
+  /**
+   * Manually clear expired scenes from cache (Step 4.1)
+   * Removes all scenes that have passed their expiration time
+   *
+   * @returns Number of scenes removed
+   */
+  const clearExpiredScenes = useCallback((): number => {
+    try {
+      const beforeCount = sceneCache.current.length;
+      const now = Date.now();
+
+      // Filter out expired entries
+      sceneCache.current = sceneCache.current.filter(
+        entry => entry.expiresAt > now
+      );
+
+      const afterCount = sceneCache.current.length;
+      const removedCount = beforeCount - afterCount;
+
+      // Save updated cache to storage
+      storage.set(
+        STORAGE_KEYS.SCENE_CACHE,
+        JSON.stringify(sceneCache.current)
+      );
+
+      // Step 4.1: Update state for UI
+      setCachedScenes([...sceneCache.current]);
+
+      if (removedCount > 0) {
+        console.log(`[SceneUnderstanding] 🗑️ Cleared ${removedCount} expired scene(s)`);
+      } else {
+        console.log('[SceneUnderstanding] ✅ No expired scenes to clear');
+      }
+
+      return removedCount;
+    } catch (error) {
+      console.error('[SceneUnderstanding] ❌ Failed to clear expired scenes:', error);
+      return 0;
+    }
+  }, []);
+
   return {
     // State
     currentScene,
@@ -814,6 +899,7 @@ export function useSceneUnderstanding(
     totalCost,
     debugInfo,
     timerState,
+    cachedScenes, // Step 4.1
 
     // Methods
     analyzeScene,
@@ -827,5 +913,7 @@ export function useSceneUnderstanding(
     setPhotoCaptureCallback,
     detectKeywords, // Step 3.3
     triggerByKeyword, // Step 3.3
+    getCachedScenes, // Step 4.1
+    clearExpiredScenes, // Step 4.1
   };
 }

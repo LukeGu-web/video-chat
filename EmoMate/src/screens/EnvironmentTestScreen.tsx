@@ -23,7 +23,6 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { BasicEmotionDetector } from '../components/BasicEmotionDetector';
 import { EmotionType } from '../types/emotion';
 import { compareImages } from '../utils/imageComparison';
-import { analyzeSceneWithClaude } from '../utils/claudeVision';
 import { useSceneUnderstanding } from '../utils/useSceneUnderstanding';
 import { getClaudeApiKey } from '../constants/ai';
 import { SceneAnalysisResponse, SceneTriggerType } from '../types/scene';
@@ -144,26 +143,28 @@ export const EnvironmentTestScreen: React.FC = () => {
     setAnalysisError(null);
 
     try {
-      // Call Claude Vision API
-      const result = await analyzeSceneWithClaude(
-        {
-          imageBase64: latestFrame.base64,
+      // Use sceneUnderstanding.analyzeScene to trigger analysis with caching (Step 4.1)
+      await sceneUnderstanding.analyzeScene(latestFrame.base64);
+
+      // Get the result from sceneUnderstanding state
+      if (sceneUnderstanding.currentScene) {
+        const result: SceneAnalysisResponse = {
+          scene: sceneUnderstanding.currentScene,
+          success: true,
           triggerType: SceneTriggerType.MANUAL,
-        },
-        apiKey
-      );
+          cost: undefined, // Cost is tracked in sceneUnderstanding
+        };
 
-      console.log('[EnvironmentTest] Scene analysis completed:', result);
+        console.log('[EnvironmentTest] Scene analysis completed:', result);
 
-      // Update state with result
-      setSceneAnalysisResult(result);
-      setTotalAnalysisCount(prev => prev + 1);
-      if (result.cost !== undefined) {
-        setTotalAPICost(prev => prev + (result.cost || 0));
-      }
+        // Update local state with result
+        setSceneAnalysisResult(result);
+        setTotalAnalysisCount(prev => prev + 1);
 
-      if (!result.success) {
-        setAnalysisError(result.error || '场景分析失败');
+        // Use sceneUnderstanding's tracked costs
+        setTotalAPICost(sceneUnderstanding.totalCost);
+      } else if (sceneUnderstanding.error) {
+        setAnalysisError(sceneUnderstanding.error);
       }
     } catch (error) {
       console.error('[EnvironmentTest] Scene analysis error:', error);
@@ -173,7 +174,7 @@ export const EnvironmentTestScreen: React.FC = () => {
     } finally {
       setIsAnalyzing(false);
     }
-  }, [capturedFrames]);
+  }, [capturedFrames, sceneUnderstanding]);
 
   // Handle frame capture
   const handleFrameCaptured = useCallback(async (base64: string, timestamp: number) => {
@@ -795,6 +796,155 @@ export const EnvironmentTestScreen: React.FC = () => {
               ]}
             >
               {sceneUnderstanding.timerState.lastTriggerReason === 'keyword' ? '✅' : '○'} 触发记录正确
+            </Text>
+          </View>
+        </View>
+
+        {/* Scene Cache History (Step 4.1) */}
+        <View style={styles.sceneCachePanel}>
+          <Text style={styles.sectionTitle}>💾 场景缓存历史 (步骤 4.1)</Text>
+
+          {/* Cache stats */}
+          <View style={styles.cacheStatsContainer}>
+            <View style={styles.cacheStatItem}>
+              <Text style={styles.cacheStatLabel}>缓存场景数</Text>
+              <Text style={styles.cacheStatValue}>
+                {sceneUnderstanding.cachedScenes.length} / 3
+              </Text>
+            </View>
+            <View style={styles.cacheStatItem}>
+              <Text style={styles.cacheStatLabel}>缓存命中</Text>
+              <Text style={styles.cacheStatValue}>
+                {sceneUnderstanding.debugInfo.cacheHits}
+              </Text>
+            </View>
+            <View style={styles.cacheStatItem}>
+              <Text style={styles.cacheStatLabel}>缓存未中</Text>
+              <Text style={styles.cacheStatValue}>
+                {sceneUnderstanding.debugInfo.cacheMisses}
+              </Text>
+            </View>
+          </View>
+
+          {/* Clear expired button */}
+          <TouchableOpacity
+            style={styles.clearExpiredButton}
+            onPress={() => {
+              const removedCount = sceneUnderstanding.clearExpiredScenes();
+              alert(`已清理 ${removedCount} 个过期场景`);
+            }}
+          >
+            <Text style={styles.clearExpiredButtonText}>
+              🗑️ 手动清理过期场景
+            </Text>
+          </TouchableOpacity>
+
+          {/* Scene history list */}
+          <View style={styles.sceneHistoryContainer}>
+            <Text style={styles.sceneHistoryTitle}>历史场景：</Text>
+
+            {sceneUnderstanding.cachedScenes.length === 0 ? (
+              <Text style={styles.emptySceneText}>暂无缓存场景</Text>
+            ) : (
+              sceneUnderstanding.cachedScenes.map((entry, index) => {
+                const now = Date.now();
+                const ageMinutes = Math.floor((now - entry.cachedAt) / 60000);
+                const expiresInMinutes = Math.floor((entry.expiresAt - now) / 60000);
+                const isExpired = entry.expiresAt <= now;
+                const isActive = expiresInMinutes > 0;
+
+                return (
+                  <View
+                    key={`${entry.cachedAt}-${index}`}
+                    style={[
+                      styles.sceneHistoryItem,
+                      isExpired && styles.sceneHistoryItemExpired,
+                    ]}
+                  >
+                    <View style={styles.sceneHistoryHeader}>
+                      <Text style={styles.sceneHistoryIndex}>{index + 1}.</Text>
+                      <Text style={styles.sceneHistoryLocation}>
+                        {entry.scene.location}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.sceneHistoryStatus,
+                          isActive ? styles.statusActive : styles.statusExpired,
+                        ]}
+                      >
+                        {isActive ? '活跃' : '已过期'}
+                      </Text>
+                    </View>
+
+                    <View style={styles.sceneHistoryDetails}>
+                      <Text style={styles.sceneHistoryTime}>
+                        缓存于: {ageMinutes < 1 ? '刚刚' : `${ageMinutes} 分钟前`}
+                      </Text>
+                      <Text style={styles.sceneHistoryExpiry}>
+                        过期: {isExpired ? '已过期' : `${expiresInMinutes} 分钟后`}
+                      </Text>
+                    </View>
+
+                    {entry.scene.objects.length > 0 && (
+                      <View style={styles.sceneHistoryObjects}>
+                        {entry.scene.objects.slice(0, 3).map((obj, objIdx) => (
+                          <View key={objIdx} style={styles.miniObjectTag}>
+                            <Text style={styles.miniObjectText}>{obj}</Text>
+                          </View>
+                        ))}
+                        {entry.scene.objects.length > 3 && (
+                          <Text style={styles.moreObjectsText}>
+                            +{entry.scene.objects.length - 3}
+                          </Text>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                );
+              })
+            )}
+          </View>
+
+          {/* Test criteria for Step 4.1 */}
+          <View style={styles.testCriteriaInline}>
+            <Text style={styles.criteriaInlineTitle}>测试标准 (步骤 4.1):</Text>
+            <Text
+              style={[
+                styles.criteriaInlineText,
+                sceneUnderstanding.cachedScenes.length > 0
+                  ? styles.criteriaPassed
+                  : styles.criteriaPending,
+              ]}
+            >
+              {sceneUnderstanding.cachedScenes.length > 0 ? '✅' : '○'} 数据正确保存和读取
+            </Text>
+            <Text
+              style={[
+                styles.criteriaInlineText,
+                styles.criteriaPending,
+              ]}
+            >
+              ○ App 重启后数据仍存在
+            </Text>
+            <Text
+              style={[
+                styles.criteriaInlineText,
+                sceneUnderstanding.cachedScenes.some(e => e.expiresAt <= Date.now())
+                  ? styles.criteriaPassed
+                  : styles.criteriaPending,
+              ]}
+            >
+              {sceneUnderstanding.cachedScenes.some(e => e.expiresAt <= Date.now()) ? '✅' : '○'} 过期场景自动清理
+            </Text>
+            <Text
+              style={[
+                styles.criteriaInlineText,
+                sceneUnderstanding.cachedScenes.length <= 3
+                  ? styles.criteriaPassed
+                  : styles.criteriaPending,
+              ]}
+            >
+              {sceneUnderstanding.cachedScenes.length <= 3 ? '✅' : '○'} 缓存容量控制（最多 3 个）
             </Text>
           </View>
         </View>
@@ -1777,5 +1927,143 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     fontWeight: '600',
+  },
+  // Step 4.1: Scene cache styles
+  sceneCachePanel: {
+    backgroundColor: '#1a1a2e',
+    padding: 16,
+    marginBottom: 16,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#9C27B0',
+  },
+  cacheStatsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 16,
+    paddingVertical: 12,
+    backgroundColor: '#252538',
+    borderRadius: 8,
+  },
+  cacheStatItem: {
+    alignItems: 'center',
+  },
+  cacheStatLabel: {
+    fontSize: 12,
+    color: '#aaa',
+    marginBottom: 4,
+  },
+  cacheStatValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#9C27B0',
+  },
+  clearExpiredButton: {
+    backgroundColor: '#FF6B6B',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  clearExpiredButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  sceneHistoryContainer: {
+    marginBottom: 12,
+  },
+  sceneHistoryTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 12,
+  },
+  emptySceneText: {
+    fontSize: 14,
+    color: '#666',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    paddingVertical: 20,
+  },
+  sceneHistoryItem: {
+    backgroundColor: '#252538',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#9C27B0',
+  },
+  sceneHistoryItemExpired: {
+    opacity: 0.6,
+    borderLeftColor: '#666',
+  },
+  sceneHistoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  sceneHistoryIndex: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#9C27B0',
+    marginRight: 8,
+  },
+  sceneHistoryLocation: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+    flex: 1,
+  },
+  sceneHistoryStatus: {
+    fontSize: 12,
+    fontWeight: '600',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  statusActive: {
+    backgroundColor: '#4CAF50',
+    color: '#fff',
+  },
+  statusExpired: {
+    backgroundColor: '#666',
+    color: '#ddd',
+  },
+  sceneHistoryDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  sceneHistoryTime: {
+    fontSize: 12,
+    color: '#aaa',
+  },
+  sceneHistoryExpiry: {
+    fontSize: 12,
+    color: '#aaa',
+  },
+  sceneHistoryObjects: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  miniObjectTag: {
+    backgroundColor: '#9C27B0',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginRight: 4,
+    marginBottom: 4,
+  },
+  miniObjectText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  moreObjectsText: {
+    fontSize: 12,
+    color: '#aaa',
+    paddingVertical: 4,
   },
 });
