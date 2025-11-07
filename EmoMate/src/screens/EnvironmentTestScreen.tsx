@@ -25,7 +25,7 @@ import { EmotionType } from '../types/emotion';
 import { compareImages } from '../utils/imageComparison';
 import { useSceneUnderstanding } from '../utils/useSceneUnderstanding';
 import { getClaudeApiKey } from '../constants/ai';
-import { SceneAnalysisResponse, SceneTriggerType } from '../types/scene';
+import { SceneAnalysisResponse, SceneTriggerType, DEFAULT_SCENE_CONFIG } from '../types/scene';
 
 // Navigation type
 type RootStackParamList = {
@@ -798,6 +798,72 @@ export const EnvironmentTestScreen: React.FC = () => {
               {sceneUnderstanding.timerState.lastTriggerReason === 'keyword' ? '✅' : '○'} 触发记录正确
             </Text>
           </View>
+        </View>
+
+        {/* Semantic Deduplication Stats (Step 4.2) */}
+        <View style={styles.deduplicationPanel}>
+          <Text style={styles.sectionTitle}>🔄 智能去重统计 (步骤 4.2)</Text>
+
+          {/* Deduplication stats grid */}
+          <View style={styles.deduplicationStatsGrid}>
+            <View style={styles.deduplicationStatCard}>
+              <Text style={styles.deduplicationStatIcon}>💰</Text>
+              <Text style={styles.deduplicationStatLabel}>节省API调用</Text>
+              <Text style={styles.deduplicationStatValue}>
+                {sceneUnderstanding.deduplicationStats.savedAPICalls}
+              </Text>
+            </View>
+
+            <View style={styles.deduplicationStatCard}>
+              <Text style={styles.deduplicationStatIcon}>🎯</Text>
+              <Text style={styles.deduplicationStatLabel}>去重次数</Text>
+              <Text style={styles.deduplicationStatValue}>
+                {sceneUnderstanding.deduplicationStats.deduplicationCount}
+              </Text>
+            </View>
+
+            <View style={styles.deduplicationStatCard}>
+              <Text style={styles.deduplicationStatIcon}>📊</Text>
+              <Text style={styles.deduplicationStatLabel}>相似度</Text>
+              <Text style={styles.deduplicationStatValue}>
+                {sceneUnderstanding.deduplicationStats.lastSimilarity !== null
+                  ? `${(sceneUnderstanding.deduplicationStats.lastSimilarity * 100).toFixed(1)}%`
+                  : 'N/A'}
+              </Text>
+            </View>
+
+            <View style={styles.deduplicationStatCard}>
+              <Text style={styles.deduplicationStatIcon}>⏱️</Text>
+              <Text style={styles.deduplicationStatLabel}>上次去重</Text>
+              <Text style={styles.deduplicationStatValue}>
+                {sceneUnderstanding.deduplicationStats.lastDeduplicationTime
+                  ? `${Math.floor((Date.now() - sceneUnderstanding.deduplicationStats.lastDeduplicationTime) / 60000)}m`
+                  : 'N/A'}
+              </Text>
+            </View>
+          </View>
+
+          {/* Deduplication explanation */}
+          <View style={styles.deduplicationExplanation}>
+            <Text style={styles.deduplicationExplanationText}>
+              💡 当图像相似度 ≥ {(DEFAULT_SCENE_CONFIG.deduplicationThreshold * 100).toFixed(0)}% 时，自动跳过 API 调用，更新场景时间戳
+            </Text>
+          </View>
+
+          {/* Cost savings calculation */}
+          {sceneUnderstanding.deduplicationStats.savedAPICalls > 0 && (
+            <View style={styles.costSavingsContainer}>
+              <Text style={styles.costSavingsLabel}>
+                预估节省成本：
+              </Text>
+              <Text style={styles.costSavingsValue}>
+                ${(sceneUnderstanding.deduplicationStats.savedAPICalls * 0.01).toFixed(4)} USD
+              </Text>
+              <Text style={styles.costSavingsNote}>
+                (假设每次调用 $0.01)
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Scene Cache History (Step 4.1) */}
@@ -1928,6 +1994,83 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
+  // Step 4.2: Deduplication styles
+  deduplicationPanel: {
+    backgroundColor: '#1a1a2e',
+    padding: 16,
+    marginBottom: 16,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#00BCD4',
+  },
+  deduplicationStatsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  deduplicationStatCard: {
+    width: '48%',
+    backgroundColor: '#252538',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  deduplicationStatIcon: {
+    fontSize: 24,
+    marginBottom: 6,
+  },
+  deduplicationStatLabel: {
+    color: '#9E9E9E',
+    fontSize: 12,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  deduplicationStatValue: {
+    color: '#00BCD4',
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  deduplicationExplanation: {
+    backgroundColor: '#252538',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#FFC107',
+  },
+  deduplicationExplanationText: {
+    color: '#B0B0B0',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  costSavingsContainer: {
+    backgroundColor: '#1e4d2b',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+  },
+  costSavingsLabel: {
+    color: '#81C784',
+    fontSize: 13,
+    marginBottom: 4,
+  },
+  costSavingsValue: {
+    color: '#4CAF50',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 2,
+  },
+  costSavingsNote: {
+    color: '#81C784',
+    fontSize: 11,
+    fontStyle: 'italic',
+  },
+
   // Step 4.1: Scene cache styles
   sceneCachePanel: {
     backgroundColor: '#1a1a2e',
