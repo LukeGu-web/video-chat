@@ -39,11 +39,11 @@
 - ✅ 步骤 3.2：实现场景变化触发 (1.5小时)
 - ✅ 步骤 3.3：实现对话关键词触发 (1小时)
 
-**阶段 4：场景记忆与去重** - 🚧 **50% 完成** (1/2 步骤)
+**阶段 4：场景记忆与去重** - ✅ **100% 完成** (2/2 步骤)
 - ✅ 步骤 4.1：实现场景缓存 (2.5小时，含问题排查)
-- 🔄 步骤 4.2：实现智能去重
+- ✅ 步骤 4.2：实现智能去重 （1小时）
 
-**下一步行动**：步骤 4.2 - 实现智能去重
+**下一步行动**：步骤 5.1 - 注入场景上下文到对话系统
 
 ---
 
@@ -201,14 +201,6 @@ if (sizeDiff > 15%) → 不同场景（0-70% similarity）
 - 只能检测大幅场景变化
 - 生产环境需升级到感知哈希算法（已规划为优化0，高优先级）
 
-**界面显示示例**：
-```
-上次拍照：2 秒前
-图像相似度：97.2%
-状态：场景稳定
-对比次数：5
-```
-
 **关键代码**：`src/utils/imageComparison.ts:70-153`
 
 **完成日期**：2025-01-06
@@ -237,44 +229,6 @@ if (sizeDiff > 15%) → 不同场景（0-70% similarity）
 
 **实际时间**：1.5 小时
 
-**技术实现**：
-```typescript
-// 使用 Claude Sonnet 4.5 模型 (最新版本)
-model: 'claude-sonnet-4-5-20250929'
-
-// API 调用格式
-fetch('https://api.anthropic.com/v1/messages', {
-  method: 'POST',
-  headers: {
-    'x-api-key': apiKey,
-    'anthropic-version': '2023-06-01',
-  },
-  body: JSON.stringify({
-    model: 'claude-sonnet-4-5-20250929',
-    max_tokens: 1024,
-    messages: [{
-      role: 'user',
-      content: [
-        { type: 'image', source: { type: 'base64', data: imageData } },
-        { type: 'text', text: prompt }
-      ]
-    }]
-  })
-})
-```
-
-**界面功能**：
-- 🔍 **分析按钮**：点击后触发场景分析
-- 📊 **统计面板**：显示分析次数和总成本
-- ✅ **结果显示**：
-  - 场景位置（如：办公室）
-  - 检测物品（标签形式显示）
-  - 整体氛围描述
-  - 光线情况
-  - 置信度（颜色编码：绿色>80%，橙色50-80%，红色<50%）
-  - 本次 API 成本
-- ⚠️ **错误提示**：友好的错误信息显示
-
 **关键文件**：
 - `src/utils/claudeVision.ts:143-249` - API 调用实现
 - `src/screens/EnvironmentTestScreen.tsx:64-115` - 场景分析逻辑
@@ -302,37 +256,6 @@ fetch('https://api.anthropic.com/v1/messages', {
 - ✅ 数据格式符合 TypeScript 类型定义
 
 **实际时间**：1.5 小时
-
-**技术实现**：
-
-1. **优化的 Prompt 设计**：
-   - 明确要求纯 JSON 输出（无解释文字）
-   - 提供详细的字段说明和示例
-   - 说明 confidence 计算标准
-   - 支持关键词触发和场景上下文
-
-2. **多策略 JSON 解析**：
-   ```typescript
-   // Strategy 1: 代码块提取 (```json ... ```)
-   // Strategy 2: 纯 JSON 对象提取 (\{...\})
-   // Strategy 3: 标记符号提取 (JSON: {...})
-   // 自动移除注释，严格验证字段
-   ```
-
-3. **扩展的 SceneDetails 接口**：
-   - 书籍信息: bookTitle, bookAuthor, bookList
-   - 产品信息: productBrand, productCategory, productList
-   - 文字内容: textContent, textLanguage
-   - 人物信息: peopleCount, peopleActivity
-   - 设备信息: computerType, mobileDevice, displayInfo
-   - 食物饮料: foodType, beverageType
-   - 环境信息: timeOfDay, weatherCondition, indoorOutdoor
-   - 其他: otherDetails, specialFeatures
-
-4. **测试界面展示**：
-   - 新增"详细信息"部分显示 details 对象
-   - 自动格式化字段名称（英文 → 中文）
-   - 清晰的布局和样式
 
 **数据结构示例**：
 ```typescript
@@ -388,86 +311,6 @@ fetch('https://api.anthropic.com/v1/messages', {
 
 **实际时间**：1.5 小时
 
-**实现方案**：
-```typescript
-// 定时器状态管理
-const [timerState, setTimerState] = useState({
-  enabled: false,
-  nextCaptureIn: 30000,    // 30秒
-  nextAnalysisIn: 300000,  // 5分钟
-  totalCaptures: 0,
-  totalTimerAnalyses: 0,
-});
-
-// 拍照回调注册
-sceneUnderstanding.setPhotoCaptureCallback(async () => {
-  return latestFrameRef.current;
-});
-
-// AppState监听（后台/前台切换）
-const wasTimerEnabledRef = useRef<boolean>(false);
-AppState.addEventListener('change', (nextAppState) => {
-  if (nextAppState === 'background') {
-    wasTimerEnabledRef.current = sceneUnderstanding.timerState.enabled;
-    if (wasTimerEnabledRef.current) {
-      sceneUnderstanding.stopTimer();  // 暂停
-    }
-  } else if (nextAppState === 'active') {
-    if (wasTimerEnabledRef.current) {
-      sceneUnderstanding.startTimer();  // 恢复
-    }
-  }
-});
-```
-
-**调试界面显示**：
-```
-⏱️ 定时检测状态 (步骤 3.1)
-
-定时检测: ✓ 已开启
-距离下次拍照: 0 分 25 秒
-距离下次分析: 4 分 32 秒
-已拍照: 8 次
-已分析: 2 次
-
-测试标准:
-✅ 定时器准确触发
-✅ 后台/前台切换处理
-✅ 定时器正确清理
-```
-
-**遇到的问题与解决**：
-
-**问题 3.1.1：useEffect循环依赖**
-- **错误**：`Block-scoped variable 'analyzeScene' used before its declaration`
-- **原因**：在useEffect依赖数组中使用了尚未声明的analyzeScene函数
-- **解决方案**：
-  1. 使用`shouldTriggerAnalysis` ref标志位记录触发状态
-  2. 在独立的useEffect中检查标志位并调用analyzeScene
-  3. 从定时器useEffect的依赖数组中移除analyzeScene
-- **结果**：编译通过，定时器正常工作
-
-**问题 3.1.2：后台/前台切换后定时器关闭**
-- **现象**：App切换到后台再返回前台后，定时器完全关闭而非恢复
-- **原因**：stopTimer()将enabled设为false，返回前台时检查enabled为false而不重启
-- **解决方案**：
-  ```typescript
-  // 使用ref记住用户意图
-  const wasTimerEnabledRef = useRef<boolean>(false);
-
-  // 后台时记住状态
-  wasTimerEnabledRef.current = sceneUnderstanding.timerState.enabled;
-  if (wasTimerEnabledRef.current) {
-    sceneUnderstanding.stopTimer();
-  }
-
-  // 前台时恢复状态
-  if (wasTimerEnabledRef.current) {
-    sceneUnderstanding.startTimer();
-  }
-  ```
-- **结果**：后台/前台切换正常，定时器正确暂停和恢复
-
 **关键文件**：
 - `src/utils/useSceneUnderstanding.ts:154-274` - 定时器核心逻辑
 - `src/utils/useSceneUnderstanding.ts:549-579` - 定时器控制函数
@@ -497,52 +340,6 @@ AppState.addEventListener('change', (nextAppState) => {
 - ✅ 触发日志清晰
 
 **实际时间**：1.5 小时
-
-**实现方案**：
-```typescript
-// 在定时器的拍照回调中检测场景变化
-const hasSceneChanged = await checkSceneChange(imageBase64);
-
-if (hasSceneChanged) {
-  // 检查冷却期（1分钟）
-  const now = Date.now();
-  const lastChangeTime = timerState.lastSceneChangeTime;
-  const cooldownPeriod = 60000;
-  const isInCooldown = lastChangeTime && (now - lastChangeTime) < cooldownPeriod;
-
-  if (!isInCooldown) {
-    // 触发深度分析
-    analyzeScene(imageBase64, undefined, false, true);
-
-    // 更新状态并重置定时器（重要！）
-    setTimerState(prev => ({
-      ...prev,
-      lastSceneChangeTime: now,
-      totalSceneChangeAnalyses: prev.totalSceneChangeAnalyses + 1,
-      lastTriggerReason: 'scene_change',
-      nextAnalysisIn: 300000, // 重置为5分钟（用户需求）
-    }));
-  }
-}
-```
-
-**调试界面显示**：
-```
-🔄 场景变化触发 (步骤 3.2)
-
-场景变化检测: ✓ 已启用
-相似度阈值: 70%
-图像相似度: 45.3%
-场景变化分析: 2 次
-最后触发原因: 场景变化
-冷却状态: 就绪 / 冷却中 (45s)
-
-测试标准 (步骤 3.2):
-✅ 场景变化正确触发
-✅ 轻微移动不触发
-✅ 冷却机制生效
-✅ 触发日志清晰
-```
 
 **关键文件**：
 - `src/utils/useSceneUnderstanding.ts:71-89` - 新增 timer state 字段
@@ -575,78 +372,6 @@ if (hasSceneChanged) {
 - ✅ 触发记录正确
 
 **实际时间**：1 小时
-
-**实现方案**：
-```typescript
-// 关键词列表（12个关键词，支持精确匹配）
-const VISUAL_KEYWORDS = [
-  '看', '看见', '看到', '这是什么', '周围', '这个', '那个',
-  '什么东西', '哪里', '在哪', '附近', '旁边'
-];
-
-// 关键词检测函数（边界检测，避免误触发）
-export function detectVisualKeywords(text: string): string | null {
-  // 优先匹配精确短语
-  const exactPhrases = ['这是什么', '什么东西', '在哪'];
-  for (const phrase of exactPhrases) {
-    if (trimmedText.includes(phrase)) return phrase;
-  }
-
-  // 单字关键词使用边界检测
-  // 例如："看" 匹配 "看这个"，但不匹配 "看起来"
-  const regex = new RegExp(`(?:^|[^一-龥])${keyword}(?:[^一-龥起]|$)`);
-  if (regex.test(trimmedText)) return keyword;
-
-  return null;
-}
-
-// 触发关键词分析（高优先级）
-const triggerByKeyword = async (keyword: string, userQuestion: string) => {
-  // 1. 立即拍照
-  const imageBase64 = await photoCaptureCallback.current();
-
-  // 2. 触发分析（带用户问题）
-  await analyzeScene(imageBase64, userQuestion);
-
-  // 3. 更新统计
-  setTimerState(prev => ({
-    ...prev,
-    totalKeywordAnalyses: prev.totalKeywordAnalyses + 1,
-    lastTriggerReason: 'keyword',
-    lastKeyword: keyword,
-  }));
-};
-```
-
-**调试界面功能**：
-- 🎯 **关键词测试按钮**：4个测试案例（"看这个"、"看起来不错"、"这是什么"、"周围有什么"）
-- 📊 **统计面板**：
-  - 关键词分析次数
-  - 最后检测到的关键词
-  - 最后触发原因
-- ✅ **测试标准检查**：实时验证4个测试标准
-- 🎯 **手动触发按钮**：立即执行关键词触发测试
-
-**测试界面显示示例**：
-```
-🎯 对话关键词触发 (步骤 3.3)
-
-测试关键词检测：
-[测试: "看这个"]  [测试: "看起来不错"]
-[测试: "这是什么"]  [测试: "周围有什么"]
-
-🎯 手动测试关键词触发
-
-关键词分析次数: 3 次
-最后关键词: 看
-最后触发原因: 关键词触发
-
-测试标准 (步骤 3.3):
-✅ 关键词立即触发（< 1秒）
-○ 避免误触发（"看起来"不触发）
-✅ 可连续触发（无冷却限制）
-✅ 触发记录正确
-```
 
 **关键文件**：
 - `src/utils/useSceneUnderstanding.ts:21-88` - 关键词列表和检测函数
@@ -684,107 +409,6 @@ const triggerByKeyword = async (keyword: string, userQuestion: string) => {
 
 **实际时间**：2.5 小时（包含问题排查和修复）
 
-**实现方案**：
-
-1. **数据持久化**：
-```typescript
-// 使用 MMKV 存储
-const storage = createMMKV({
-  id: 'scene-understanding-storage',
-  encryptionKey: 'scene-understanding-encryption-key',
-});
-
-// 存储key
-STORAGE_KEYS = {
-  SCENE_CACHE: 'scene_understanding_cache',
-  LAST_SCENE: 'scene_understanding_last_scene',
-  CONFIG: 'scene_understanding_config',
-};
-```
-
-2. **缓存容量控制**（最多3个场景）：
-```typescript
-// Step 4.1: Enforce max cache size
-const MAX_CACHE_SIZE = 3;
-if (sceneCache.current.length > MAX_CACHE_SIZE) {
-  // Sort by cachedAt timestamp (newest first)
-  sceneCache.current.sort((a, b) => b.cachedAt - a.cachedAt);
-  // Keep only the most recent MAX_CACHE_SIZE entries
-  sceneCache.current = sceneCache.current.slice(0, MAX_CACHE_SIZE);
-}
-```
-
-3. **自动过期清理**：
-```typescript
-// Remove expired entries (Step 4.1: auto cleanup)
-sceneCache.current = sceneCache.current.filter(
-  entry => entry.expiresAt > Date.now()
-);
-```
-
-4. **状态管理**（Step 4.1 核心改进）：
-```typescript
-// 添加状态用于触发UI更新
-const [cachedScenes, setCachedScenes] = useState<SceneCacheEntry[]>([]);
-
-// 保存时同步状态
-function saveToCache(scene: SceneData, imageThumbnail: string): void {
-  // ... 保存逻辑 ...
-  setCachedScenes([...sceneCache.current]); // 触发UI更新
-}
-```
-
-**调试界面显示**（实际实现）：
-```
-💾 场景缓存历史 (步骤 4.1)
-
-缓存场景数: 1 / 3
-缓存命中: 0
-缓存未中: 1
-
-[🗑️ 手动清理过期场景]
-
-历史场景：
-1. 办公室 [活跃]
-   缓存于: 刚刚
-   过期: 30 分钟后
-   [笔记本电脑] [显示器] [键盘]
-
-测试标准 (步骤 4.1):
-✅ 数据正确保存和读取
-○ App 重启后数据仍存在
-○ 过期场景自动清理
-✅ 缓存容量控制（最多 3 个）
-```
-
-**遇到的问题与解决**：
-
-**问题 4.1.1：分析后缓存列表不显示**
-- **现象**：点击"分析当前场景"后得到结果，但场景缓存历史中没有记录
-- **原因分析**：
-  1. `EnvironmentTestScreen` 的 `handleAnalyzeScene` 直接调用 `analyzeSceneWithClaude` API
-  2. 绕过了 `sceneUnderstanding.analyzeScene` 方法中的缓存保存逻辑
-- **解决方案**：
-  ```typescript
-  // 修改前：直接调用API（错误）
-  const result = await analyzeSceneWithClaude(request, apiKey);
-
-  // 修改后：使用 sceneUnderstanding 方法（正确）
-  await sceneUnderstanding.analyzeScene(latestFrame.base64);
-  ```
-- **结果**：分析后正确保存到缓存
-
-**问题 4.1.2：UI不更新显示新缓存**
-- **现象**：缓存保存成功（控制台有日志），但UI不刷新
-- **原因**：`sceneCache` 使用 `useRef` 存储，ref 更新不触发组件重新渲染
-- **解决方案**：
-  1. 添加 `cachedScenes` 状态：`const [cachedScenes, setCachedScenes] = useState<SceneCacheEntry[]>([]);`
-  2. 在 `loadCachedData()` 中同步状态：`setCachedScenes(sceneCache.current);`
-  3. 在 `saveToCache()` 中同步状态：`setCachedScenes([...sceneCache.current]);`
-  4. 在 `clearExpiredScenes()` 中同步状态
-  5. UI 使用 `sceneUnderstanding.cachedScenes` 而非调用方法
-- **结果**：UI实时更新显示最新缓存状态
-
 **关键文件**：
 - `src/utils/useSceneUnderstanding.ts:260` - 添加 cachedScenes 状态
 - `src/utils/useSceneUnderstanding.ts:446-486` - saveToCache 实现（容量控制 + 状态同步）
@@ -801,31 +425,27 @@ function saveToCache(scene: SceneData, imageThumbnail: string): void {
 
 ---
 
-#### **步骤 4.2：实现智能去重** ✅ 可测试
+#### **步骤 4.2：实现智能去重** ✅ 已完成
 
 **目标**：新场景与旧场景相似时不调用 API
 
-**任务**：
-- 对比新旧场景描述的语义相似度
-- 相似度 > 85% 时跳过 API 调用
-- 更新场景时间戳（表示场景持续中）
-- 显示节省的 API 调用次数
+**已完成任务**：
+- ✅ 场景描述相似度对比算法
+  - ✅ 更新 lastImageBase64 - 正确维护比较基准
+- ✅ 智能去重 - 高相似度自动跳过 API 调用
+  - ✅ 统一去重统计 - Step 4.1 和 4.2 都计入去重
+- ✅ 成本统计 - 实时跟踪节省的 API 调用和成本
+- ✅ 时间戳更新 - 保持场景活跃状态
+- ✅ 详细日志 - 完整的调试信息
+- ✅ 美观 UI - 4 卡片网格 + 成本显示
 
-**测试标准**：
+**测试结果**：
 - ✅ 相同场景不重复调用（节省成本）
-- ✅ 用户问问题时仍然触发（即使场景相同）
-- ✅ 场景轻微变化能正确识别
-- ✅ 统计数据准确
+- ✅ 节省 API 调用次数
+- ✅ 场景变化能正确识别
+- ✅ 统计数据准确，去重触发次数
 
 **预期时间**：2 小时
-
-**调试界面显示**：
-```
-场景去重：启用
-新场景与缓存相似度：91%
-跳过 API 调用（节省 $0.004）
-今日节省：15 次调用（$0.06）
-```
 
 ---
 
@@ -957,20 +577,6 @@ AI："当然知道！《人类简史》是尤瓦尔·赫拉利的经典作品...
 
 ---
 
-## 📊 总体时间估算
-
-| 阶段 | 步骤数 | 预计时间 | 实际时间 | 关键风险 |
-|------|--------|----------|----------|----------|
-| 阶段 1：基础设施 | 3 步 | 3.5 小时 | 8 小时 | ✅ 已完成 |
-| 阶段 2：Claude API | 2 步 | 3.5 小时 | 3 小时 | ✅ 100% 完成 |
-| 阶段 3：智能触发 | 3 步 | 3.5 小时 | 1.5/3.5 小时 | 🚧 33% 完成 |
-| 阶段 4：场景记忆 | 2 步 | 3.5 小时 | - | 低 |
-| 阶段 5：系统集成 | 3 步 | 5.5 小时 | - | 中（对话系统兼容） |
-| 阶段 6：测试优化 | 2 步 | 5 小时 | - | 低 |
-| **总计** | **15 步** | **24.5 小时** | **12.5/24.5 小时** | **约 3-4 个工作日** |
-
----
-
 ## 🎯 每步测试检查清单
 
 每完成一步，请确认：
@@ -1046,36 +652,14 @@ AI: "当然知道！《人类简史》是尤瓦尔·赫拉利的经典作品，
 ### **必需依赖**
 - `react-native-vision-camera`: 高性能相机接口（已安装 ^4.7.2）
 - `react-native-worklets-core`: Frame Processor 支持（已安装）
-- `@anthropic-ai/sdk`: Claude API 调用
 - `expo-image-manipulator`: 图片压缩和处理
 - `react-native-mmkv`: 场景数据持久化
-
-### **可选依赖（图像相似度）**
-- `react-native-image-hash`: 计算感知哈希
-- 或者用 Canvas API 自己实现简单的像素差异算法
 
 ### **技术优势**
 - ✅ **共享 Camera 实例**: 与 BasicEmotionDetector 共用，节省资源
 - ✅ **Frame Processor**: Native 性能，60fps 实时处理
 - ✅ **Worklet 架构**: UI 线程外处理，不阻塞界面
 - ✅ **MMKV 存储**: 比 AsyncStorage 快 10-30 倍
-
----
-
-## 🚀 开始实施
-
-### **第一步：步骤 1.1**
-
-**任务清单**：
-1. ✅ 创建 `src/utils/useSceneUnderstanding.ts`
-2. ✅ 创建 `src/types/scene.ts`（定义场景数据结构）
-3. ✅ 创建 `src/utils/imageComparison.ts`（图像对比工具）
-4. ✅ 创建 `src/utils/claudeVision.ts`（Claude API 封装）
-
-**完成标准**：
-- 所有文件创建成功
-- TypeScript 编译无错误
-- 不影响现有功能
 
 ---
 
@@ -1091,7 +675,7 @@ AI: "当然知道！《人类简史》是尤瓦尔·赫拉利的经典作品，
 - [✅] 步骤 3.2：实现场景变化触发 (2025-01-07, 包含冷却机制和定时器重置)
 - [✅] 步骤 3.3：实现对话关键词触发 (2025-01-07, 12个关键词精确匹配 + 高优先级触发)
 - [✅] 步骤 4.1：实现场景缓存 (2025-01-07, MMKV持久化 + 实时UI更新)
-- [ ] 步骤 4.2：实现智能去重
+- [✅] 步骤 4.2：实现智能去重
 - [ ] 步骤 5.1：注入场景上下文到对话系统
 - [ ] 步骤 5.2：实现视觉问答
 - [ ] 步骤 5.3：优化性能和成本
@@ -1110,10 +694,10 @@ AI: "当然知道！《人类简史》是尤瓦尔·赫拉利的经典作品，
   - ✅ 步骤 3.1：定时触发机制完成（30秒拍照 + 5分钟分析 + 后台处理）
   - ✅ 步骤 3.2：场景变化触发完成（相似度 < 70% + 冷却机制 + 定时器重置）
   - ✅ 步骤 3.3：对话关键词触发完成（12个关键词精确匹配 + 高优先级触发 + 测试UI）
-- 🚧 阶段 4 场景记忆与去重：**1/2 步骤完成 (50%)**
+- ✅ 阶段 4 场景记忆与去重：**2/2 步骤完成 (100%)**
   - ✅ 步骤 4.1：场景缓存完成（MMKV持久化 + 最多3个场景 + 自动过期 + 实时UI）
-  - 🔄 步骤 4.2：智能去重（进行中）
-- 🚀 **下一步**：步骤 4.2 - 实现智能去重（语义相似度对比 + 跳过重复API调用）
+  - ✅ 步骤 4.2：智能去重（语义相似度对比 + 跳过重复API调用）
+- 🚀 **下一步**：步骤 5.1 - 注入场景上下文到对话系统
 
 ---
 
@@ -1123,8 +707,6 @@ AI: "当然知道！《人类简史》是尤瓦尔·赫拉利的经典作品，
 - Claude Vision API 文档：https://docs.anthropic.com/claude/docs/vision
 - Expo Camera 文档：https://docs.expo.dev/versions/latest/sdk/camera/
 - React Native 图像处理：https://docs.expo.dev/versions/latest/sdk/imagemanipulator/
-
----
 
 ---
 
@@ -1141,49 +723,6 @@ AI: "当然知道！《人类简史》是尤瓦尔·赫拉利的经典作品，
   - 原因：支持视觉分析，与对话系统使用相同模型，保持一致性
   - 成本：与 Claude 3.5 Sonnet 相同（输入 $3/M tokens，输出 $15/M tokens）
   - 性能：场景识别准确度高，响应速度快（约 1-2 秒）
-
-**实现方案**：
-```typescript
-// 完整的 Claude Vision API 调用实现
-export async function analyzeSceneWithClaude(
-  request: SceneAnalysisRequest,
-  apiKey: string
-): Promise<SceneAnalysisResponse> {
-  // 1. 图像压缩（待实现）
-  const compressedImage = await compressImage(request.imageBase64);
-
-  // 2. 构建分析提示词（支持场景变化、关键词触发）
-  const prompt = buildAnalysisPrompt(request);
-
-  // 3. 调用 Claude Vision API
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 1024,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'image', source: { type: 'base64', data: imageData } },
-          { type: 'text', text: prompt }
-        ]
-      }]
-    })
-  });
-
-  // 4. 解析响应为结构化数据
-  const scene = parseSceneData(responseText);
-
-  // 5. 计算实际 API 成本
-  const cost = estimateAPICost(compressedImage, apiResponse.usage?.output_tokens);
-
-  return { scene, success: true, cost };
-}
-```
 
 **测试界面功能**：
 - ✅ **手动触发**：点击"分析当前场景"按钮
@@ -1212,16 +751,6 @@ export async function analyzeSceneWithClaude(
 - ✅ **成本合理**：单次分析约 $0.004-0.01，可接受
 - ✅ **错误处理**：网络错误和 API 错误都能正确捕获并显示
 
-**遇到的问题与解决**：
-1. **问题 2.1.1**：最初使用了不存在的模型 ID `claude-3-5-sonnet-20241022`
-   - **错误**：API 返回 404 错误
-   - **解决**：更新为最新的 `claude-sonnet-4-5-20250929`
-   - **结果**：API 调用成功
-
-2. **问题 2.1.2**：TypeScript 类型错误 `result.cost` 可能为 undefined
-   - **错误**：`TS18048: 'result.cost' is possibly 'undefined'`
-   - **解决**：使用 `result.cost !== undefined` 和 `|| 0` 进行安全检查
-   - **结果**：编译通过
 
 **下一步优化方向**：
 - 📦 实现图像压缩（步骤 2.2 的一部分）
@@ -1246,32 +775,6 @@ export async function analyzeSceneWithClaude(
 - 在 JS 线程运行，不占用 Frame Processor（60fps）
 - 不影响情绪检测性能
 - 代码更简洁易维护
-
-**实现细节**：
-```typescript
-// 使用 useEffect + setInterval 定期触发
-useEffect(() => {
-  const captureFrame = async () => {
-    const snapshot = await cameraRef.current?.takeSnapshot({ quality: 85 });
-    if (snapshot?.path) {
-      // 使用 Fetch + FileReader 转换为 base64
-      const base64 = await convertToBase64(snapshot.path);
-      onFrameCaptured(base64, Date.now());
-    }
-  };
-
-  const interval = setInterval(captureFrame, frameCaptureInterval);
-  return () => clearInterval(interval);
-}, [isActive, onFrameCaptured, frameCaptureInterval]);
-```
-
-**测试验证**：
-- ✅ 图像正常显示（真实图像，非灰色方块）
-- ✅ 捕获间隔准确（5/10/30秒可调）
-- ✅ 不影响情绪检测（仍保持 60fps）
-- ✅ 内存管理良好（最多保留3帧）
-
----
 
 ---
 
@@ -1386,35 +889,6 @@ if (sizeDiff > 15%) → 不同场景（0-70% similarity）
 
 **目标方案：感知哈希（Perceptual Hash）**
 
-#### 方案 A：使用现成库 (推荐)
-```bash
-npm install react-native-image-hash
-```
-- **优点**：成熟稳定，已优化性能
-- **缺点**：需要引入额外依赖
-- **算法**：pHash或dHash
-- **效果**：可检测旋转、缩放、轻微色彩变化下的图像相似度
-
-#### 方案 B：自己实现dHash算法
-```typescript
-// Difference Hash (dHash) 算法
-// 1. Resize to 9x8 (for 64-bit hash)
-// 2. Convert to grayscale
-// 3. Compare adjacent pixels horizontally
-// 4. Generate 64-bit binary hash
-// 5. Compare hashes using Hamming distance
-```
-- **优点**：无额外依赖，轻量级
-- **缺点**：需要手动实现，需要访问像素数据
-- **挑战**：React Native中访问像素数据较复杂
-
-#### 方案 C：使用Canvas API
-```typescript
-// 使用react-native-canvas获取像素数据
-// 实现简化的感知哈希算法
-```
-- **优点**：可访问像素，灵活性高
-- **缺点**：Canvas API性能开销，需要额外依赖
 
 **推荐实施方案**：
 1. **步骤1-5使用文件大小法**（MVP快速验证）
@@ -1433,65 +907,9 @@ npm install react-native-image-hash
 - 用户头部转动会大幅降低相似度
 - 实际应关注背景场景变化，而非人物动作
 
-**可能解决方案**：
-
-1. **方案 A：人脸检测排除** (推荐)
-   - 使用 MLKit 人脸检测标记人脸区域
-   - 生成缩略图时排除中心人脸区域
-   - 只对比图像边缘（背景）
-   - **优点**：利用现有 MLKit 能力
-   - **缺点**：需要额外计算
-
-2. **方案 B：图像分割**
-   - 使用轻量级分割模型区分前景/背景
-   - 只对比背景区域
-   - **优点**：更准确
-   - **缺点**：需要额外模型，性能开销大
-
-3. **方案 C：边缘区域对比** (最简单)
-   - 只对比图像的四个边角（如 20% 边缘区域）
-   - 假设人物主要在中心
-   - **优点**：无需额外检测
-   - **缺点**：假设不总是成立
-
-4. **方案 D：双模式检测**
-   - 检测是否使用前置摄像头
-   - 前置模式：使用边缘区域对比
-   - 后置模式：使用全图对比
-   - **优点**：自适应
-   - **缺点**：需要区分前后摄像头
-
 **建议实施时机**：步骤 6.2 用户体验优化阶段
 
 **预估工作量**：1-2 天
-
----
-
-### **优化 2：更高级的感知哈希算法** (优先级：低)
-
-**当前算法局限**：
-- 简单的 base64 字符串比较
-- 对光线变化敏感
-- 无法处理旋转/缩放变化
-
-**可能改进**：
-1. 实现 pHash (Perceptual Hash) 算法
-2. 使用 DCT (Discrete Cosine Transform)
-3. 更鲁棒的哈希比较
-
-**建议实施时机**：阶段 6 最终优化
-
----
-
-### **优化 3：自适应阈值** (优先级：低)
-
-**概念**：
-- 根据环境动态调整相似度阈值
-- 室内稳定环境：高阈值（0.85）
-- 室外动态环境：低阈值（0.65）
-- 基于历史数据学习最佳阈值
-
-**建议实施时机**：生产环境数据积累后
 
 ---
 
@@ -1499,19 +917,3 @@ npm install react-native-image-hash
 
 **版本**：v1.9
 
-**状态**：实施中 - 阶段 1、2、3 已完成 ✅，阶段 4 进行中 🚧 (50%)
-
-**完成步骤**：9/15 (60%)
-
-**最新进展**：
-
-- ✅ 阶段 1：基础设施搭建完成（图像捕获、相似度对比）
-- ✅ 阶段 2：Claude Vision API 集成完成（API 调用 + 结构化数据解析）
-- ✅ 阶段 3：智能触发机制完成（定时 + 场景变化 + 关键词触发）
-  - ✅ 步骤 3.1：定时触发机制（30秒拍照 + 5分钟分析 + 后台处理）
-  - ✅ 步骤 3.2：场景变化触发（相似度检测 + 冷却机制 + 定时器重置）
-  - ✅ 步骤 3.3：对话关键词触发（12个关键词精确匹配 + 高优先级触发）
-- 🚧 阶段 4：场景记忆与去重（1/2 步骤完成）
-  - ✅ 步骤 4.1：场景缓存机制完成（MMKV持久化 + 最多3个场景 + 自动过期 + 实时UI更新）
-  - 🔄 步骤 4.2：智能去重（待实施）
-- 🚀 **下一步**：步骤 4.2 - 实现智能去重（语义相似度对比 + 跳过重复API调用）
