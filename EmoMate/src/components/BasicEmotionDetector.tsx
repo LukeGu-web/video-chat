@@ -468,43 +468,67 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
 
   // Scene understanding frame capture using takeSnapshot
   useEffect(() => {
-    if (!isActive || !onFrameCaptured || !cameraRef.current) return;
+    if (!isActive || !onFrameCaptured || !hasPermission) return;
 
-    const captureFrame = async () => {
-      try {
-        const snapshot = await cameraRef.current?.takeSnapshot({
-          quality: 85,
-        });
+    // Delay first capture to ensure camera is ready
+    const initialDelay = setTimeout(() => {
+      const captureFrame = async () => {
+        const now = Date.now();
+        if (now - lastFrameCapture.current < frameCaptureInterval) return;
 
-        if (snapshot?.path) {
-          // Read the file and convert to base64
-          const base64 = await fetch(`file://${snapshot.path}`)
-            .then((res) => res.blob())
-            .then((blob) => {
-              return new Promise<string>((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                  const result = reader.result as string;
-                  // Remove the data:image/...;base64, prefix
-                  const base64Data = result.split(',')[1];
-                  resolve(base64Data);
-                };
-                reader.onerror = reject;
-                reader.readAsDataURL(blob);
+        try {
+          if (!cameraRef.current) {
+            debugLog('BasicEmotionDetector', 'Camera ref not ready, skipping frame capture');
+            return;
+          }
+
+          const snapshot = await cameraRef.current.takeSnapshot({
+            quality: 85,
+          });
+
+          if (snapshot?.path) {
+            // Read the file and convert to base64
+            const base64 = await fetch(`file://${snapshot.path}`)
+              .then((res) => res.blob())
+              .then((blob) => {
+                return new Promise<string>((resolve, reject) => {
+                  const reader = new FileReader();
+                  reader.onloadend = () => {
+                    const result = reader.result as string;
+                    // Remove the data:image/...;base64, prefix
+                    const base64Data = result.split(',')[1];
+                    resolve(base64Data);
+                  };
+                  reader.onerror = reject;
+                  reader.readAsDataURL(blob);
+                });
               });
+
+            lastFrameCapture.current = now;
+            onFrameCaptured(base64, Date.now());
+            console.log('[BasicEmotionDetector] 📸 Frame captured (30s interval)');
+            debugLog('BasicEmotionDetector', 'Frame captured via takeSnapshot', {
+              timestamp: now,
+              size: base64.length,
             });
-
-          onFrameCaptured(base64, Date.now());
-          debugLog('BasicEmotionDetector', 'Frame captured via takeSnapshot');
+          }
+        } catch (error) {
+          console.error('[BasicEmotionDetector] ❌ Frame capture error:', error);
+          debugLog('BasicEmotionDetector', 'Frame capture error', error);
         }
-      } catch (error) {
-        debugLog('BasicEmotionDetector', 'Frame capture error', error);
-      }
-    };
+      };
 
-    const interval = setInterval(captureFrame, frameCaptureInterval);
-    return () => clearInterval(interval);
-  }, [isActive, onFrameCaptured, frameCaptureInterval]);
+      // Start interval after initial delay
+      const interval = setInterval(captureFrame, frameCaptureInterval);
+
+      // Capture first frame immediately after delay
+      captureFrame();
+
+      return () => clearInterval(interval);
+    }, 2000); // Wait 2 seconds for camera to be ready
+
+    return () => clearTimeout(initialDelay);
+  }, [isActive, onFrameCaptured, frameCaptureInterval, hasPermission]);
 
   // Cleanup timeout on component unmount
   useEffect(() => {

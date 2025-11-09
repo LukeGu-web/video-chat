@@ -6,6 +6,7 @@ interface HeaderProps {
   characterName?: string;
   onGoBack?: () => void;
   onGoToChatHistory?: () => void;
+  onGoToSceneHistory?: () => void;
   onGoToEmotionTest?: () => void;
   onGoToEnvironmentTest?: () => void;
 }
@@ -21,6 +22,7 @@ const Header: React.FC<HeaderProps> = ({
   characterName = 'AI伴侣',
   onGoBack,
   onGoToChatHistory,
+  onGoToSceneHistory,
   onGoToEmotionTest,
   onGoToEnvironmentTest,
 }) => {
@@ -34,6 +36,15 @@ const Header: React.FC<HeaderProps> = ({
       onPress: () => {
         setIsModalVisible(false);
         onGoToChatHistory?.();
+      },
+    },
+    {
+      id: 'sceneHistory',
+      label: '场景历史',
+      icon: '📸',
+      onPress: () => {
+        setIsModalVisible(false);
+        onGoToSceneHistory?.();
       },
     },
     ...(isDebugMode() && onGoToEmotionTest

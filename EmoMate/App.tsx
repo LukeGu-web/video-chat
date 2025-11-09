@@ -11,6 +11,7 @@ import {
   HiyoriScreen,
   EmotionTestScreen,
   EnvironmentTestScreen,
+  SceneHistoryScreen,
 } from './src/screens';
 import { isDebugMode } from './src/utils/debug';
 import { TTSQueue, initializeTTSCache } from './src/utils/ttsQueue'; // Phase 3: TTS 预热 + 缓存
@@ -23,6 +24,7 @@ export type RootStackParamList = {
   Hiyori: undefined;
   EmotionTest: undefined;
   EnvironmentTest: undefined;
+  SceneHistory: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -135,6 +137,7 @@ export default function App() {
           <Stack.Screen name='Home' component={HomeScreen} />
           <Stack.Screen name='ChatHistory' component={ChatHistoryScreen} />
           <Stack.Screen name='Hiyori' component={HiyoriScreen} />
+          <Stack.Screen name='SceneHistory' component={SceneHistoryScreen} />
           {isDebugMode() && (
             <>
               <Stack.Screen name='EmotionTest' component={EmotionTestScreen} />

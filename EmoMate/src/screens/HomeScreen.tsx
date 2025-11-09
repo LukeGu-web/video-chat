@@ -35,6 +35,7 @@ type RootStackParamList = {
   Hiyori: undefined;
   EmotionTest: undefined;
   EnvironmentTest: undefined;
+  SceneHistory: undefined;
 };
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<
@@ -167,6 +168,10 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
 
   const handleGoToChatHistory = () => {
     navigation.navigate('ChatHistory');
+  };
+
+  const handleGoToSceneHistory = () => {
+    navigation.navigate('SceneHistory');
   };
 
   const handleGoToEmotionTest = () => {
@@ -327,6 +332,7 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
           characterName={selectedCharacter || 'AI伴侣'}
           onGoBack={handleGoBack}
           onGoToChatHistory={handleGoToChatHistory}
+          onGoToSceneHistory={handleGoToSceneHistory}
           onGoToEmotionTest={handleGoToEmotionTest}
           onGoToEnvironmentTest={handleGoToEnvironmentTest}
         />
