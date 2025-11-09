@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { EnvironmentContext } from '../types/environment';
+import { SceneData } from '../types/scene';
 
 export interface EmotionLog {
   date: string;
@@ -22,6 +23,8 @@ interface UserState {
   // Environment detection state
   currentEnvironment: EnvironmentContext | null;
   environmentHistory: EnvironmentContext[];
+  // Scene understanding state (Step 5.1)
+  currentScene: SceneData | null;
 }
 
 interface UserActions {
@@ -32,6 +35,8 @@ interface UserActions {
   // Environment actions
   setCurrentEnvironment: (environment: EnvironmentContext) => void;
   addEnvironmentHistory: (environment: EnvironmentContext) => void;
+  // Scene understanding actions (Step 5.1)
+  setCurrentScene: (scene: SceneData | null) => void;
   reset: () => void;
 }
 
@@ -43,6 +48,7 @@ const initialState: UserState = {
   chatHistory: [],
   currentEnvironment: null,
   environmentHistory: [],
+  currentScene: null,
 };
 
 export const useUserStore = create<UserStore>()(
@@ -89,6 +95,12 @@ export const useUserStore = create<UserStore>()(
       });
     },
 
+    setCurrentScene: (scene: SceneData | null) => {
+      set((state) => {
+        state.currentScene = scene;
+      });
+    },
+
     reset: () => {
       set((state) => {
         state.selectedCharacter = initialState.selectedCharacter;
@@ -96,6 +108,7 @@ export const useUserStore = create<UserStore>()(
         state.chatHistory = initialState.chatHistory;
         state.currentEnvironment = initialState.currentEnvironment;
         state.environmentHistory = initialState.environmentHistory;
+        state.currentScene = initialState.currentScene;
       });
     },
   }))

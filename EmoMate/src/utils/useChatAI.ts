@@ -17,6 +17,7 @@ import { TTSQueue } from './ttsQueue'; // Phase 2: TTS队列管理
 import { SmartSentenceBuffer } from './smartSentenceBuffer'; // Phase 3: 智能句子过滤
 import { useUserStore } from '../store/userStore'; // Environment context
 import { buildEnvironmentPrompt } from './buildEnvironmentPrompt'; // Environment awareness
+import { buildScenePrompt, isSceneDataFresh } from './buildScenePrompt'; // Scene understanding (Step 5.1)
 
 export interface ChatMessage {
   id: string;
@@ -76,8 +77,8 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
   );
   const [isProactiveModeEnabled, setIsProactiveModeEnabled] = useState(true);
 
-  // Get current environment context from store
-  const { currentEnvironment } = useUserStore();
+  // Get current environment and scene context from store (Step 5.1)
+  const { currentEnvironment, currentScene } = useUserStore();
 
   // 主动对话相关状态
   const lastUserMessageTime = useRef<number>(Date.now());
@@ -255,19 +256,30 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     // 构建API消息格式，包含人格、情绪、上下文信息和背景故事
     const personalityText = config.personality || currentPersonality;
 
-    // Build environment context prompt
+    // Build environment context prompt (sensor data)
     const environmentPrompt = buildEnvironmentPrompt(
       currentEnvironment,
       true,
       5
     );
 
+    // Build scene context prompt (Step 5.1: Scene understanding)
+    // Only include scene if data is fresh (within 30 minutes)
+    const scenePrompt = isSceneDataFresh(currentScene, 30)
+      ? buildScenePrompt(currentScene, true, 5)
+      : '';
+
+    // Combine environment and scene prompts
+    const contextPrompt = [environmentPrompt, scenePrompt]
+      .filter(p => p.trim().length > 0)
+      .join('\n');
+
     const systemMessage = buildSystemPrompt(
       personalityText,
       config.userEmotion,
       conversationType,
       config.backgroundStory,
-      environmentPrompt // Add environment awareness
+      contextPrompt // Add both environment and scene awareness
     );
 
     // 保留更多上下文消息以保持对话连贯性
@@ -336,19 +348,30 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     const lengthConfig = getResponseLengthConfig(conversationType);
     const personalityText = config.personality || currentPersonality;
 
-    // Build environment context prompt for streaming
+    // Build environment context prompt for streaming (sensor data)
     const environmentPrompt = buildEnvironmentPrompt(
       currentEnvironment,
       true,
       5
     );
 
+    // Build scene context prompt (Step 5.1: Scene understanding)
+    // Only include scene if data is fresh (within 30 minutes)
+    const scenePrompt = isSceneDataFresh(currentScene, 30)
+      ? buildScenePrompt(currentScene, true, 5)
+      : '';
+
+    // Combine environment and scene prompts
+    const contextPrompt = [environmentPrompt, scenePrompt]
+      .filter(p => p.trim().length > 0)
+      .join('\n');
+
     const systemMessage = buildSystemPrompt(
       personalityText,
       config.userEmotion,
       conversationType,
       config.backgroundStory,
-      environmentPrompt // Add environment awareness
+      contextPrompt // Add both environment and scene awareness
     );
 
     const contextMessages = messages
