@@ -18,6 +18,7 @@ import { SmartSentenceBuffer } from './smartSentenceBuffer'; // Phase 3: 智能�
 import { useUserStore } from '../store/userStore'; // Environment context
 import { buildEnvironmentPrompt } from './buildEnvironmentPrompt'; // Environment awareness
 import { buildScenePrompt, isSceneDataFresh } from './buildScenePrompt'; // Scene understanding (Step 5.1)
+import { SceneData } from '../types/scene'; // Scene data type
 
 export interface ChatMessage {
   id: string;
@@ -36,6 +37,7 @@ export interface ChatAIConfig {
   voiceId?: string; // ElevenLabs 语音 ID
   userEmotion?: string; // 用户当前情绪状态
   backgroundStory?: string; // 背景故事上下文
+  sceneContext?: SceneData | null; // 场景上下文（Step 5.2: 直接传递，避免状态更新延迟）
 }
 
 export interface UseChatAIReturn {
@@ -264,15 +266,36 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     );
 
     // Build scene context prompt (Step 5.1: Scene understanding)
-    // Only include scene if data is fresh (within 30 minutes)
-    const scenePrompt = isSceneDataFresh(currentScene, 30)
-      ? buildScenePrompt(currentScene, true, 5)
+    // Prioritize sceneContext from config (Step 5.2: Avoid state update delay)
+    const sceneToUse = config.sceneContext !== undefined ? config.sceneContext : currentScene;
+    const isFresh = isSceneDataFresh(sceneToUse, 30);
+
+    console.log('[ChatAI] 🔍 Scene data check:', {
+      source: config.sceneContext !== undefined ? 'config.sceneContext' : 'userStore.currentScene',
+      hasScene: !!sceneToUse,
+      isFresh,
+      location: sceneToUse?.location,
+      objectsCount: sceneToUse?.objects?.length || 0,
+      timestamp: sceneToUse?.timestamp,
+      ageMinutes: sceneToUse?.timestamp ? (Date.now() - sceneToUse.timestamp) / 60000 : null,
+    });
+
+    const scenePrompt = isFresh
+      ? buildScenePrompt(sceneToUse, true, 5)
       : '';
+
+    if (scenePrompt) {
+      console.log('[ChatAI] ✅ Scene prompt generated:', scenePrompt.substring(0, 200) + '...');
+    } else {
+      console.log('[ChatAI] ⚠️ No scene prompt (scene not fresh or missing)');
+    }
 
     // Combine environment and scene prompts
     const contextPrompt = [environmentPrompt, scenePrompt]
       .filter(p => p.trim().length > 0)
       .join('\n');
+
+    console.log('[ChatAI] 📝 Final context prompt length:', contextPrompt.length);
 
     const systemMessage = buildSystemPrompt(
       personalityText,
@@ -356,15 +379,36 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     );
 
     // Build scene context prompt (Step 5.1: Scene understanding)
-    // Only include scene if data is fresh (within 30 minutes)
-    const scenePrompt = isSceneDataFresh(currentScene, 30)
-      ? buildScenePrompt(currentScene, true, 5)
+    // Prioritize sceneContext from config (Step 5.2: Avoid state update delay)
+    const sceneToUse = config.sceneContext !== undefined ? config.sceneContext : currentScene;
+    const isFresh = isSceneDataFresh(sceneToUse, 30);
+
+    console.log('[ChatAI] 🔍 Scene data check:', {
+      source: config.sceneContext !== undefined ? 'config.sceneContext' : 'userStore.currentScene',
+      hasScene: !!sceneToUse,
+      isFresh,
+      location: sceneToUse?.location,
+      objectsCount: sceneToUse?.objects?.length || 0,
+      timestamp: sceneToUse?.timestamp,
+      ageMinutes: sceneToUse?.timestamp ? (Date.now() - sceneToUse.timestamp) / 60000 : null,
+    });
+
+    const scenePrompt = isFresh
+      ? buildScenePrompt(sceneToUse, true, 5)
       : '';
+
+    if (scenePrompt) {
+      console.log('[ChatAI] ✅ Scene prompt generated:', scenePrompt.substring(0, 200) + '...');
+    } else {
+      console.log('[ChatAI] ⚠️ No scene prompt (scene not fresh or missing)');
+    }
 
     // Combine environment and scene prompts
     const contextPrompt = [environmentPrompt, scenePrompt]
       .filter(p => p.trim().length > 0)
       .join('\n');
+
+    console.log('[ChatAI] 📝 Final context prompt length:', contextPrompt.length);
 
     const systemMessage = buildSystemPrompt(
       personalityText,

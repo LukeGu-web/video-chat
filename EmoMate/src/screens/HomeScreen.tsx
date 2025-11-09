@@ -9,8 +9,9 @@ import {
 import { SafeAreaView as SafeAreaViewRN } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useUserStore, ChatMessage, useAIStatus } from '../store';
-import { useSpeechToText, useChatAI, useVisualQA } from '../utils';
-import { PERSONALITY_PROMPTS } from '../constants';
+import { useSpeechToText, useChatAI } from '../utils';
+import { useSceneUnderstanding, detectVisualKeywords } from '../utils/useSceneUnderstanding';
+import { PERSONALITY_PROMPTS, getClaudeApiKey } from '../constants';
 import {
   Header,
   VoiceControl,
@@ -56,6 +57,7 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
     addEmotionLog,
     chatHistory,
     addChatMessage,
+    setCurrentScene,
   } = useUserStore();
 
   // Background context hook
@@ -97,23 +99,10 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
   // Step 5.2: Visual QA - store last captured frame
   const lastCapturedFrameRef = useRef<string | null>(null);
 
-  // Step 5.2: Visual QA hook
-  const { processUserInput: processVisualQuestion } = useVisualQA({
+  // Step 5.2: Scene Understanding hook with caching
+  const apiKey = getClaudeApiKey();
+  const sceneUnderstanding = useSceneUnderstanding(apiKey || '', {
     enabled: true,
-    onKeywordDetected: (keyword) => {
-      console.log(`[HomeScreen] 🎯 Visual keyword detected: "${keyword}"`);
-    },
-    onAnalysisStart: () => {
-      console.log('[HomeScreen] 🔍 Starting visual analysis...');
-    },
-    onAnalysisComplete: () => {
-      console.log('[HomeScreen] ✅ Visual analysis complete');
-    },
-    onError: (error) => {
-      console.error('[HomeScreen] ❌ Visual analysis error:', error);
-      setErrorMessage(`场景分析失败: ${error}`);
-      setShowErrorToast(true);
-    },
   });
 
   // Handle errors (including background errors)
@@ -204,17 +193,43 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
         addChatMessage(userMessage);
 
         // 2. Step 5.2: Check for visual keywords and trigger scene analysis
-        const hasVisualKeyword = await processVisualQuestion(
-          inputText,
-          lastCapturedFrameRef.current || undefined
-        );
+        const detectedKeyword = detectVisualKeywords(inputText);
 
-        if (hasVisualKeyword) {
-          console.log(
-            '[HomeScreen] 🎯 Visual question detected, scene analysis triggered'
-          );
-          // Scene analysis will update userStore.currentScene
-          // AI will automatically use the updated scene context
+        if (detectedKeyword) {
+          console.log(`[HomeScreen] 🎯 Visual keyword detected: "${detectedKeyword}"`);
+
+          // Check if we have a captured frame
+          if (lastCapturedFrameRef.current) {
+            try {
+              console.log('[HomeScreen] 🔍 Starting scene analysis with caching...');
+
+              // Use sceneUnderstanding.analyzeScene to ensure caching
+              await sceneUnderstanding.analyzeScene(
+                lastCapturedFrameRef.current,
+                inputText // Pass user question for context
+              );
+
+              // Update userStore with the analyzed scene for AI context
+              if (sceneUnderstanding.currentScene) {
+                setCurrentScene(sceneUnderstanding.currentScene);
+                console.log('[HomeScreen] 📝 Updated userStore.currentScene:', {
+                  location: sceneUnderstanding.currentScene.location,
+                  objects: sceneUnderstanding.currentScene.objects,
+                  timestamp: sceneUnderstanding.currentScene.timestamp,
+                });
+              } else {
+                console.warn('[HomeScreen] ⚠️ No scene data returned from analysis');
+              }
+
+              console.log('[HomeScreen] ✅ Scene analysis complete and cached');
+            } catch (error) {
+              console.error('[HomeScreen] ❌ Scene analysis error:', error);
+              setErrorMessage(`场景分析失败: ${error instanceof Error ? error.message : '未知错误'}`);
+              setShowErrorToast(true);
+            }
+          } else {
+            console.log('[HomeScreen] ⚠️ Visual keyword detected but no image available');
+          }
         }
 
         // 3. 准备背景故事（如果可用）
@@ -227,6 +242,7 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
           modelType: 'haiku',
           enableTTS: true, // 启用语音播放
           backgroundStory, // 传递背景故事
+          sceneContext: sceneUnderstanding.currentScene, // 直接传递场景数据，避免状态更新延迟
         });
 
         // 注意：状态变化由统一的 useEffect 管理
@@ -235,7 +251,7 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
         // 错误处理，状态会自动回到 idle
       }
     },
-    [addChatMessage, sendMessage, backgroundContext, processVisualQuestion]
+    [addChatMessage, sendMessage, backgroundContext, sceneUnderstanding, setCurrentScene]
   );
 
   // 核心语音对话流程（使用 runAIFlow）
