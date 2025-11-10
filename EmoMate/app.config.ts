@@ -64,13 +64,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         },
       },
     ],
-    [
-      'react-native-fast-tflite',
-      {
-        enableCoreMLDelegate: true, // iOS GPU 加速
-        enableAndroidGpuLibraries: true, // Android GPU 加速
-      },
-    ],
     'expo-asset',
   ],
   extra: {
