@@ -129,6 +129,16 @@ interface SceneUnderstandingState {
   /** Total cost in USD */
   totalCost: number;
 
+  /** Performance statistics (Step 5.3) */
+  performanceStats: {
+    /** Average response time in ms */
+    averageResponseTime: number;
+    /** Last response time in ms */
+    lastResponseTime: number;
+    /** Total response time sum (for average calculation) */
+    totalResponseTime: number;
+  };
+
   /** Debug information */
   debugInfo: {
     lastImageSize: number;
@@ -171,6 +181,10 @@ interface SceneUnderstandingState {
     totalKeywordAnalyses: number;
     /** Last keyword that triggered analysis (Step 3.3) */
     lastKeyword: string | null;
+    /** Last conversation activity time (Step 5.3: Smart pause) */
+    lastConversationActivityTime: number | null;
+    /** Whether analysis is paused due to conversation inactivity (Step 5.3) */
+    isPausedDueToInactivity: boolean;
   };
 
   /** Cached scenes (Step 4.1) - for UI display */
@@ -219,6 +233,9 @@ interface UseSceneUnderstandingReturn extends SceneUnderstandingState {
 
   /** Manually clear expired scenes from cache (Step 4.1) */
   clearExpiredScenes: () => number;
+
+  /** Notify that conversation is active (Step 5.3: Smart pause) */
+  notifyConversationActivity: () => void;
 }
 
 /**
@@ -249,6 +266,13 @@ export function useSceneUnderstanding(
   const [totalAPICalls, setTotalAPICalls] = useState(0);
   const [totalCost, setTotalCost] = useState(0);
 
+  // Performance statistics (Step 5.3)
+  const [performanceStats, setPerformanceStats] = useState({
+    averageResponseTime: 0,
+    lastResponseTime: 0,
+    totalResponseTime: 0,
+  });
+
   // Debug info
   const [debugInfo, setDebugInfo] = useState({
     lastImageSize: 0,
@@ -265,7 +289,7 @@ export function useSceneUnderstanding(
     lastDeduplicationTime: null as number | null,
   });
 
-  // Timer state (Step 3.1 & 3.2 & 3.3)
+  // Timer state (Step 3.1 & 3.2 & 3.3 & 5.3)
   const [timerState, setTimerState] = useState({
     enabled: false,
     nextCaptureIn: 30000, // 30 seconds
@@ -277,6 +301,8 @@ export function useSceneUnderstanding(
     lastTriggerReason: null as string | null, // Step 3.2 & 3.3: Last trigger reason
     totalKeywordAnalyses: 0, // Step 3.3: Keyword trigger count
     lastKeyword: null as string | null, // Step 3.3: Last detected keyword
+    lastConversationActivityTime: Date.now(), // Step 5.3: Track conversation activity
+    isPausedDueToInactivity: false, // Step 5.3: Pause state
   });
 
   // Cached scenes state (Step 4.1) - for triggering UI updates
@@ -326,6 +352,16 @@ export function useSceneUnderstanding(
     // Schedule next photo capture (every 30 seconds)
     if (timerState.nextCaptureIn > 0) {
       timerRef.current = setTimeout(async () => {
+        // Step 5.3: Skip if conversation is inactive
+        if (timerState.isPausedDueToInactivity) {
+          console.log('[SceneUnderstanding] ⏸️ Skipping photo capture - conversation inactive');
+          setTimerState(prev => ({
+            ...prev,
+            nextCaptureIn: 30000, // Reset to 30 seconds
+          }));
+          return;
+        }
+
         console.log('[SceneUnderstanding] Timer: Capturing photo...');
 
         if (photoCaptureCallback.current) {
@@ -412,11 +448,30 @@ export function useSceneUnderstanding(
 
     // Setup countdown timer (updates every second)
     countdownTimerRef.current = setInterval(() => {
-      setTimerState(prev => ({
-        ...prev,
-        nextCaptureIn: Math.max(0, prev.nextCaptureIn - 1000),
-        nextAnalysisIn: Math.max(0, prev.nextAnalysisIn - 1000),
-      }));
+      setTimerState(prev => {
+        // Step 5.3: Check conversation inactivity (5 minutes = 300000ms)
+        const now = Date.now();
+        const inactivityThreshold = 5 * 60 * 1000; // 5 minutes
+        const timeSinceLastActivity = prev.lastConversationActivityTime
+          ? now - prev.lastConversationActivityTime
+          : 0;
+
+        const shouldPause = timeSinceLastActivity > inactivityThreshold;
+
+        // Log inactivity status change
+        if (shouldPause && !prev.isPausedDueToInactivity) {
+          console.log('[SceneUnderstanding] ⏸️ Conversation inactive for 5 minutes - pausing scene analysis');
+        } else if (!shouldPause && prev.isPausedDueToInactivity) {
+          console.log('[SceneUnderstanding] ▶️ Conversation activity resumed - resuming scene analysis');
+        }
+
+        return {
+          ...prev,
+          nextCaptureIn: Math.max(0, prev.nextCaptureIn - 1000),
+          nextAnalysisIn: Math.max(0, prev.nextAnalysisIn - 1000),
+          isPausedDueToInactivity: shouldPause,
+        };
+      });
     }, 1000);
 
     return () => {
@@ -812,11 +867,17 @@ export function useSceneUnderstanding(
           previousScene: currentScene || undefined,
         };
 
+        // Step 5.3: Track response time
+        const apiStartTime = Date.now();
+
         // Call Claude Vision API
         const response: SceneAnalysisResponse = await analyzeSceneWithClaude(
           request,
           apiKey
         );
+
+        // Calculate response time
+        const responseTime = Date.now() - apiStartTime;
 
         if (!response.success) {
           throw new Error(response.error || 'Analysis failed');
@@ -828,6 +889,25 @@ export function useSceneUnderstanding(
         setLastAnalysisTime(Date.now());
         setTotalAPICalls(prev => prev + 1);
         setTotalCost(prev => prev + (response.cost || 0));
+
+        // Step 5.3: Update performance statistics
+        setPerformanceStats(prev => {
+          const newTotalResponseTime = prev.totalResponseTime + responseTime;
+          const newCallCount = totalAPICalls + 1;
+          const newAverageResponseTime = newTotalResponseTime / newCallCount;
+
+          console.log('[SceneUnderstanding] ⏱️ Performance stats:', {
+            lastResponseTime: `${responseTime}ms`,
+            averageResponseTime: `${newAverageResponseTime.toFixed(0)}ms`,
+            totalCalls: newCallCount,
+          });
+
+          return {
+            lastResponseTime: responseTime,
+            totalResponseTime: newTotalResponseTime,
+            averageResponseTime: newAverageResponseTime,
+          };
+        });
 
         // Update timer analysis count if triggered by timer (Step 3.1)
         if (isTimerTriggered) {
@@ -1127,6 +1207,26 @@ export function useSceneUnderstanding(
     }
   }, []);
 
+  /**
+   * Notify that conversation is active (Step 5.3: Smart pause)
+   * Call this when user sends a message or AI responds
+   */
+  const notifyConversationActivity = useCallback((): void => {
+    const now = Date.now();
+
+    setTimerState(prev => {
+      const wasInactive = prev.isPausedDueToInactivity;
+
+      return {
+        ...prev,
+        lastConversationActivityTime: now,
+        isPausedDueToInactivity: false,
+      };
+    });
+
+    console.log('[SceneUnderstanding] 💬 Conversation activity notified - timer resumed');
+  }, []);
+
   return {
     // State
     currentScene,
@@ -1136,6 +1236,7 @@ export function useSceneUnderstanding(
     lastAnalysisTime,
     totalAPICalls,
     totalCost,
+    performanceStats, // Step 5.3
     debugInfo,
     deduplicationStats, // Step 4.2
     timerState,
@@ -1155,5 +1256,6 @@ export function useSceneUnderstanding(
     triggerByKeyword, // Step 3.3
     getCachedScenes, // Step 4.1
     clearExpiredScenes, // Step 4.1
+    notifyConversationActivity, // Step 5.3
   };
 }

@@ -8,4 +8,4 @@ export * from './debug';
 export * from './emotionAnalysis';
 export * from './useEmotionState';
 export * from './audioModeManager';
-export * from './useVisualQA'; // Step 5.2: Visual Question Answering
+export * from './imageCompression'; // Step 5.3: Image compression utilities

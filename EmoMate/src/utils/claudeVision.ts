@@ -9,6 +9,7 @@ import {
   SceneAnalysisResponse,
   SceneTriggerType,
 } from '../types/scene';
+import { compressBase64Image, formatByteSize } from './imageCompression';
 
 /**
  * Claude API configuration
@@ -41,10 +42,29 @@ export async function compressImage(
   imageBase64: string,
   maxSizeKB: number = 500
 ): Promise<string> {
-  // TODO: Implement image compression in Step 2.2
-  // For now, return the original image
-  console.log('[ClaudeVision] compressImage called, maxSizeKB:', maxSizeKB);
-  return imageBase64;
+  try {
+    const { base64: compressedBase64, stats } = await compressBase64Image(
+      imageBase64,
+      {
+        maxSizeBytes: maxSizeKB * 1024,
+        maxWidth: 1024, // Optimal for Claude Vision
+        compress: 0.7, // Start with 70% quality
+      }
+    );
+
+    console.log('[ClaudeVision] ✅ Image compression complete:', {
+      originalSize: formatByteSize(stats.originalSize),
+      compressedSize: formatByteSize(stats.compressedSize),
+      savings: `${(stats.compressionRatio * 100).toFixed(1)}%`,
+      underLimit: stats.compressedSize <= maxSizeKB * 1024 ? '✓' : '✗',
+    });
+
+    return compressedBase64;
+  } catch (error) {
+    console.error('[ClaudeVision] ⚠️ Image compression failed, using original:', error);
+    // Fallback to original image if compression fails
+    return imageBase64;
+  }
 }
 
 /**

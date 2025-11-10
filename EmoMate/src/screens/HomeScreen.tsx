@@ -5,6 +5,8 @@ import {
   Text,
   ImageBackground,
   ActivityIndicator,
+  AppState,
+  AppStateStatus,
 } from 'react-native';
 import { SafeAreaView as SafeAreaViewRN } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -151,6 +153,31 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
     });
   }, [selectedCharacter, setSelectedCharacter, addEmotionLog]);
 
+  // Step 5.3: Background pause - Stop scene detection when app goes to background
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active') {
+        console.log('[HomeScreen] 📱 App is active - starting scene timer');
+        sceneUnderstanding.startTimer();
+      } else if (nextAppState === 'background' || nextAppState === 'inactive') {
+        console.log('[HomeScreen] 📴 App is background/inactive - stopping scene timer');
+        sceneUnderstanding.stopTimer();
+      }
+    });
+
+    // Start timer if app is currently active
+    if (AppState.currentState === 'active') {
+      console.log('[HomeScreen] 📱 Initial state: App is active - starting scene timer');
+      sceneUnderstanding.startTimer();
+    }
+
+    return () => {
+      subscription.remove();
+      sceneUnderstanding.stopTimer();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency - only run once on mount
+
   const handleGoBack = () => {
     navigation.goBack();
   };
@@ -182,6 +209,9 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
       if (!inputText.trim()) return;
 
       try {
+        // Step 5.3: Notify conversation activity (smart pause)
+        sceneUnderstanding.notifyConversationActivity();
+
         // 1. 添加用户消息到聊天历史
         const userMessage: ChatMessage = {
           id: generateMessageId(),
@@ -251,7 +281,9 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
         // 错误处理，状态会自动回到 idle
       }
     },
-    [addChatMessage, sendMessage, backgroundContext, sceneUnderstanding, setCurrentScene]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [addChatMessage, sendMessage, backgroundContext, setCurrentScene]
+    // Note: sceneUnderstanding excluded to prevent re-render loop
   );
 
   // 核心语音对话流程（使用 runAIFlow）
