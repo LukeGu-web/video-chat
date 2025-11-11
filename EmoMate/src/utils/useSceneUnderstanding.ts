@@ -490,10 +490,31 @@ export function useSceneUnderstanding(
    */
   function loadCachedData(): void {
     try {
+      const now = Date.now();
+
       // Load scene cache
       const cacheJson = storage.getString(STORAGE_KEYS.SCENE_CACHE);
       if (cacheJson) {
-        sceneCache.current = JSON.parse(cacheJson);
+        const loadedCache = JSON.parse(cacheJson);
+        const beforeCount = loadedCache.length;
+
+        // Automatically clean up expired scenes on load
+        sceneCache.current = loadedCache.filter(
+          (entry: SceneCacheEntry) => entry.expiresAt > now
+        );
+
+        const afterCount = sceneCache.current.length;
+        const removedCount = beforeCount - afterCount;
+
+        if (removedCount > 0) {
+          console.log(`[SceneUnderstanding] 🗑️ Auto-cleaned ${removedCount} expired scene(s) on load`);
+          // Save cleaned cache back to storage
+          storage.set(
+            STORAGE_KEYS.SCENE_CACHE,
+            JSON.stringify(sceneCache.current)
+          );
+        }
+
         setCachedScenes(sceneCache.current); // Step 4.1: Update state for UI
         console.log('[SceneUnderstanding] Loaded', sceneCache.current.length, 'cached scenes');
       }
@@ -696,9 +717,17 @@ export function useSceneUnderstanding(
       // Generate thumbnail for comparison
       const thumbnail = await generateThumbnail(imageBase64);
 
+      const now = Date.now();
+
       // Check against cached scenes
       for (const entry of sceneCache.current) {
         if (!entry.imageThumbnail) continue;
+
+        // Skip expired scenes - they should not be used for deduplication
+        if (entry.expiresAt <= now) {
+          console.log('[SceneUnderstanding] ⏭️ Skipping expired scene in cache check');
+          continue;
+        }
 
         const comparison = await compareImages(
           thumbnail,
