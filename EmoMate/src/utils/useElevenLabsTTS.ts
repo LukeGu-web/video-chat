@@ -1,5 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
-import { useAudioPlayer } from 'expo-audio';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { File, Paths } from 'expo-file-system';
 import {
   ELEVENLABS_CONFIG,
@@ -9,6 +8,7 @@ import {
   preprocessTextForNaturalSpeech
 } from '../constants/ai';
 import { base64ToUint8Array, safeDeleteFile } from './fileSystemHelpers';
+import { SoundPlayer } from './soundPlayer';
 import { audioModeManager } from './audioModeManager';
 
 export interface UseElevenLabsTTSReturn {
@@ -25,11 +25,20 @@ export const useElevenLabsTTS = (): UseElevenLabsTTSReturn => {
   const [error, setError] = useState<string | null>(null);
   const [audioUri, setAudioUri] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false); // 新增：语音生成状态
-  const [playbackTimer, setPlaybackTimer] = useState<NodeJS.Timeout | null>(null);
   const [currentSegment, setCurrentSegment] = useState<string>(''); // 当前播放的语音片段
-  
-  // Initialize audio player with null to avoid native module errors
-  const audioPlayer = useAudioPlayer(null);
+
+  // Initialize sound player using react-native-sound (avoids expo-audio AudioMode conflicts)
+  const soundPlayerRef = useRef<SoundPlayer | null>(null);
+
+  // Initialize sound player on mount
+  useEffect(() => {
+    soundPlayerRef.current = new SoundPlayer();
+    return () => {
+      // Clean up sound player on unmount
+      soundPlayerRef.current?.release();
+      soundPlayerRef.current = null;
+    };
+  }, []);
 
   const createMockSegments = (text: string): {text: string, start: number, end: number}[] => {
     const segments: {text: string, start: number, end: number}[] = [];
@@ -256,54 +265,24 @@ export const useElevenLabsTTS = (): UseElevenLabsTTSReturn => {
     });
   };
 
-  // Monitor audio player state changes
-  useEffect(() => {
-    // 更新 isSpeaking 状态
-    setIsSpeaking(audioPlayer.playing);
-
-    // 检查音频是否播放完成
-    if (!audioPlayer.playing && audioPlayer.duration > 0) {
-      setIsSpeaking(false);
-      setCurrentSegment('');
-
-      // 清理计时器
-      if (playbackTimer) {
-        clearInterval(playbackTimer);
-        setPlaybackTimer(null);
-      }
-
-      // Fix: Restore audio mode to idle after playback completes
-      (async () => {
-        try {
-          await audioModeManager.setIdleMode();
-        } catch (error) {
-          console.warn('[ElevenLabsTTS] Failed to restore idle mode after playback:', error);
-        }
-      })();
-
-      // 延迟清理音频文件
-      if (!isGenerating && audioUri && audioPlayer.currentTime > 0) {
-        setTimeout(async () => {
-          await safeDeleteFile(audioUri);
-          setAudioUri(null);
-        }, 500);
-      }
-    }
-  }, [audioPlayer.playing, audioPlayer.currentTime, audioPlayer.duration, isGenerating, audioUri, playbackTimer]);
+  // No longer needed - SoundPlayer uses callbacks instead of effect-based monitoring
 
   const speak = useCallback(async (text: string, voiceId?: string, userEmotion?: string) => {
     if (!text.trim()) return;
+
+    const soundPlayer = soundPlayerRef.current;
+    if (!soundPlayer) {
+      console.error('[ElevenLabsTTS] SoundPlayer not initialized');
+      return;
+    }
 
     try {
       setError(null);
       setIsGenerating(true); // 开始生成语音
       setCurrentSegment(''); // 清空当前段落
-      
+
       // 停止当前播放
-      if (audioPlayer.playing) {
-        audioPlayer.pause();
-        audioPlayer.seekTo(0);
-      }
+      soundPlayer.stop();
 
       // 清理之前的音频文件
       if (audioUri) {
@@ -312,70 +291,60 @@ export const useElevenLabsTTS = (): UseElevenLabsTTSReturn => {
 
       // 使用情感化语音生成
       const newAudioUri = await generateSpeechFile(text, voiceId, userEmotion);
-      
+
       // 创建模拟的段落数据用于测试
       const segments = createMockSegments(text);
-      
-      // 使用 replace 方法设置新的音频源
-      audioPlayer.replace(newAudioUri);
+
       setAudioUri(newAudioUri);
+      setIsGenerating(false);
 
-      // 等待音频加载完成后播放
-      setTimeout(async () => {
-        // Fix: Set audio mode to playback to increase volume
-        try {
-          await audioModeManager.setPlaybackMode();
-        } catch (error) {
-          console.warn('[ElevenLabsTTS] Failed to set playback mode:', error);
-        }
+      // CRITICAL FIX: Set expo-audio to idle mode before playback
+      // This prevents expo-audio's recording mode from interfering with react-native-sound
+      try {
+        await audioModeManager.setIdleMode();
+        console.log('[ElevenLabsTTS] ✅ Set expo-audio to idle before playback');
+      } catch (error) {
+        console.warn('[ElevenLabsTTS] ⚠️ Failed to set idle mode:', error);
+      }
 
-        // Fix: Set volume to maximum (1.0) to ensure proper playback volume
-        audioPlayer.volume = 1.0;
-        audioPlayer.play();
-        setIsGenerating(false);
-        
-        // 添加播放结束监听器
-        const checkPlaybackEnd = () => {
-          const currentTime = audioPlayer.currentTime;
-          const duration = audioPlayer.duration;
-          
-          if (duration > 0 && currentTime >= duration - 0.1) {
-            setCurrentSegment('');
-            setIsSpeaking(false);
-            if (playbackTimer) {
-              clearInterval(playbackTimer);
-              setPlaybackTimer(null);
-            }
-            return true;
-          }
-          return false;
-        };
-        
-        // 开始监控段落播放
-        const segmentTimer = setInterval(() => {
-          if (audioPlayer.playing) {
-            // 首先检查是否播放完成
-            if (checkPlaybackEnd()) {
-              return;
-            }
-            
-            const currentTime = audioPlayer.currentTime;
-            const currentSegmentData = segments.find(s => 
-              currentTime >= s.start && currentTime < s.end
+      // Start playback with SoundPlayer
+      console.log('[ElevenLabsTTS] 🎵 Starting playback with SoundPlayer');
+
+      await soundPlayer.play(newAudioUri, {
+        onPlaybackStatusUpdate: (status) => {
+          setIsSpeaking(status.playing);
+
+          // Update current segment based on playback position
+          if (status.playing && status.duration > 0) {
+            const currentSegmentData = segments.find(s =>
+              status.currentTime >= s.start && status.currentTime < s.end
             );
-            
+
             if (currentSegmentData) {
               setCurrentSegment(currentSegmentData.text);
             }
-          } else {
-            setCurrentSegment('');
-            setIsSpeaking(false);
-            clearInterval(segmentTimer);
           }
-        }, 50); // 减少间隔时间以提高响应速度
-        
-        setPlaybackTimer(segmentTimer);
-      }, 100);
+        },
+        onPlaybackFinished: async () => {
+          console.log('[ElevenLabsTTS] ✅ Playback finished');
+          setIsSpeaking(false);
+          setCurrentSegment('');
+
+          // 清理音频文件
+          if (audioUri) {
+            await safeDeleteFile(audioUri);
+            setAudioUri(null);
+          }
+        },
+        onError: (error) => {
+          console.error('[ElevenLabsTTS] ❌ Playback error:', error);
+          setError(error.message);
+          setIsSpeaking(false);
+          setCurrentSegment('');
+        },
+      });
+
+      setIsSpeaking(true);
 
     } catch (err) {
       setError(err instanceof Error ? err.message : '语音合成失败');
@@ -384,50 +353,38 @@ export const useElevenLabsTTS = (): UseElevenLabsTTSReturn => {
       setCurrentSegment('');
       console.error('ElevenLabs TTS Error:', err);
     }
-  }, [audioPlayer, audioUri]);
+  }, [audioUri]);
 
   const stop = useCallback(async () => {
+    const soundPlayer = soundPlayerRef.current;
+    if (!soundPlayer) {
+      console.warn('[ElevenLabsTTS] SoundPlayer not initialized');
+      return;
+    }
+
     try {
-      if (audioPlayer.playing) {
-        audioPlayer.pause();
-        audioPlayer.seekTo(0);
-      }
+      // Stop playback using SoundPlayer
+      soundPlayer.stop();
 
       // 停止所有状态
       setIsGenerating(false);
       setIsSpeaking(false);
       setCurrentSegment(''); // 清空当前段落
 
-      // 清理备用定时器
-      if (playbackTimer) {
-        clearInterval(playbackTimer);
-        setPlaybackTimer(null);
-      }
-
-      // Fix: Restore audio mode to idle after stopping
-      try {
-        await audioModeManager.setIdleMode();
-      } catch (error) {
-        console.warn('[ElevenLabsTTS] Failed to restore idle mode after stopping:', error);
-      }
-
       // 清理临时音频文件
       if (audioUri) {
         await safeDeleteFile(audioUri);
         setAudioUri(null);
       }
+
+      console.log('[ElevenLabsTTS] ⏹️ Stopped playback');
     } catch (err) {
       setError(err instanceof Error ? err.message : '停止播放失败');
       setIsGenerating(false);
       setIsSpeaking(false); // 确保即使出错也重置状态
       setCurrentSegment(''); // 清空当前段落
-      // 清理备用定时器
-      if (playbackTimer) {
-        clearInterval(playbackTimer);
-        setPlaybackTimer(null);
-      }
     }
-  }, [audioPlayer, audioUri, playbackTimer]);
+  }, [audioUri]);
 
   return {
     isSpeaking,

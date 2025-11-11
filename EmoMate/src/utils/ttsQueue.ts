@@ -9,7 +9,7 @@
  * - Graceful cleanup and cancellation
  */
 
-import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
+import { createAudioPlayer, type AudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { File, Directory, Paths } from 'expo-file-system';
 import {
   ELEVENLABS_CONFIG,
@@ -19,7 +19,7 @@ import {
   preprocessTextForNaturalSpeech,
 } from '../constants/ai';
 import { base64ToUint8Array, safeDeleteFile, ensureDirectoryExists } from './fileSystemHelpers';
-import { audioModeManager } from './audioModeManager';
+import Sound from 'react-native-sound';
 
 /**
  * Common phrases to pre-cache for instant playback
@@ -537,12 +537,28 @@ export class TTSQueue {
         console.log(`[TTSQueue] 🔊 Playing ${item.id}: "${item.text}"`);
         item.status = 'playing';
 
-        // Fix: Set audio mode to playback to increase volume
-        // This prevents iOS from using the earpiece and ensures louder speaker output
+        // CRITICAL FIX 1: Force react-native-sound to use speaker (this overrides expo-audio)
         try {
-          await audioModeManager.setPlaybackMode();
+          Sound.setCategory('Playback', true); // true = force speaker output
+          console.log('[TTSQueue] ✅ react-native-sound category set to Playback (speaker)');
         } catch (error) {
-          console.warn('[TTSQueue] Failed to set playback mode:', error);
+          console.warn('[TTSQueue] ⚠️ Failed to set Sound category:', error);
+        }
+
+        // CRITICAL FIX 2: Set expo-audio mode to maximize volume output
+        // Force allowsRecording: false and shouldRouteThroughEarpiece: false for louder playback
+        try {
+          await setAudioModeAsync({
+            playsInSilentMode: true,
+            allowsRecording: false, // CRITICAL: Disable recording for louder output
+            shouldPlayInBackground: true,
+            interruptionMode: 'duckOthers',
+            interruptionModeAndroid: 'duckOthers',
+            shouldRouteThroughEarpiece: false, // CRITICAL: Use speaker, not earpiece
+          });
+          console.log('[TTSQueue] ✅ expo-audio mode set: allowsRecording=false, speaker output');
+        } catch (error) {
+          console.warn('[TTSQueue] ⚠️ Failed to set audio mode:', error);
         }
 
         // Callback: Playback started
@@ -560,13 +576,6 @@ export class TTSQueue {
               this.config.onPlayEnd(item.text);
             }
 
-            // Fix: Restore audio mode to idle after playback
-            try {
-              await audioModeManager.setIdleMode();
-            } catch (error) {
-              console.warn('[TTSQueue] Failed to restore idle mode:', error);
-            }
-
             this.currentIndex++;
 
             // Cleanup audio
@@ -582,6 +591,10 @@ export class TTSQueue {
             }
           }
         });
+
+        // CRITICAL: Set volume to maximum before playback
+        item.player.volume = 1.0;
+        console.log('[TTSQueue] 🔊 Volume set to maximum: 1.0');
 
         item.player.play();
       } catch (error) {
@@ -630,13 +643,6 @@ export class TTSQueue {
       } catch (e) {
         // Ignore errors during cleanup
       }
-    }
-
-    // Fix: Restore audio mode to idle after cancellation
-    try {
-      await audioModeManager.setIdleMode();
-    } catch (error) {
-      console.warn('[TTSQueue] Failed to restore idle mode after cancellation:', error);
     }
 
     // Cleanup all audio resources
