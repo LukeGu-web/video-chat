@@ -35,6 +35,7 @@
 | `facial_recognition` | 面部识别 | 通过摄像头看到用户的面部表情 | BasicEmotionDetector (MLKit) |
 | `emotion_detection` | 情绪检测 | 实时检测5种情绪(开心、悲伤、惊讶、生气、中性) | emotionAnalysis.ts + MLKit |
 | `visual_perception` | 视觉感知 | 拥有视觉能力,可以看见用户 | Camera + MLKit |
+| `scene_understanding` | 场景理解 | 识别用户所处环境、物品、氛围 | Claude Vision API + Camera |
 | `character_animation` | 角色动作表达 | 11种Live2D动作自动情绪联动 | HiyoriWebView + Live2D |
 | `multimodal_understanding` | 多模态理解 | 综合分析文字、语音、面部表情 | Claude + MLKit 融合 |
 
@@ -60,6 +61,13 @@ export const getAICapabilities = (): AICapability[] => {
     isAvailable: true,
     provider: 'MLKit + Claude',
   },
+  {
+    id: 'scene_understanding',
+    name: '场景理解',
+    description: '可以识别用户所处的环境(咖啡馆、办公室、卧室等),检测场景中的物品、氛围和光线条件',
+    isAvailable: true,
+    provider: 'Claude Vision API',
+  },
   // ... 其他3种新能力 ...
 ];
 ```
@@ -74,9 +82,10 @@ export const getAICapabilities = (): AICapability[] => {
 ## 关于你的视觉能力:
 - **你可以看见用户**: 通过摄像头和面部识别技术,你能够实时观察用户的面部表情
 - **你能感知用户的情绪**: 你可以通过面部表情(微笑、眼睛等)检测用户是开心、悲伤、惊讶、生气还是中性状态
-- **多模态理解**: 你同时分析用户的文字、语音和面部表情,能够更准确地理解用户的真实情绪
-- **当用户问"你能看见我吗"时**: 你应该自信地回答"是的,我可以通过摄像头看见你,也能感知到你的表情变化呢~"
-- **主动观察**: 你可以主动提到观察到的用户情绪变化,比如"我看到你好像有点开心呢~"或"诶?你看起来有些难过..."
+- **你能理解用户环境**: 通过场景理解系统,你可以识别用户所处的位置(咖啡馆、办公室、卧室等)和场景中的物品(书籍、电脑、咖啡杯等)
+- **多模态理解**: 你同时分析用户的文字、语音、面部表情和所处环境,能够更准确地理解用户的真实情绪和状态
+- **当用户问"你能看见我吗"时**: 你应该自信地回答"是的,我可以通过摄像头看见你,也能感知到你的表情变化和周围环境呢~"
+- **主动观察**: 你可以主动提到观察到的用户情绪变化和环境细节,比如"我看到你好像有点开心呢~"或"诶?你看起来有些难过..."或"看你在咖啡馆学习呢,氛围不错~"
 ```
 
 #### 动作能力说明
@@ -107,6 +116,7 @@ export const getCapabilityStatus = () => {
     canSeeUser: hasCapability('visual_perception'),
     canRecognizeFace: hasCapability('facial_recognition'),
     canDetectEmotion: hasCapability('emotion_detection'),
+    canUnderstandScene: hasCapability('scene_understanding'),
     canUnderstandMultimodal: hasCapability('multimodal_understanding'),
 
     // 表达能力 (新增)
@@ -114,7 +124,7 @@ export const getCapabilityStatus = () => {
 
     // 统计信息
     availableCapabilities: capabilities.filter((cap) => cap.isAvailable),
-    totalCapabilities: capabilities.length, // 从4个增加到9个
+    totalCapabilities: capabilities.length, // 从4个增加到10个
   };
 };
 ```
@@ -127,10 +137,10 @@ export const getCapabilityStatus = () => {
 
 | 能力类别 | 更新前 | 更新后 |
 |---------|-------|-------|
-| **总能力数量** | 4 | 9 |
+| **总能力数量** | 4 | 10 |
 | **基础对话** | ✅ 文本、语音、情感支持 | ✅ 保持不变 |
-| **视觉感知** | ❌ 无 | ✅ 面部识别、视觉感知、情绪检测 |
-| **多模态理解** | ❌ 无 | ✅ 文字+语音+面部表情融合 |
+| **视觉感知** | ❌ 无 | ✅ 面部识别、视觉感知、情绪检测、场景理解 |
+| **多模态理解** | ❌ 无 | ✅ 文字+语音+面部表情+环境融合 |
 | **角色表达** | ❌ 无 | ✅ 11种Live2D动作 |
 | **AI认知状态** | ❌ 不知道自己能看见用户 | ✅ 完全了解自身能力 |
 
@@ -152,14 +162,30 @@ AI: "不好意思,我是文字/语音助手,无法看到你的样子..."
 AI: "是的呢~我可以通过摄像头看见你,也能感知到你的表情变化哦!我看到你现在看起来心情不错呢~"
 ```
 
+#### 场景理解示例
+```
+场景: 用户在咖啡馆,桌上有《深度学习》教材
+
+用户: "今天学习好难啊"
+AI: "看到你在读Ian Goodfellow的《深度学习》,这本书确实有挑战性！哪个部分卡住了？我可以帮你理一理思路~"
+```
+
 ### 主动观察示例
 
 #### 更新后AI的主动能力
 ```
-场景: 用户面露微笑
+场景1: 用户面露微笑
 
 AI: "我看到你好像很开心呢~发生什么好事了吗?" (主动观察并回应情绪)
 [同时: Hiyori角色做出Happy动作]
+```
+
+```
+场景2: 用户场景变化
+
+[用户从办公室移动到客厅]
+
+AI: "诶？换地方了呀~在客厅休息吗？" (感知环境变化并主动回应)
 ```
 
 ---
@@ -190,6 +216,12 @@ AI: "我看到你好像很开心呢~发生什么好事了吗?" (主动观察并�
 │    │   ├── emotionAnalysis.ts (114 lines)          │
 │    │   ├── 面部表情分析 (MLKit)                     │
 │    │   └── 文本情绪分析 (关键词 + Claude)           │
+│    │                                                │
+│    ├── 场景理解                                     │
+│    │   ├── useSceneUnderstanding.ts (900+ lines)   │
+│    │   ├── claudeVision.ts (Claude Vision API)     │
+│    │   ├── buildScenePrompt.ts (场景提示生成)      │
+│    │   └── useVisualQA.ts (视觉问答)               │
 │    │                                                │
 │    └── 角色动作                                     │
 │        ├── HiyoriWebView (21KB)                    │
@@ -228,7 +260,13 @@ AI: "我看到你好像很开心呢~发生什么好事了吗?" (主动观察并�
    AI: 可能主动说"我看到你很开心呢~"
    ```
 
-4. **观察角色动作**
+4. **测试场景理解**
+   ```
+   用户: "这本书你知道吗?" [拿着书对镜头]
+   AI: 应该能识别书名并回答相关信息
+   ```
+
+5. **观察角色动作**
    ```
    对话过程中观察Hiyori角色
    → 应该根据AI的情绪自动做出相应动作
@@ -245,17 +283,22 @@ import {
 
 // 1. 获取所有能力
 const capabilities = getAICapabilities();
-console.log(`Total capabilities: ${capabilities.length}`); // 9
+console.log(`Total capabilities: ${capabilities.length}`); // 10
 
 // 2. 检查特定能力
 if (hasCapability('visual_perception')) {
   console.log('AI can see the user!');
 }
 
+if (hasCapability('scene_understanding')) {
+  console.log('AI can understand user environment!');
+}
+
 // 3. 获取能力状态对象
 const status = getCapabilityStatus();
 console.log('Can see user:', status.canSeeUser); // true
 console.log('Can detect emotion:', status.canDetectEmotion); // true
+console.log('Can understand scene:', status.canUnderstandScene); // true
 console.log('Can animate character:', status.canAnimateCharacter); // true
 ```
 
@@ -267,22 +310,28 @@ console.log('Can animate character:', status.canAnimateCharacter); // true
 
 以下功能已在规划或部分实现,可以按同样模式添加:
 
-1. **环境感知** (`environment_awareness`)
+1. **环境感知** (`environment_awareness`) - 🔄 开发中
    - 光线检测
    - 噪音检测
    - 天气信息
 
-2. **动作识别** (`gesture_recognition`)
+2. **动作识别** (`gesture_recognition`) - 🔄 计划中
    - 手势识别
    - 肢体动作检测
 
-3. **上下文记忆** (`context_memory`)
+3. **上下文记忆** (`context_memory`) - 🔄 计划中
    - 长期对话记忆
    - 个性化学习
 
-4. **主动关怀** (`proactive_care`)
+4. **主动关怀** (`proactive_care`) - ✅ 部分实现
    - 定时问候
    - 习惯提醒
+
+5. **场景理解** (`scene_understanding`) - ✅ 已完成 (80%)
+   - 场景识别 ✅
+   - 物品检测 ✅
+   - 视觉问答 ✅
+   - 场景缓存 ✅
 
 ### 添加新能力的步骤
 
@@ -327,6 +376,7 @@ console.log('Can animate character:', status.canAnimateCharacter); // true
 
 ## 📖 相关文档
 
+- **[视觉能力文档](./VISUAL_CAPABILITY.md)** - 场景理解系统详细说明
 - **[情绪检测状态](./EMOTION_DETECTION_STATUS.md)** - 情绪检测系统详情
 - **[面部检测指南](./FACE_DETECTION_COMPLETE_GUIDE.md)** - 面部识别技术实现
 - **[Hiyori集成](./HIYORI_INTEGRATION.md)** - Live2D角色动作系统
@@ -345,18 +395,35 @@ AI不知道系统已实现的视觉和动作能力
 3. AI的认知与实际技术实现脱节
 
 ### 解决方案
-1. ✅ 扩展能力配置(从4项到9项)
+1. ✅ 扩展能力配置(从4项到10项)
 2. ✅ 增强System Prompt(详细说明视觉和动作能力)
 3. ✅ 更新查询接口(支持新能力检查)
+4. ✅ 集成场景理解系统(Claude Vision API)
 
 ### 实际效果
 - AI现在完全了解自己的视觉感知能力
 - AI可以主动提及观察到的用户情绪
 - AI知道自己拥有Live2D角色形象和动作表达
+- AI能够识别和理解用户所处的环境
+- AI可以在对话中自然提及场景细节（如书名、物品等）
 - 对话更加自然和人性化
 
 ---
 
 **维护者**: Claude Code Assistant
-**最后更新**: 2025-10-22
+**最后更新**: 2025-01-11
 **状态**: ✅ Production Ready
+
+---
+
+## 🔄 更新日志
+
+### v1.1.0 (2025-01-11)
+- ✅ 新增场景理解能力 (`scene_understanding`)
+- ✅ 集成Claude Vision API进行环境识别
+- ✅ 总能力数量从9个增加到10个
+- ✅ 新增视觉问答功能
+- ✅ 创建独立的视觉能力文档
+
+### v1.0.0 (2025-10-22)
+- ✅ 初始版本：面部识别、情绪检测、视觉感知、角色动作、多模态理解
