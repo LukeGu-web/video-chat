@@ -16,6 +16,7 @@ import {
   useSceneUnderstanding,
   detectVisualKeywords,
 } from '../utils/useSceneUnderstanding';
+import { useObjectRecognition } from '../utils/useObjectRecognition';
 import { PERSONALITY_PROMPTS, getClaudeApiKey } from '../constants';
 import {
   Header,
@@ -110,6 +111,12 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
   const sceneUnderstanding = useSceneUnderstanding(apiKey || '', {
     enabled: true,
   });
+
+  // Object Recognition hook
+  const objectRecognition = useObjectRecognition(apiKey || '');
+
+  // Object recognition state
+  const [isRecognizing, setIsRecognizing] = useState(false);
 
   // Stable callback for frame capture (prevents useEffect re-triggering)
   const handleFrameCaptured = useCallback((frameBase64: string, timestamp: number) => {
@@ -371,6 +378,55 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
 
   const handleGoToEmotionTest = () => {
     navigation.navigate('EmotionTest');
+  };
+
+  // Handle object recognition
+  const handleRecognizeObject = async () => {
+    if (!lastCapturedFrameRef.current) {
+      console.log('[HomeScreen] ⚠️ No captured frame available');
+      setErrorMessage('请等待摄像头捕获画面');
+      setShowErrorToast(true);
+      return;
+    }
+
+    if (isRecognizing || objectRecognition.isLoading) {
+      console.log('[HomeScreen] ⚠️ Recognition already in progress');
+      return;
+    }
+
+    setIsRecognizing(true);
+    console.log('[HomeScreen] 📸 Starting object recognition...');
+
+    try {
+      const response = await objectRecognition.recognizeObject(
+        lastCapturedFrameRef.current,
+        '识别这个物品'
+      );
+
+      if (response.success) {
+        console.log('[HomeScreen] ✅ Object recognized:', {
+          name: response.object.objectName,
+          category: response.object.category,
+        });
+
+        // Show success message
+        setErrorMessage(`识别成功: ${response.object.objectName}`);
+        setShowErrorToast(true);
+
+        // Navigate to scene history (object tab will show the new record)
+        navigation.navigate('SceneHistory');
+      } else {
+        console.error('[HomeScreen] ❌ Recognition failed:', response.error);
+        setErrorMessage(response.error || '识别失败，请重试');
+        setShowErrorToast(true);
+      }
+    } catch (error) {
+      console.error('[HomeScreen] ❌ Recognition error:', error);
+      setErrorMessage('识别过程中发生错误');
+      setShowErrorToast(true);
+    } finally {
+      setIsRecognizing(false);
+    }
   };
 
   const handleGoToEnvironmentTest = () => {
@@ -652,6 +708,35 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
             onStopListening={stopListening}
             onStopSpeaking={stopSpeaking}
           />
+        </View>
+
+        {/* Object Recognition Button - Floating on left side */}
+        <View className='absolute px-4 left-8 bottom-8'>
+          <TouchableOpacity
+            onPress={handleRecognizeObject}
+            disabled={isRecognizing || objectRecognition.isLoading}
+            className={`w-16 h-16 rounded-full items-center justify-center shadow-lg ${
+              isRecognizing || objectRecognition.isLoading
+                ? 'bg-gray-400'
+                : 'bg-green-500'
+            }`}
+            style={{
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.3,
+              shadowRadius: 8,
+              elevation: 8,
+            }}
+          >
+            {isRecognizing || objectRecognition.isLoading ? (
+              <ActivityIndicator size='small' color='#fff' />
+            ) : (
+              <Text className='text-3xl'>📷</Text>
+            )}
+          </TouchableOpacity>
+          <Text className='mt-2 text-xs text-center text-white'>
+            {isRecognizing || objectRecognition.isLoading ? '识别中...' : '识别物品'}
+          </Text>
         </View>
 
         {/* Facial Emotion Detection */}

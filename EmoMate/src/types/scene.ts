@@ -239,3 +239,106 @@ export const DEFAULT_SCENE_CONFIG: SceneConfig = {
   triggerKeywords: ['看', '看见', '看到', '这是什么', '周围', '环境', '场景'],
   debugMode: process.env.SHOW_TEST_COMPONENTS === 'true',
 };
+
+/**
+ * Analysis mode - differentiates between scene understanding and object recognition
+ */
+export enum AnalysisMode {
+  /** Scene understanding - analyze the overall environment */
+  SCENE = 'scene',
+
+  /** Object recognition - focus on a specific object the user wants to identify */
+  OBJECT = 'object',
+}
+
+/**
+ * Object recognition data - stores detailed information about a specific object
+ */
+export interface ObjectRecognitionData {
+  /** Name/title of the object */
+  objectName: string;
+
+  /** Category of the object (e.g., "书籍", "电子产品", "食物") */
+  category: string;
+
+  /** Detailed description of the object */
+  description: string;
+
+  /** Brand name (if applicable) */
+  brand?: string;
+
+  /** Model/version (if applicable) */
+  model?: string;
+
+  /** Color information */
+  color?: string;
+
+  /** Material composition */
+  material?: string;
+
+  /** Estimated price range */
+  priceRange?: string;
+
+  /** Additional details (key-value pairs) */
+  additionalInfo?: Record<string, string>;
+
+  /** User's question or prompt that triggered this recognition */
+  userPrompt?: string;
+
+  /** Confidence score (0-1) */
+  confidence: number;
+
+  /** Unix timestamp when recognized */
+  timestamp: number;
+
+  /** Raw response from Claude Vision API for debugging */
+  rawResponse?: string;
+}
+
+/**
+ * Object recognition request
+ */
+export interface ObjectRecognitionRequest {
+  /** Base64 encoded image data */
+  imageBase64: string;
+
+  /** User's question or specific focus */
+  userPrompt: string;
+
+  /** Analysis mode (should be OBJECT for object recognition) */
+  mode: AnalysisMode.OBJECT;
+}
+
+/**
+ * Object recognition response
+ */
+export interface ObjectRecognitionResponse {
+  /** Recognized object data */
+  object: ObjectRecognitionData;
+
+  /** Whether recognition was successful */
+  success: boolean;
+
+  /** Optional: Error message if recognition failed */
+  error?: string;
+
+  /** API call cost in USD (for tracking) */
+  cost?: number;
+}
+
+/**
+ * Object recognition record - stored entry with image
+ */
+export interface ObjectRecognitionRecord {
+  /** Unique ID for this record */
+  id: string;
+
+  /** Base64 encoded image of the recognized object */
+  imageBase64: string;
+
+  /** Recognition data */
+  data: ObjectRecognitionData;
+
+  /** When this record was created */
+  createdAt: number;
+}

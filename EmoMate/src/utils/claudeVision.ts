@@ -8,6 +8,10 @@ import {
   SceneAnalysisRequest,
   SceneAnalysisResponse,
   SceneTriggerType,
+  AnalysisMode,
+  ObjectRecognitionData,
+  ObjectRecognitionRequest,
+  ObjectRecognitionResponse,
 } from '../types/scene';
 import { compressBase64Image, formatByteSize } from './imageCompression';
 
@@ -143,6 +147,68 @@ function buildAnalysisPrompt(request: SceneAnalysisRequest): string {
   }
 
   return basePrompt;
+}
+
+/**
+ * Build prompt for object recognition mode
+ * Focus on detailed analysis of a specific object
+ *
+ * @param request - Object recognition request
+ * @returns Prompt string for Claude API
+ */
+function buildObjectRecognitionPrompt(request: ObjectRecognitionRequest): string {
+  return `请仔细分析这张图片中的物品。用户想要识别这个物品，请提供详细的信息。你的回复必须是一个有效的JSON对象，不要包含任何其他文字或解释。
+
+请严格按照以下JSON格式返回：
+
+{
+  "objectName": "物品名称（如：《人类简史》、MacBook Pro、拿铁咖啡等）",
+  "category": "物品类别（如：书籍、电子产品、食物、饮料、服装、家具等）",
+  "description": "详细描述（包括外观特征、功能用途、使用场景等，2-3句话）",
+  "brand": "品牌名称（如果能识别出来）",
+  "model": "型号/版本（如果能识别出来）",
+  "color": "颜色信息（主要颜色）",
+  "material": "材质（如果能看出来）",
+  "priceRange": "价格范围估计（如：100-200元，仅供参考）",
+  "additionalInfo": {
+    // 如果是书籍，添加：
+    "author": "作者名",
+    "publisher": "出版社",
+    "isbn": "ISBN（如果可见）",
+
+    // 如果是电子产品，添加：
+    "screenSize": "屏幕尺寸",
+    "processor": "处理器信息（如果可见）",
+    "storage": "存储容量（如果可见）",
+
+    // 如果是食物/饮料，添加：
+    "taste": "口味特点",
+    "ingredients": "主要成分",
+    "calories": "热量信息（如果可见）",
+
+    // 其他任何相关的详细信息
+    "其他字段": "其他值"
+  },
+  "userPrompt": "${request.userPrompt}",
+  "confidence": 0.85
+}
+
+用户的问题：「${request.userPrompt}」
+
+关于置信度(confidence)的计算标准：
+- 0.9-1.0: 物品非常清晰，细节可见，品牌型号明确
+- 0.75-0.89: 物品清晰，主要特征可识别
+- 0.5-0.74: 物品识别，但细节不太清楚
+- 0-0.49: 物品模糊，难以确定具体信息
+
+重要提示：
+1. objectName 应该尽可能具体（如"《人类简史》"而不是"书"）
+2. description 要详细描述物品的特征和用途
+3. 如果某些信息无法确定（如品牌、型号），该字段可以省略或设为null
+4. additionalInfo 中只添加确实能识别出的信息
+5. 回复只能是纯JSON，不要添加任何解释文字
+6. 确保JSON格式完全正确，可以被 JSON.parse() 解析
+7. 重点关注物品本身的细节，而不是周围环境`;
 }
 
 /**
@@ -460,4 +526,249 @@ export function estimateAPICost(
   });
 
   return totalCost;
+}
+
+/**
+ * Parse Claude API response to extract object recognition data
+ *
+ * @param responseText - Raw text response from Claude API
+ * @returns Parsed object recognition data
+ */
+function parseObjectRecognitionData(responseText: string): ObjectRecognitionData {
+  try {
+    console.log('[ClaudeVision] Parsing object recognition response...');
+
+    // Strategy 1: Try to extract JSON from code block
+    let jsonText: string | null = null;
+    const codeBlockMatch = responseText.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+    if (codeBlockMatch) {
+      jsonText = codeBlockMatch[1];
+      console.log('[ClaudeVision] Found JSON in code block');
+    }
+
+    // Strategy 2: Try to extract first complete JSON object
+    if (!jsonText) {
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        jsonText = jsonMatch[0];
+        console.log('[ClaudeVision] Found JSON object');
+      }
+    }
+
+    if (!jsonText) {
+      throw new Error('No JSON found in response');
+    }
+
+    // Remove comments from JSON
+    jsonText = jsonText.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+
+    // Parse JSON
+    const objectData = JSON.parse(jsonText);
+    console.log('[ClaudeVision] JSON parsed successfully');
+
+    // Validate required fields
+    if (typeof objectData.objectName !== 'string' || !objectData.objectName.trim()) {
+      throw new Error('Invalid or missing "objectName" field');
+    }
+    objectData.objectName = objectData.objectName.trim();
+
+    if (typeof objectData.category !== 'string' || !objectData.category.trim()) {
+      throw new Error('Invalid or missing "category" field');
+    }
+    objectData.category = objectData.category.trim();
+
+    if (typeof objectData.description !== 'string' || !objectData.description.trim()) {
+      throw new Error('Invalid or missing "description" field');
+    }
+    objectData.description = objectData.description.trim();
+
+    // Validate optional string fields
+    const stringFields = ['brand', 'model', 'color', 'material', 'priceRange', 'userPrompt'];
+    stringFields.forEach((field) => {
+      if (objectData[field] !== undefined && typeof objectData[field] === 'string') {
+        objectData[field] = objectData[field].trim();
+      }
+    });
+
+    // Validate additionalInfo object
+    if (
+      objectData.additionalInfo &&
+      (typeof objectData.additionalInfo !== 'object' ||
+        Array.isArray(objectData.additionalInfo))
+    ) {
+      console.warn('[ClaudeVision] Invalid additionalInfo field, using empty object');
+      objectData.additionalInfo = {};
+    }
+
+    // Validate and normalize confidence
+    if (typeof objectData.confidence !== 'number') {
+      console.warn('[ClaudeVision] Invalid confidence field, attempting conversion');
+      objectData.confidence = parseFloat(objectData.confidence);
+    }
+    if (isNaN(objectData.confidence)) {
+      console.warn('[ClaudeVision] Cannot parse confidence, using default 0.5');
+      objectData.confidence = 0.5;
+    }
+    // Clamp confidence to [0, 1]
+    objectData.confidence = Math.max(0, Math.min(1, objectData.confidence));
+
+    // Add timestamp
+    objectData.timestamp = Date.now();
+
+    // Store raw response for debugging
+    objectData.rawResponse = responseText;
+
+    console.log('[ClaudeVision] Parsed object data:', {
+      objectName: objectData.objectName,
+      category: objectData.category,
+      confidence: objectData.confidence,
+    });
+
+    return objectData as ObjectRecognitionData;
+  } catch (error) {
+    console.error('[ClaudeVision] Failed to parse object recognition data:', error);
+    console.error('[ClaudeVision] Raw response:', responseText);
+
+    // Return fallback object data
+    return {
+      objectName: '解析失败',
+      category: '未知',
+      description: '无法识别该物品，请重试',
+      confidence: 0,
+      timestamp: Date.now(),
+      rawResponse: responseText,
+    };
+  }
+}
+
+/**
+ * Recognize object using Claude Vision API
+ *
+ * @param request - Object recognition request
+ * @param apiKey - Anthropic API key
+ * @returns Object recognition response
+ */
+export async function recognizeObjectWithClaude(
+  request: ObjectRecognitionRequest,
+  apiKey: string
+): Promise<ObjectRecognitionResponse> {
+  const startTime = Date.now();
+
+  try {
+    console.log('[ClaudeVision] Starting object recognition:', {
+      userPrompt: request.userPrompt,
+      mode: request.mode,
+    });
+
+    // Compress image if needed
+    const compressedImage = await compressImage(request.imageBase64);
+
+    // Build prompt
+    const prompt = buildObjectRecognitionPrompt(request);
+
+    // Extract image data
+    let imageData = compressedImage;
+    if (imageData.startsWith('data:image')) {
+      imageData = imageData.split(',')[1] || imageData;
+    }
+
+    console.log('[ClaudeVision] Preparing API request...');
+    console.log(
+      '[ClaudeVision] Image size:',
+      Math.round((imageData.length * 0.75) / 1024),
+      'KB'
+    );
+
+    // Make API call to Claude Vision
+    const response = await fetch(CLAUDE_API_CONFIG.endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': CLAUDE_API_CONFIG.apiVersion,
+      },
+      body: JSON.stringify({
+        model: CLAUDE_API_CONFIG.model,
+        max_tokens: CLAUDE_API_CONFIG.maxTokens,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: {
+                  type: 'base64',
+                  media_type: 'image/jpeg',
+                  data: imageData,
+                },
+              },
+              {
+                type: 'text',
+                text: prompt,
+              },
+            ],
+          },
+        ],
+      }),
+    });
+
+    // Check if response is OK
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        `Claude API error: ${response.status} - ${
+          errorData.error?.message || response.statusText
+        }`
+      );
+    }
+
+    // Parse API response
+    const apiResponse = await response.json();
+    console.log('[ClaudeVision] API response received:', {
+      id: apiResponse.id,
+      model: apiResponse.model,
+      usage: apiResponse.usage,
+    });
+
+    // Extract text content from response
+    const responseText = apiResponse.content?.[0]?.text || 'No response text';
+
+    // Parse object recognition data
+    const object = parseObjectRecognitionData(responseText);
+
+    // Calculate cost
+    const cost = estimateAPICost(
+      compressedImage,
+      apiResponse.usage?.output_tokens || 300
+    );
+
+    const duration = Date.now() - startTime;
+    console.log(`[ClaudeVision] Object recognition completed in ${duration}ms`);
+    console.log('[ClaudeVision] Recognized object:', {
+      name: object.objectName,
+      category: object.category,
+      confidence: object.confidence,
+    });
+
+    return {
+      object,
+      success: true,
+      cost,
+    };
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`[ClaudeVision] Object recognition failed after ${duration}ms:`, error);
+
+    return {
+      object: {
+        objectName: '识别失败',
+        category: '未知',
+        description: '无法识别该物品，请重试',
+        confidence: 0,
+        timestamp: Date.now(),
+      },
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
 }
