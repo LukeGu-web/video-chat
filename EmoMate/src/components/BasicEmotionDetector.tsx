@@ -1,7 +1,6 @@
 import React, { useRef, useCallback, useEffect, useState } from 'react';
 import {
   View,
-  StyleSheet,
   Text,
   TouchableOpacity,
   PanResponder,
@@ -604,12 +603,13 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
     };
   });
 
-  // 容器样式
-  const containerStyle = [
-    styles.container,
+  // 容器样式 - Dynamic positioning and animation as inline style
+  const containerInlineStyle = [
     {
       left: position.x,
       top: position.y,
+      width: CONTAINER_WIDTH,
+      height: CONTAINER_HEIGHT,
     },
     animatedStyle,
   ];
@@ -617,13 +617,18 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
   // Render permission request UI if needed
   if (!hasPermission) {
     return (
-      <AnimatedView style={containerStyle}>
-        <Text style={styles.errorText}>Camera permission required</Text>
+      <AnimatedView
+        className="absolute z-[1000] rounded-xl overflow-hidden bg-[#f8f9fa] border-2 border-[#e9ecef]"
+        style={containerInlineStyle}
+      >
+        <Text className="text-[9px] text-[#e74c3c] text-center px-1.5 pt-3.5">
+          Camera permission required
+        </Text>
         <TouchableOpacity
           onPress={requestPermission}
-          style={styles.permissionButton}
+          className="bg-[#3498db] px-2 py-1 rounded mx-auto mt-2"
         >
-          <Text style={styles.permissionButtonText}>Grant Permission</Text>
+          <Text className="text-white text-[9px] font-bold">Grant Permission</Text>
         </TouchableOpacity>
       </AnimatedView>
     );
@@ -631,21 +636,28 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
 
   if (!isActive) {
     return (
-      <AnimatedView style={containerStyle}>
-        <View style={styles.inactiveIndicator}>
-          <Text style={styles.inactiveText}>Camera Inactive</Text>
+      <AnimatedView
+        className="absolute z-[1000] rounded-xl overflow-hidden bg-[#f8f9fa] border-2 border-[#e9ecef]"
+        style={containerInlineStyle}
+      >
+        <View className="justify-center items-center w-full h-full bg-[#f5f5f5]">
+          <Text className="text-[10px] text-[#666] text-center">Camera Inactive</Text>
         </View>
       </AnimatedView>
     );
   }
 
   return (
-    <AnimatedView style={containerStyle} {...panResponder.panHandlers}>
+    <AnimatedView
+      className="absolute z-[1000] rounded-xl overflow-hidden bg-[#f8f9fa] border-2 border-[#e9ecef] shadow-md"
+      style={containerInlineStyle}
+      {...panResponder.panHandlers}
+    >
       {/* React Native Vision Camera */}
       {frontDevice && (
         <Camera
           ref={cameraRef}
-          style={styles.camera}
+          style={{ width: '100%', height: '100%' }}
           device={frontDevice}
           isActive={isActive && hasPermission}
           frameProcessor={useMLKit ? frameProcessor : undefined}
@@ -654,124 +666,22 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
       )}
 
       {/* 拖拽指示器 */}
-      <View style={styles.dragIndicator}>
-        <View style={styles.dragHandle} />
+      <View className="absolute top-1 left-0 right-0 items-center">
+        <View className="w-[30px] h-[3px] bg-white/70 rounded-full" />
       </View>
       {faceDetected && (
-        <View className='absolute bottom-2 left-3'>
-          <Text style={styles.detectingText}>●</Text>
+        <View className="absolute bottom-2 left-3">
+          <Text className="text-[#22c55e] text-xs font-bold">●</Text>
         </View>
       )}
       <Pressable
-        className='absolute bottom-0 right-2'
+        className="absolute bottom-0 right-2"
         onPress={() =>
           setCameraPosition(cameraPosition === 'front' ? 'back' : 'front')
         }
       >
-        <Text className='text-2xl font-extrabold text-white'>↺</Text>
+        <Text className="text-2xl font-extrabold text-white">↺</Text>
       </Pressable>
     </AnimatedView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    width: CONTAINER_WIDTH,
-    height: CONTAINER_HEIGHT,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: '#f8f9fa',
-    position: 'absolute',
-    zIndex: 1000,
-    borderWidth: 2,
-    borderColor: '#e9ecef',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  camera: {
-    width: '100%',
-    height: '100%',
-  },
-  dragIndicator: {
-    position: 'absolute',
-    top: 4,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  dragHandle: {
-    width: 30,
-    height: 3,
-    backgroundColor: 'rgba(255,255,255,0.7)',
-    borderRadius: 1.5,
-  },
-  activeIndicator: {
-    backgroundColor: 'rgba(59, 130, 246, 0.2)',
-  },
-  detectingIndicator: {
-    marginLeft: 6,
-  },
-  detectingText: {
-    color: '#22c55e',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  emotionText: {
-    fontSize: 16,
-  },
-  statusText: {
-    fontSize: 10,
-    color: '#666',
-    textAlign: 'center',
-    paddingHorizontal: 8,
-    paddingTop: 20,
-  },
-  errorText: {
-    fontSize: 9,
-    color: '#e74c3c',
-    textAlign: 'center',
-    paddingHorizontal: 6,
-    paddingTop: 15,
-  },
-  permissionButton: {
-    backgroundColor: '#3498db',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    marginTop: 8,
-    alignSelf: 'center',
-  },
-  permissionButtonText: {
-    color: 'white',
-    fontSize: 9,
-    fontWeight: 'bold',
-  },
-  inactiveIndicator: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#f5f5f5',
-  },
-  inactiveText: {
-    fontSize: 10,
-    color: '#666',
-    textAlign: 'center',
-  },
-  debugOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    padding: 2,
-  },
-  debugText: {
-    fontSize: 8,
-    color: 'white',
-    textAlign: 'center',
-  },
-});
