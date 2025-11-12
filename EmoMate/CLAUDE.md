@@ -262,7 +262,7 @@ The app implements a permission-first design:
 ```
 src/
 ├── screens/     # Screen components (WelcomeScreen, HomeScreen)
-├── components/  # Reusable UI components (ChatBubble, ErrorToast, etc.)
+├── components/  # Reusable UI components (ChatBubble, Toast, etc.)
 ├── store/       # Zustand state management
 ├── utils/       # Utility functions (useChatAI, useTTS, useSpeechToText, permissions)
 └── constants/   # App constants (ai.ts, colors, sizes)

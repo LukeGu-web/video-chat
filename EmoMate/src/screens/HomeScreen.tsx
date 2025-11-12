@@ -23,7 +23,7 @@ import { PERSONALITY_PROMPTS, getClaudeApiKey } from '../constants';
 import {
   Header,
   VoiceControl,
-  ErrorToast,
+  Toast,
   CurrentSpeechBubble,
   EmotionProvider,
   useEmotionContext,
@@ -97,9 +97,10 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
     currentSegment,
   } = useChatAI({ personality: PERSONALITY_PROMPTS.gentle, enableTTS: true });
 
-  // Error toast state
-  const [showErrorToast, setShowErrorToast] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
+  // Toast state
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'error' | 'success'>('error');
 
   // Test mode state
   const [isTestMode, setIsTestMode] = useState(false);
@@ -172,8 +173,9 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
   useEffect(() => {
     if (error || aiError || backgroundError) {
       const message = error || aiError || backgroundError?.message || '';
-      setErrorMessage(message);
-      setShowErrorToast(true);
+      setToastMessage(message);
+      setToastType('error');
+      setShowToast(true);
     }
   }, [error, aiError, backgroundError]);
 
@@ -194,9 +196,9 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
     }
   }, [isListening, isGenerating, isSpeaking, setAIStatus]);
 
-  const handleDismissError = () => {
-    setShowErrorToast(false);
-    setErrorMessage('');
+  const handleDismissToast = () => {
+    setShowToast(false);
+    setToastMessage('');
   };
 
   useEffect(() => {
@@ -389,8 +391,9 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
   const handleRecognizeObject = async () => {
     if (!lastCapturedFrameRef.current) {
       console.log('[HomeScreen] ⚠️ No captured frame available');
-      setErrorMessage('请等待摄像头捕获画面');
-      setShowErrorToast(true);
+      setToastMessage('请等待摄像头捕获画面');
+      setToastType('error');
+      setShowToast(true);
       return;
     }
 
@@ -414,21 +417,24 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
           category: response.object.category,
         });
 
-        // Show success message
-        setErrorMessage(`识别成功: ${response.object.objectName}`);
-        setShowErrorToast(true);
+        // Show success message (no navigation, just save and notify)
+        setToastMessage(`识别成功: ${response.object.objectName}`);
+        setToastType('success');
+        setShowToast(true);
 
-        // Navigate to scene history (object tab will show the new record)
-        navigation.navigate('SceneHistory');
+        // Result is automatically saved by useObjectRecognition hook
+        // User can now ask AI about this object in conversation
       } else {
         console.error('[HomeScreen] ❌ Recognition failed:', response.error);
-        setErrorMessage(response.error || '识别失败，请重试');
-        setShowErrorToast(true);
+        setToastMessage(response.error || '识别失败，请重试');
+        setToastType('error');
+        setShowToast(true);
       }
     } catch (error) {
       console.error('[HomeScreen] ❌ Recognition error:', error);
-      setErrorMessage('识别过程中发生错误');
-      setShowErrorToast(true);
+      setToastMessage('识别过程中发生错误');
+      setToastType('error');
+      setShowToast(true);
     } finally {
       setIsRecognizing(false);
     }
@@ -452,15 +458,17 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
 
     if (!apiKey) {
       console.error('[HomeScreen] ❌ No API Key configured!');
-      setErrorMessage('API Key 未配置，请检查 .env 文件');
-      setShowErrorToast(true);
+      setToastMessage('API Key 未配置，请检查 .env 文件');
+      setToastType('error');
+      setShowToast(true);
       return;
     }
 
     if (!lastCapturedFrameRef.current) {
       console.warn('[HomeScreen] ⚠️ No frame captured yet, waiting...');
-      setErrorMessage('摄像头还未捕获帧，请稍候再试');
-      setShowErrorToast(true);
+      setToastMessage('摄像头还未捕获帧，请稍候再试');
+      setToastType('error');
+      setShowToast(true);
       return;
     }
 
@@ -473,10 +481,11 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
       console.log('[HomeScreen] ✅ Manual scene analysis completed');
     } catch (error) {
       console.error('[HomeScreen] ❌ Manual scene analysis failed:', error);
-      setErrorMessage(
+      setToastMessage(
         `场景分析失败: ${error instanceof Error ? error.message : '未知错误'}`
       );
-      setShowErrorToast(true);
+      setToastType('error');
+      setShowToast(true);
     }
   }, [apiKey, sceneUnderstanding]);
 
@@ -516,37 +525,43 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
           // Check if we have a captured frame
           if (lastCapturedFrameRef.current) {
             try {
-              console.log(
-                '[HomeScreen] 📸 Starting object recognition...'
-              );
+              console.log('[HomeScreen] 📸 Starting object recognition...');
 
               // Trigger object recognition
-              const recognitionResponse = await objectRecognition.recognizeObject(
-                lastCapturedFrameRef.current,
-                inputText // Pass user's original question
-              );
+              const recognitionResponse =
+                await objectRecognition.recognizeObject(
+                  lastCapturedFrameRef.current,
+                  inputText // Pass user's original question
+                );
 
               if (recognitionResponse.success) {
                 // Format object recognition result as context
-                objectContext = formatObjectRecognitionForAI(recognitionResponse.object);
+                objectContext = formatObjectRecognitionForAI(
+                  recognitionResponse.object
+                );
                 console.log('[HomeScreen] ✅ Object recognition complete:', {
                   name: recognitionResponse.object.objectName,
                   category: recognitionResponse.object.category,
                   contextLength: objectContext.length,
                 });
               } else {
-                console.error('[HomeScreen] ❌ Object recognition failed:', recognitionResponse.error);
-                setErrorMessage(recognitionResponse.error || '物品识别失败');
-                setShowErrorToast(true);
+                console.error(
+                  '[HomeScreen] ❌ Object recognition failed:',
+                  recognitionResponse.error
+                );
+                setToastMessage(recognitionResponse.error || '物品识别失败');
+                setToastType('error');
+                setShowToast(true);
               }
             } catch (error) {
               console.error('[HomeScreen] ❌ Object recognition error:', error);
-              setErrorMessage(
+              setToastMessage(
                 `物品识别失败: ${
                   error instanceof Error ? error.message : '未知错误'
                 }`
               );
-              setShowErrorToast(true);
+              setToastType('error');
+              setShowToast(true);
             }
           } else {
             console.log(
@@ -556,7 +571,9 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
         }
 
         // 3. If no object keyword, check for scene keywords and trigger scene analysis
-        const detectedKeyword = !objectKeyword ? detectVisualKeywords(inputText) : null;
+        const detectedKeyword = !objectKeyword
+          ? detectVisualKeywords(inputText)
+          : null;
 
         if (detectedKeyword) {
           console.log(
@@ -594,12 +611,13 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
               console.log('[HomeScreen] ✅ Scene analysis complete and cached');
             } catch (error) {
               console.error('[HomeScreen] ❌ Scene analysis error:', error);
-              setErrorMessage(
+              setToastMessage(
                 `场景分析失败: ${
                   error instanceof Error ? error.message : '未知错误'
                 }`
               );
-              setShowErrorToast(true);
+              setToastType('error');
+              setShowToast(true);
             }
           } else {
             console.log(
@@ -616,12 +634,39 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
           combinedContext += formatStoryForAI(backgroundContext);
         }
 
-        // Add object recognition context if available (higher priority)
+        // Add object recognition context if triggered by keyword
         if (objectContext) {
           if (combinedContext) {
             combinedContext += '\n\n';
           }
           combinedContext += objectContext;
+        } else {
+          // Check if there's a recent object recognition record (within 5 minutes)
+          // This allows user to manually recognize an object, then ask AI about it
+          const recentRecords = objectRecognition.records;
+          if (recentRecords.length > 0) {
+            const latestRecord = recentRecords[0]; // Already sorted newest first
+            const recordAge = Date.now() - latestRecord.createdAt;
+            const fiveMinutesInMs = 5 * 60 * 1000;
+
+            if (recordAge < fiveMinutesInMs) {
+              console.log(
+                '[HomeScreen] 📦 Using recent object recognition as context:',
+                {
+                  name: latestRecord.data.objectName,
+                  ageSeconds: Math.round(recordAge / 1000),
+                }
+              );
+
+              if (combinedContext) {
+                combinedContext += '\n\n';
+              }
+              combinedContext += '【最近识别的物品】\n';
+              combinedContext += formatObjectRecognitionForAI(
+                latestRecord.data
+              );
+            }
+          }
         }
 
         // 5. 调用 AI 获取回复并播放 TTS
@@ -725,12 +770,13 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
       resizeMode='cover'
     >
       <SafeAreaViewRN className='flex-1'>
-        {/* Error Toast */}
-        <ErrorToast
-          message={errorMessage}
-          isVisible={showErrorToast}
-          onDismiss={handleDismissError}
+        {/* Toast (Error/Success) */}
+        <Toast
+          message={toastMessage}
+          isVisible={showToast}
+          onDismiss={handleDismissToast}
           duration={4000}
+          type={toastType}
         />
 
         <Header

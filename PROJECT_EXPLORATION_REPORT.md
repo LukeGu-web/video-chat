@@ -97,7 +97,7 @@ video-chat/
 - `Live2DCharacter.tsx` (6,620 字节) - Live2D 字符处理
 - `VoiceControl.tsx` - 语音控制
 - `ChatBubble.tsx`, `ChatList.tsx`, `CurrentSpeechBubble.tsx`
-- `LoadingDots.tsx`, `ErrorToast.tsx`, `Header.tsx`
+- `LoadingDots.tsx`, `Toast.tsx`, `Header.tsx`
 - `EmotionProvider.tsx` - 情绪提供者
 
 **工具函数** (`src/utils/`):

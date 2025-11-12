@@ -1,6 +1,6 @@
 export * from './ChatBubble';
 export { default as LoadingDots } from './LoadingDots';
-export { default as ErrorToast } from './ErrorToast';
+export { default as Toast } from './Toast';
 export { default as Header } from './Header';
 export { default as ChatList } from './ChatList';
 export { default as VoiceControl } from './VoiceControl';
