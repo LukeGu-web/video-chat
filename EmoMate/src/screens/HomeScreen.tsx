@@ -119,16 +119,19 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
   const [isRecognizing, setIsRecognizing] = useState(false);
 
   // Stable callback for frame capture (prevents useEffect re-triggering)
-  const handleFrameCaptured = useCallback((frameBase64: string, timestamp: number) => {
-    // Step 5.2: Store last captured frame for visual QA and scene understanding
-    const frameSize = Math.round((frameBase64.length * 0.75) / 1024);
-    console.log('[HomeScreen] 📷 Frame captured from camera:', {
-      frameSizeKB: frameSize,
-      timestamp: new Date(timestamp).toISOString(),
-      timestampMs: timestamp,
-    });
-    lastCapturedFrameRef.current = frameBase64;
-  }, []);
+  const handleFrameCaptured = useCallback(
+    (frameBase64: string, timestamp: number) => {
+      // Step 5.2: Store last captured frame for visual QA and scene understanding
+      const frameSize = Math.round((frameBase64.length * 0.75) / 1024);
+      console.log('[HomeScreen] 📷 Frame captured from camera:', {
+        frameSizeKB: frameSize,
+        timestamp: new Date(timestamp).toISOString(),
+        timestampMs: timestamp,
+      });
+      lastCapturedFrameRef.current = frameBase64;
+    },
+    []
+  );
 
   // Debug: Log API key once on mount
   useEffect(() => {
@@ -715,7 +718,7 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
           <TouchableOpacity
             onPress={handleRecognizeObject}
             disabled={isRecognizing || objectRecognition.isLoading}
-            className={`w-16 h-16 rounded-full items-center justify-center shadow-lg ${
+            className={`w-20 h-20 rounded-full items-center justify-center shadow-lg ${
               isRecognizing || objectRecognition.isLoading
                 ? 'bg-gray-400'
                 : 'bg-green-500'
@@ -733,10 +736,12 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
             ) : (
               <Text className='text-3xl'>📷</Text>
             )}
+            <Text className='text-xs text-center text-white'>
+              {isRecognizing || objectRecognition.isLoading
+                ? '识别中...'
+                : '识别物品'}
+            </Text>
           </TouchableOpacity>
-          <Text className='mt-2 text-xs text-center text-white'>
-            {isRecognizing || objectRecognition.isLoading ? '识别中...' : '识别物品'}
-          </Text>
         </View>
 
         {/* Facial Emotion Detection */}

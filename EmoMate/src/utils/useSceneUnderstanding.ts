@@ -503,6 +503,9 @@ export function useSceneUnderstanding(
           (entry: SceneCacheEntry) => entry.expiresAt > now
         );
 
+        // Sort by cachedAt timestamp (newest first)
+        sceneCache.current.sort((a, b) => b.cachedAt - a.cachedAt);
+
         const afterCount = sceneCache.current.length;
         const removedCount = beforeCount - afterCount;
 
@@ -516,7 +519,7 @@ export function useSceneUnderstanding(
         }
 
         setCachedScenes(sceneCache.current); // Step 4.1: Update state for UI
-        console.log('[SceneUnderstanding] Loaded', sceneCache.current.length, 'cached scenes');
+        console.log('[SceneUnderstanding] Loaded', sceneCache.current.length, 'cached scenes (sorted newest first)');
       }
 
       // Load last scene
@@ -1039,6 +1042,7 @@ export function useSceneUnderstanding(
     try {
       sceneCache.current = [];
       storage.remove(STORAGE_KEYS.SCENE_CACHE);
+      setCachedScenes([]); // Update state for UI
       console.log('[SceneUnderstanding] Cache cleared');
     } catch (error) {
       console.error('[SceneUnderstanding] Failed to clear cache:', error);
@@ -1210,6 +1214,9 @@ export function useSceneUnderstanding(
       sceneCache.current = sceneCache.current.filter(
         entry => entry.expiresAt > now
       );
+
+      // Sort by cachedAt timestamp (newest first)
+      sceneCache.current.sort((a, b) => b.cachedAt - a.cachedAt);
 
       const afterCount = sceneCache.current.length;
       const removedCount = beforeCount - afterCount;

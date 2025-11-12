@@ -1,12 +1,5 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-  Image,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSceneUnderstanding } from '../utils/useSceneUnderstanding';
@@ -48,11 +41,29 @@ const SceneHistoryScreen: React.FC<Props> = ({ navigation }) => {
   const apiKey = getClaudeApiKey();
   const [activeTab, setActiveTab] = useState<TabType>('scene');
 
+  // Track expanded descriptions by record ID
+  const [expandedDescriptions, setExpandedDescriptions] = useState<Set<string>>(
+    new Set()
+  );
+
   const sceneUnderstanding = useSceneUnderstanding(apiKey || '', {
     enabled: false, // Only used for reading cached scenes
   });
 
   const objectRecognition = useObjectRecognition(apiKey || '');
+
+  // Toggle description expansion
+  const toggleDescription = (recordId: string) => {
+    setExpandedDescriptions((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(recordId)) {
+        newSet.delete(recordId);
+      } else {
+        newSet.add(recordId);
+      }
+      return newSet;
+    });
+  };
 
   const handleGoBack = () => {
     navigation.goBack();
@@ -71,277 +82,356 @@ const SceneHistoryScreen: React.FC<Props> = ({ navigation }) => {
   const objectStats = objectRecognition.getStats();
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView className='flex-1 bg-gray-50'>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
-          <Text style={styles.backButtonText}>‹ 返回</Text>
+      <View className='flex-row items-center justify-between px-4 py-3 bg-white border-b border-gray-200'>
+        <TouchableOpacity onPress={handleGoBack} className='px-1 py-2'>
+          <Text className='font-medium text-blue-500 text-16'>← 返回</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>视觉记录</Text>
-        <View style={styles.headerSpacer} />
+        <Text className='text-lg font-bold text-gray-800'>视觉记录</Text>
+        <View className='w-10' />
       </View>
 
       {/* Tabs */}
-      <View style={styles.tabsContainer}>
+      <View className='flex-row px-4 bg-white border-b border-gray-200'>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'scene' && styles.tabActive]}
+          className={`flex-1 py-4 items-center justify-center flex-row border-b-2 ${
+            activeTab === 'scene' ? 'border-blue-500' : 'border-transparent'
+          }`}
           onPress={() => setActiveTab('scene')}
+          activeOpacity={0.9}
         >
-          <Text style={[styles.tabText, activeTab === 'scene' && styles.tabTextActive]}>
+          <Text
+            className={`text-base font-semibold ${
+              activeTab === 'scene' ? 'text-blue-500' : 'text-gray-400'
+            }`}
+          >
             场景历史
           </Text>
           {sceneUnderstanding.cachedScenes.length > 0 && (
-            <View style={styles.tabBadge}>
-              <Text style={styles.tabBadgeText}>{sceneUnderstanding.cachedScenes.length}</Text>
+            <View className='bg-blue-500 rounded-full px-2 py-0.5 ml-2 min-w-[20px] items-center'>
+              <Text className='text-xs font-bold text-white'>
+                {sceneUnderstanding.cachedScenes.length}
+              </Text>
             </View>
           )}
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'object' && styles.tabActive]}
+          className={`flex-1 py-4 items-center justify-center flex-row border-b-2 ${
+            activeTab === 'object' ? 'border-blue-500' : 'border-transparent'
+          }`}
           onPress={() => setActiveTab('object')}
+          activeOpacity={0.9}
         >
-          <Text style={[styles.tabText, activeTab === 'object' && styles.tabTextActive]}>
+          <Text
+            className={`text-base font-semibold ${
+              activeTab === 'object' ? 'text-blue-500' : 'text-gray-400'
+            }`}
+          >
             物品识别
           </Text>
           {objectRecognition.records.length > 0 && (
-            <View style={styles.tabBadge}>
-              <Text style={styles.tabBadgeText}>{objectRecognition.records.length}</Text>
+            <View className='bg-blue-500 rounded-full px-2 py-0.5 ml-2 min-w-[20px] items-center'>
+              <Text className='text-xs font-bold text-white'>
+                {objectRecognition.records.length}
+              </Text>
             </View>
           )}
         </TouchableOpacity>
       </View>
 
       {/* Content */}
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+      <ScrollView className='flex-1' contentContainerClassName='p-4'>
         {activeTab === 'scene' ? (
           <>
             {/* Scene History Stats */}
-            <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{sceneUnderstanding.cachedScenes.length}</Text>
-            <Text style={styles.statLabel}>总场景数</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>
-              {sceneUnderstanding.cachedScenes.filter(
-                (entry) => entry.expiresAt > Date.now()
-              ).length}
-            </Text>
-            <Text style={styles.statLabel}>活跃场景</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>
-              {sceneUnderstanding.cachedScenes.filter(
-                (entry) => entry.expiresAt <= Date.now()
-              ).length}
-            </Text>
-            <Text style={styles.statLabel}>已过期</Text>
-          </View>
-        </View>
-
-        {/* Action buttons */}
-        <View style={styles.actionsContainer}>
-          <TouchableOpacity
-            style={[
-              styles.actionButton,
-              styles.clearExpiredButton,
-              sceneUnderstanding.cachedScenes.filter(
-                (entry) => entry.expiresAt <= Date.now()
-              ).length === 0 && styles.actionButtonDisabled,
-            ]}
-            onPress={handleClearExpired}
-            disabled={
-              sceneUnderstanding.cachedScenes.filter(
-                (entry) => entry.expiresAt <= Date.now()
-              ).length === 0
-            }
-          >
-            <Text style={styles.actionButtonText}>🗑️ 清理过期场景</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.actionButton,
-              styles.clearAllButton,
-              sceneUnderstanding.cachedScenes.length === 0 && styles.actionButtonDisabled,
-            ]}
-            onPress={handleClearAll}
-            disabled={sceneUnderstanding.cachedScenes.length === 0}
-          >
-            <Text style={styles.actionButtonText}>🚮 清空所有场景</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Scene history list */}
-        <View style={styles.sceneListContainer}>
-          <Text style={styles.sceneListTitle}>历史记录</Text>
-
-          {sceneUnderstanding.cachedScenes.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyIcon}>📭</Text>
-              <Text style={styles.emptyText}>暂无缓存场景</Text>
-              <Text style={styles.emptyHint}>
-                使用视觉问答功能后,场景分析结果会自动保存在这里
-              </Text>
-            </View>
-          ) : (
-            sceneUnderstanding.cachedScenes.map((entry, index) => {
-              const now = Date.now();
-              const ageMinutes = Math.floor((now - entry.cachedAt) / 60000);
-              const expiresInMinutes = Math.floor((entry.expiresAt - now) / 60000);
-              const isExpired = entry.expiresAt <= now;
-              const isActive = expiresInMinutes > 0;
-
-              return (
-                <View
-                  key={`${entry.cachedAt}-${index}`}
-                  style={[
-                    styles.sceneCard,
-                    isExpired && styles.sceneCardExpired,
-                  ]}
-                >
-                  {/* Header */}
-                  <View style={styles.sceneCardHeader}>
-                    <View style={styles.sceneCardTitleContainer}>
-                      <Text style={styles.sceneCardIndex}>#{index + 1}</Text>
-                      <Text style={styles.sceneCardLocation}>
-                        {entry.scene.location}
-                      </Text>
-                    </View>
-                    <View
-                      style={[
-                        styles.sceneCardStatus,
-                        isActive ? styles.statusActive : styles.statusExpired,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.sceneCardStatusText,
-                          isActive ? styles.statusActiveText : styles.statusExpiredText,
-                        ]}
-                      >
-                        {isActive ? '✓ 活跃' : '✗ 已过期'}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Time info */}
-                  <View style={styles.sceneCardTimeContainer}>
-                    <View style={styles.sceneCardTimeItem}>
-                      <Text style={styles.sceneCardTimeLabel}>缓存于</Text>
-                      <Text style={styles.sceneCardTimeValue}>
-                        {ageMinutes < 1 ? '刚刚' : `${ageMinutes} 分钟前`}
-                      </Text>
-                    </View>
-                    <View style={styles.sceneCardTimeItem}>
-                      <Text style={styles.sceneCardTimeLabel}>过期</Text>
-                      <Text
-                        style={[
-                          styles.sceneCardTimeValue,
-                          isExpired && styles.sceneCardTimeValueExpired,
-                        ]}
-                      >
-                        {isExpired ? '已过期' : `${expiresInMinutes} 分钟后`}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Objects */}
-                  {entry.scene.objects.length > 0 && (
-                    <View style={styles.sceneCardObjectsContainer}>
-                      <Text style={styles.sceneCardObjectsLabel}>
-                        检测到的物品 ({entry.scene.objects.length})
-                      </Text>
-                      <View style={styles.sceneCardObjectsList}>
-                        {entry.scene.objects.slice(0, 6).map((obj, objIdx) => (
-                          <View key={objIdx} style={styles.objectTag}>
-                            <Text style={styles.objectTagText}>{obj}</Text>
-                          </View>
-                        ))}
-                        {entry.scene.objects.length > 6 && (
-                          <View style={styles.objectTag}>
-                            <Text style={styles.objectTagText}>
-                              +{entry.scene.objects.length - 6}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                    </View>
-                  )}
-
-                  {/* Atmosphere */}
-                  {entry.scene.atmosphere && (
-                    <View style={styles.sceneCardDescriptionContainer}>
-                      <Text style={styles.sceneCardDescriptionLabel}>氛围</Text>
-                      <Text
-                        style={styles.sceneCardDescriptionText}
-                        numberOfLines={2}
-                      >
-                        {entry.scene.atmosphere}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              );
-            })
-          )}
-        </View>
-          </>
-        ) : (
-          <>
-            {/* Object Recognition Stats */}
-            <View style={styles.statsContainer}>
-              <View style={styles.statCard}>
-                <Text style={styles.statValue}>{objectRecognition.records.length}</Text>
-                <Text style={styles.statLabel}>识别记录</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statValue}>{objectStats.categories.length}</Text>
-                <Text style={styles.statLabel}>物品类别</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statValue}>
-                  {objectStats.latestRecord
-                    ? Math.floor((Date.now() - objectStats.latestRecord.createdAt) / 60000) < 1
-                      ? '刚刚'
-                      : `${Math.floor((Date.now() - objectStats.latestRecord.createdAt) / 60000)}分钟前`
-                    : '-'}
+            <View className='flex-row justify-between mb-4'>
+              <View className='items-center flex-1 p-4 mx-1 bg-white shadow-sm rounded-xl'>
+                <Text className='mb-1 text-xl font-bold text-blue-500'>
+                  {sceneUnderstanding.cachedScenes.length}
                 </Text>
-                <Text style={styles.statLabel}>最近识别</Text>
+                <Text className='text-xs font-medium text-gray-600'>
+                  总场景数
+                </Text>
+              </View>
+              <View className='items-center flex-1 p-4 mx-1 bg-white shadow-sm rounded-xl'>
+                <Text className='mb-1 text-xl font-bold text-blue-500'>
+                  {
+                    sceneUnderstanding.cachedScenes.filter(
+                      (entry) => entry.expiresAt > Date.now()
+                    ).length
+                  }
+                </Text>
+                <Text className='text-xs font-medium text-gray-600'>
+                  活跃场景
+                </Text>
+              </View>
+              <View className='items-center flex-1 p-4 mx-1 bg-white shadow-sm rounded-xl'>
+                <Text className='mb-1 text-xl font-bold text-blue-500'>
+                  {
+                    sceneUnderstanding.cachedScenes.filter(
+                      (entry) => entry.expiresAt <= Date.now()
+                    ).length
+                  }
+                </Text>
+                <Text className='text-xs font-medium text-gray-600'>
+                  已过期
+                </Text>
               </View>
             </View>
 
             {/* Action buttons */}
-            <View style={styles.actionsContainer}>
+            <View className='flex-row justify-between mb-5'>
               <TouchableOpacity
-                style={[
-                  styles.actionButton,
-                  styles.clearAllButton,
-                  objectRecognition.records.length === 0 && styles.actionButtonDisabled,
-                ]}
+                className={`flex-1 py-3 px-4 rounded-xl mx-1 items-center ${
+                  sceneUnderstanding.cachedScenes.filter(
+                    (entry) => entry.expiresAt <= Date.now()
+                  ).length === 0
+                    ? 'bg-gray-300 opacity-50'
+                    : 'bg-amber-500'
+                }`}
+                onPress={handleClearExpired}
+                disabled={
+                  sceneUnderstanding.cachedScenes.filter(
+                    (entry) => entry.expiresAt <= Date.now()
+                  ).length === 0
+                }
+              >
+                <Text className='text-sm font-semibold text-white'>
+                  🗑️ 清理过期场景
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                className={`flex-1 py-3 px-4 rounded-xl mx-1 items-center ${
+                  sceneUnderstanding.cachedScenes.length === 0
+                    ? 'bg-gray-300 opacity-50'
+                    : 'bg-red-500'
+                }`}
+                onPress={handleClearAll}
+                disabled={sceneUnderstanding.cachedScenes.length === 0}
+              >
+                <Text className='text-sm font-semibold text-white'>
+                  🚮 清空所有场景
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Scene history list */}
+            <View className='mt-2'>
+              <Text className='mb-3 text-lg font-bold text-gray-800'>
+                历史记录
+              </Text>
+
+              {sceneUnderstanding.cachedScenes.length === 0 ? (
+                <View className='items-center p-10 bg-white shadow-sm rounded-2xl'>
+                  <Text className='mb-3 text-6xl'>📭</Text>
+                  <Text className='mb-2 text-base font-semibold text-gray-600'>
+                    暂无缓存场景
+                  </Text>
+                  <Text className='text-sm leading-5 text-center text-gray-400'>
+                    使用视觉问答功能后,场景分析结果会自动保存在这里
+                  </Text>
+                </View>
+              ) : (
+                sceneUnderstanding.cachedScenes.map((entry, index) => {
+                  const now = Date.now();
+                  const ageMinutes = Math.floor((now - entry.cachedAt) / 60000);
+                  const expiresInMinutes = Math.floor(
+                    (entry.expiresAt - now) / 60000
+                  );
+                  const isExpired = entry.expiresAt <= now;
+                  const isActive = expiresInMinutes > 0;
+
+                  return (
+                    <View
+                      key={`${entry.cachedAt}-${index}`}
+                      className={`bg-white rounded-xl p-4 mb-3 shadow-sm border-l-4 ${
+                        isExpired
+                          ? 'border-gray-400 opacity-70'
+                          : 'border-blue-500'
+                      }`}
+                    >
+                      {/* Header */}
+                      <View className='flex-row items-center justify-between mb-3'>
+                        <View className='flex-row items-center flex-1'>
+                          <Text className='mr-2 text-sm font-bold text-gray-600'>
+                            #{index + 1}
+                          </Text>
+                          <Text className='flex-1 text-base font-semibold text-gray-800'>
+                            {entry.scene.location}
+                          </Text>
+                        </View>
+                        <View
+                          className={`px-3 py-1 rounded-xl ${
+                            isActive ? 'bg-green-100' : 'bg-red-100'
+                          }`}
+                        >
+                          <Text
+                            className={`text-xs font-semibold ${
+                              isActive ? 'text-green-800' : 'text-red-800'
+                            }`}
+                          >
+                            {isActive ? '✓ 活跃' : '✗ 已过期'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Time info */}
+                      <View className='flex-row justify-between pb-3 mb-3 border-b border-gray-100'>
+                        <View className='flex-1'>
+                          <Text className='text-xs text-gray-400 mb-0.5'>
+                            缓存于
+                          </Text>
+                          <Text className='text-sm font-medium text-gray-700'>
+                            {ageMinutes < 1 ? '刚刚' : `${ageMinutes} 分钟前`}
+                          </Text>
+                        </View>
+                        <View className='flex-1'>
+                          <Text className='text-xs text-gray-400 mb-0.5'>
+                            过期
+                          </Text>
+                          <Text
+                            className={`text-sm font-medium ${
+                              isExpired ? 'text-red-600' : 'text-gray-700'
+                            }`}
+                          >
+                            {isExpired
+                              ? '已过期'
+                              : `${expiresInMinutes} 分钟后`}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Objects */}
+                      {entry.scene.objects.length > 0 && (
+                        <View className='mb-3'>
+                          <Text className='mb-2 text-xs font-semibold text-gray-600'>
+                            检测到的物品 ({entry.scene.objects.length})
+                          </Text>
+                          <View className='flex-row flex-wrap'>
+                            {entry.scene.objects
+                              .slice(0, 6)
+                              .map((obj, objIdx) => (
+                                <View
+                                  key={objIdx}
+                                  className='bg-blue-50 rounded-md px-3 py-1 mr-1.5 mb-1.5'
+                                >
+                                  <Text className='text-xs font-medium text-blue-900'>
+                                    {obj}
+                                  </Text>
+                                </View>
+                              ))}
+                            {entry.scene.objects.length > 6 && (
+                              <View className='bg-blue-50 rounded-md px-3 py-1 mr-1.5 mb-1.5'>
+                                <Text className='text-xs font-medium text-blue-900'>
+                                  +{entry.scene.objects.length - 6}
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+                        </View>
+                      )}
+
+                      {/* Atmosphere */}
+                      {entry.scene.atmosphere && (
+                        <View className='mt-2'>
+                          <Text className='mb-1 text-xs text-gray-400'>
+                            氛围
+                          </Text>
+                          <Text
+                            className='text-sm leading-5 text-gray-700'
+                            numberOfLines={2}
+                          >
+                            {entry.scene.atmosphere}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })
+              )}
+            </View>
+          </>
+        ) : (
+          <>
+            {/* Object Recognition Stats */}
+            <View className='flex-row justify-between mb-4'>
+              <View className='items-center flex-1 p-4 mx-1 bg-white shadow-sm rounded-xl'>
+                <Text className='mb-1 text-xl font-bold text-green-500'>
+                  {objectRecognition.records.length}
+                </Text>
+                <Text className='text-xs font-medium text-gray-600'>
+                  识别记录
+                </Text>
+              </View>
+              <View className='items-center flex-1 p-4 mx-1 bg-white shadow-sm rounded-xl'>
+                <Text className='mb-1 text-xl font-bold text-green-500'>
+                  {objectStats.categories.length}
+                </Text>
+                <Text className='text-xs font-medium text-gray-600'>
+                  物品类别
+                </Text>
+              </View>
+              <View className='items-center flex-1 p-4 mx-1 bg-white shadow-sm rounded-xl'>
+                <Text className='mb-1 text-xl font-bold text-green-500'>
+                  {objectStats.latestRecord
+                    ? Math.floor(
+                        (Date.now() - objectStats.latestRecord.createdAt) /
+                          60000
+                      ) < 1
+                      ? '刚刚'
+                      : `${Math.floor(
+                          (Date.now() - objectStats.latestRecord.createdAt) /
+                            60000
+                        )}分`
+                    : '-'}
+                </Text>
+                <Text className='text-xs font-medium text-gray-600'>
+                  最近识别
+                </Text>
+              </View>
+            </View>
+
+            {/* Action buttons */}
+            <View className='flex-row justify-between mb-5'>
+              <TouchableOpacity
+                className={`flex-1 py-3 px-4 rounded-xl mx-1 items-center ${
+                  objectRecognition.records.length === 0
+                    ? 'bg-gray-300 opacity-50'
+                    : 'bg-red-500'
+                }`}
                 onPress={() => objectRecognition.clearAllRecords()}
                 disabled={objectRecognition.records.length === 0}
               >
-                <Text style={styles.actionButtonText}>🚮 清空所有记录</Text>
+                <Text className='text-sm font-semibold text-white'>
+                  🚮 清空所有记录
+                </Text>
               </TouchableOpacity>
             </View>
 
             {/* Object recognition records list */}
-            <View style={styles.sceneListContainer}>
-              <Text style={styles.sceneListTitle}>识别记录</Text>
+            <View className='mt-2'>
+              <Text className='mb-3 text-lg font-bold text-gray-800'>
+                识别记录
+              </Text>
 
               {objectRecognition.records.length === 0 ? (
-                <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyIcon}>📦</Text>
-                  <Text style={styles.emptyText}>暂无识别记录</Text>
-                  <Text style={styles.emptyHint}>
+                <View className='items-center p-10 bg-white shadow-sm rounded-2xl'>
+                  <Text className='mb-3 text-6xl'>📦</Text>
+                  <Text className='mb-2 text-base font-semibold text-gray-600'>
+                    暂无识别记录
+                  </Text>
+                  <Text className='text-sm leading-5 text-center text-gray-400'>
                     在主界面使用物品识别功能后，记录会显示在这里
                   </Text>
                 </View>
               ) : (
                 objectRecognition.records.map((record, index) => {
-                  const ageMinutes = Math.floor((Date.now() - record.createdAt) / 60000);
+                  const ageMinutes = Math.floor(
+                    (Date.now() - record.createdAt) / 60000
+                  );
                   const ageHours = Math.floor(ageMinutes / 60);
                   const ageDays = Math.floor(ageHours / 24);
 
@@ -359,92 +449,150 @@ const SceneHistoryScreen: React.FC<Props> = ({ navigation }) => {
                     ? record.imageBase64
                     : `data:image/jpeg;base64,${record.imageBase64}`;
 
+                  const isExpanded = expandedDescriptions.has(record.id);
+                  const descriptionLength = record.data.description.length;
+                  const needsToggle = descriptionLength > 100;
+
                   return (
-                    <View key={record.id} style={styles.objectCard}>
+                    <View
+                      key={record.id}
+                      className='p-4 mb-3 bg-white border-l-4 border-green-500 shadow-sm rounded-xl'
+                    >
                       {/* Header with image and basic info */}
-                      <View style={styles.objectCardHeader}>
+                      <View className='flex-row mb-3'>
                         {/* Thumbnail */}
-                        <View style={styles.objectThumbnailContainer}>
+                        <View className='relative w-20 h-20'>
                           <Image
                             source={{ uri: imageUri }}
-                            style={styles.objectThumbnail}
-                            resizeMode="cover"
+                            className='w-20 h-20 bg-gray-100 rounded-lg'
+                            resizeMode='cover'
                             onError={(error) => {
-                              console.error('[SceneHistory] Image load error:', error.nativeEvent);
+                              console.error(
+                                '[SceneHistory] Image load error:',
+                                error.nativeEvent
+                              );
                             }}
                           />
-                          {/* Fallback placeholder overlay (shows while loading) */}
-                          <View style={styles.objectThumbnailPlaceholder}>
-                            <Text style={styles.objectThumbnailPlaceholderText}>📷</Text>
+                          {/* Fallback placeholder overlay */}
+                          <View className='absolute top-0 bottom-0 left-0 right-0 items-center justify-center bg-gray-200 rounded-lg -z-10'>
+                            <Text className='text-3xl opacity-50'>📷</Text>
                           </View>
                         </View>
 
                         {/* Basic info */}
-                        <View style={styles.objectCardInfo}>
-                          <Text style={styles.objectCardName} numberOfLines={2}>
+                        <View className='justify-center flex-1 ml-3'>
+                          <Text
+                            className='text-base font-bold text-gray-800 mb-1.5'
+                            numberOfLines={2}
+                          >
                             {record.data.objectName}
                           </Text>
-                          <View style={styles.objectCardMeta}>
-                            <View style={styles.objectCategoryTag}>
-                              <Text style={styles.objectCategoryTagText}>
+                          <View className='flex-row items-center'>
+                            <View className='bg-green-100 rounded-md px-2 py-0.5 mr-2'>
+                              <Text className='text-xs font-semibold text-green-800'>
                                 {record.data.category}
                               </Text>
                             </View>
-                            <Text style={styles.objectCardTime}>{ageText}</Text>
+                            <Text className='text-xs text-gray-400'>
+                              {ageText}
+                            </Text>
                           </View>
                         </View>
 
                         {/* Delete button */}
                         <TouchableOpacity
-                          style={styles.deleteButton}
-                          onPress={() => objectRecognition.deleteRecord(record.id)}
+                          className='items-center justify-center w-8 h-8 bg-red-100 rounded-full'
+                          onPress={() =>
+                            objectRecognition.deleteRecord(record.id)
+                          }
                         >
-                          <Text style={styles.deleteButtonText}>✕</Text>
+                          <Text className='text-lg font-semibold text-red-600'>
+                            ✕
+                          </Text>
                         </TouchableOpacity>
                       </View>
 
-                      {/* Description */}
-                      <Text style={styles.objectCardDescription} numberOfLines={3}>
-                        {record.data.description}
-                      </Text>
-
-                      {/* Details */}
-                      <View style={styles.objectCardDetails}>
-                        {record.data.brand && (
-                          <View style={styles.objectDetailItem}>
-                            <Text style={styles.objectDetailLabel}>品牌</Text>
-                            <Text style={styles.objectDetailValue}>{record.data.brand}</Text>
-                          </View>
-                        )}
-                        {record.data.model && (
-                          <View style={styles.objectDetailItem}>
-                            <Text style={styles.objectDetailLabel}>型号</Text>
-                            <Text style={styles.objectDetailValue}>{record.data.model}</Text>
-                          </View>
-                        )}
-                        {record.data.color && (
-                          <View style={styles.objectDetailItem}>
-                            <Text style={styles.objectDetailLabel}>颜色</Text>
-                            <Text style={styles.objectDetailValue}>{record.data.color}</Text>
-                          </View>
-                        )}
-                        {record.data.priceRange && (
-                          <View style={styles.objectDetailItem}>
-                            <Text style={styles.objectDetailLabel}>参考价格</Text>
-                            <Text style={styles.objectDetailValue}>{record.data.priceRange}</Text>
-                          </View>
+                      {/* Description with expand/collapse */}
+                      <View className='mb-3'>
+                        <Text
+                          className='text-sm leading-5 text-gray-700'
+                          numberOfLines={isExpanded ? undefined : 3}
+                        >
+                          {record.data.description}
+                        </Text>
+                        {needsToggle && (
+                          <TouchableOpacity
+                            onPress={() => toggleDescription(record.id)}
+                            className='mt-1'
+                          >
+                            <Text className='text-xs font-semibold text-blue-500'>
+                              {isExpanded ? '收起 ▲' : '展开 ▼'}
+                            </Text>
+                          </TouchableOpacity>
                         )}
                       </View>
 
-                      {/* Confidence badge */}
-                      <View style={styles.objectCardFooter}>
+                      {/* Details */}
+                      {(record.data.brand ||
+                        record.data.model ||
+                        record.data.color ||
+                        record.data.priceRange) && (
+                        <View className='flex-row flex-wrap mb-3'>
+                          {record.data.brand && (
+                            <View className='flex-row mr-4 mb-1.5'>
+                              <Text className='mr-1 text-xs text-gray-400'>
+                                品牌
+                              </Text>
+                              <Text className='text-xs font-medium text-gray-700'>
+                                {record.data.brand}
+                              </Text>
+                            </View>
+                          )}
+                          {record.data.model && (
+                            <View className='flex-row mr-4 mb-1.5'>
+                              <Text className='mr-1 text-xs text-gray-400'>
+                                型号
+                              </Text>
+                              <Text className='text-xs font-medium text-gray-700'>
+                                {record.data.model}
+                              </Text>
+                            </View>
+                          )}
+                          {record.data.color && (
+                            <View className='flex-row mr-4 mb-1.5'>
+                              <Text className='mr-1 text-xs text-gray-400'>
+                                颜色
+                              </Text>
+                              <Text className='text-xs font-medium text-gray-700'>
+                                {record.data.color}
+                              </Text>
+                            </View>
+                          )}
+                          {record.data.priceRange && (
+                            <View className='flex-row mr-4 mb-1.5'>
+                              <Text className='mr-1 text-xs text-gray-400'>
+                                参考价格
+                              </Text>
+                              <Text className='text-xs font-medium text-gray-700'>
+                                {record.data.priceRange}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      )}
+
+                      {/* Footer with user prompt and confidence */}
+                      <View className='flex-row items-center justify-between pt-3 border-t border-gray-100'>
                         {record.data.userPrompt && (
-                          <Text style={styles.objectUserPrompt} numberOfLines={1}>
+                          <Text
+                            className='flex-1 mr-2 text-xs italic text-gray-600'
+                            numberOfLines={1}
+                          >
                             "{record.data.userPrompt}"
                           </Text>
                         )}
-                        <View style={styles.confidenceBadge}>
-                          <Text style={styles.confidenceBadgeText}>
+                        <View className='px-3 py-1 bg-blue-50 rounded-xl'>
+                          <Text className='text-xs font-semibold text-blue-900'>
                             置信度 {(record.data.confidence * 100).toFixed(0)}%
                           </Text>
                         </View>
@@ -460,458 +608,5 @@ const SceneHistoryScreen: React.FC<Props> = ({ navigation }) => {
     </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
-  },
-  backButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-  },
-  backButtonText: {
-    fontSize: 24,
-    color: '#3B82F6',
-    fontWeight: '600',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1f2937',
-  },
-  headerSpacer: {
-    width: 40,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 16,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginHorizontal: 4,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  statValue: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#3B82F6',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#6b7280',
-    fontWeight: '500',
-  },
-  actionsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  actionButton: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    marginHorizontal: 4,
-    alignItems: 'center',
-  },
-  clearExpiredButton: {
-    backgroundColor: '#f59e0b',
-  },
-  clearAllButton: {
-    backgroundColor: '#ef4444',
-  },
-  actionButtonDisabled: {
-    backgroundColor: '#d1d5db',
-    opacity: 0.5,
-  },
-  actionButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  sceneListContainer: {
-    marginTop: 8,
-  },
-  sceneListTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1f2937',
-    marginBottom: 12,
-  },
-  emptyContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 40,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: 12,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#6b7280',
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  emptyHint: {
-    fontSize: 13,
-    color: '#9ca3af',
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  sceneCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-    borderLeftWidth: 4,
-    borderLeftColor: '#3B82F6',
-  },
-  sceneCardExpired: {
-    borderLeftColor: '#9ca3af',
-    opacity: 0.7,
-  },
-  sceneCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  sceneCardTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  sceneCardIndex: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#6b7280',
-    marginRight: 8,
-  },
-  sceneCardLocation: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
-    flex: 1,
-  },
-  sceneCardStatus: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusActive: {
-    backgroundColor: '#d1fae5',
-  },
-  statusExpired: {
-    backgroundColor: '#fee2e2',
-  },
-  sceneCardStatusText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  statusActiveText: {
-    color: '#065f46',
-  },
-  statusExpiredText: {
-    color: '#991b1b',
-  },
-  sceneCardTimeContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  sceneCardTimeItem: {
-    flex: 1,
-  },
-  sceneCardTimeLabel: {
-    fontSize: 11,
-    color: '#9ca3af',
-    marginBottom: 2,
-  },
-  sceneCardTimeValue: {
-    fontSize: 13,
-    color: '#4b5563',
-    fontWeight: '500',
-  },
-  sceneCardTimeValueExpired: {
-    color: '#dc2626',
-  },
-  sceneCardTypeContainer: {
-    marginBottom: 12,
-  },
-  sceneCardTypeLabel: {
-    fontSize: 11,
-    color: '#9ca3af',
-    marginBottom: 4,
-  },
-  sceneCardTypeValue: {
-    fontSize: 14,
-    color: '#4b5563',
-    fontWeight: '500',
-  },
-  sceneCardObjectsContainer: {
-    marginBottom: 12,
-  },
-  sceneCardObjectsLabel: {
-    fontSize: 12,
-    color: '#6b7280',
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  sceneCardObjectsList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  objectTag: {
-    backgroundColor: '#eff6ff',
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    marginRight: 6,
-    marginBottom: 6,
-  },
-  objectTagText: {
-    fontSize: 12,
-    color: '#1e40af',
-    fontWeight: '500',
-  },
-  sceneCardDescriptionContainer: {
-    marginTop: 8,
-  },
-  sceneCardDescriptionLabel: {
-    fontSize: 11,
-    color: '#9ca3af',
-    marginBottom: 4,
-  },
-  sceneCardDescriptionText: {
-    fontSize: 13,
-    color: '#4b5563',
-    lineHeight: 18,
-  },
-  // Tabs styles
-  tabsContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
-    paddingHorizontal: 16,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  tabActive: {
-    borderBottomColor: '#3B82F6',
-  },
-  tabText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#6b7280',
-  },
-  tabTextActive: {
-    color: '#3B82F6',
-  },
-  tabBadge: {
-    backgroundColor: '#3B82F6',
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    marginLeft: 8,
-    minWidth: 20,
-    alignItems: 'center',
-  },
-  tabBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  // Object recognition record styles
-  objectCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-    borderLeftWidth: 4,
-    borderLeftColor: '#10b981',
-  },
-  objectCardHeader: {
-    flexDirection: 'row',
-    marginBottom: 12,
-  },
-  objectThumbnailContainer: {
-    position: 'relative',
-    width: 80,
-    height: 80,
-  },
-  objectThumbnail: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    backgroundColor: '#f3f4f6',
-  },
-  objectThumbnailPlaceholder: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 8,
-    backgroundColor: '#e5e7eb',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: -1, // Behind the actual image
-  },
-  objectThumbnailPlaceholderText: {
-    fontSize: 32,
-    opacity: 0.5,
-  },
-  objectCardInfo: {
-    flex: 1,
-    marginLeft: 12,
-    justifyContent: 'center',
-  },
-  objectCardName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1f2937',
-    marginBottom: 6,
-  },
-  objectCardMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  objectCategoryTag: {
-    backgroundColor: '#d1fae5',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    marginRight: 8,
-  },
-  objectCategoryTagText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#065f46',
-  },
-  objectCardTime: {
-    fontSize: 12,
-    color: '#9ca3af',
-  },
-  deleteButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#fee2e2',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  deleteButtonText: {
-    fontSize: 18,
-    color: '#dc2626',
-    fontWeight: '600',
-  },
-  objectCardDescription: {
-    fontSize: 14,
-    color: '#4b5563',
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  objectCardDetails: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 12,
-  },
-  objectDetailItem: {
-    flexDirection: 'row',
-    marginRight: 16,
-    marginBottom: 6,
-  },
-  objectDetailLabel: {
-    fontSize: 12,
-    color: '#9ca3af',
-    marginRight: 4,
-  },
-  objectDetailValue: {
-    fontSize: 12,
-    color: '#4b5563',
-    fontWeight: '500',
-  },
-  objectCardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
-  },
-  objectUserPrompt: {
-    flex: 1,
-    fontSize: 12,
-    color: '#6b7280',
-    fontStyle: 'italic',
-    marginRight: 8,
-  },
-  confidenceBadge: {
-    backgroundColor: '#eff6ff',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  confidenceBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#1e40af',
-  },
-});
 
 export default SceneHistoryScreen;
