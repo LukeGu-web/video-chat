@@ -15,6 +15,8 @@ import { useSpeechToText, useChatAI } from '../utils';
 import {
   useSceneUnderstanding,
   detectVisualKeywords,
+  detectObjectKeywords,
+  formatObjectRecognitionForAI,
 } from '../utils/useSceneUnderstanding';
 import { useObjectRecognition } from '../utils/useObjectRecognition';
 import { PERSONALITY_PROMPTS, getClaudeApiKey } from '../constants';
@@ -502,8 +504,59 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
         };
         addChatMessage(userMessage);
 
-        // 2. Step 5.2: Check for visual keywords and trigger scene analysis
-        const detectedKeyword = detectVisualKeywords(inputText);
+        // 2. Check for object recognition keywords first (higher priority)
+        let objectContext = '';
+        const objectKeyword = detectObjectKeywords(inputText);
+
+        if (objectKeyword) {
+          console.log(
+            `[HomeScreen] 🎯 Object recognition keyword detected: "${objectKeyword}"`
+          );
+
+          // Check if we have a captured frame
+          if (lastCapturedFrameRef.current) {
+            try {
+              console.log(
+                '[HomeScreen] 📸 Starting object recognition...'
+              );
+
+              // Trigger object recognition
+              const recognitionResponse = await objectRecognition.recognizeObject(
+                lastCapturedFrameRef.current,
+                inputText // Pass user's original question
+              );
+
+              if (recognitionResponse.success) {
+                // Format object recognition result as context
+                objectContext = formatObjectRecognitionForAI(recognitionResponse.object);
+                console.log('[HomeScreen] ✅ Object recognition complete:', {
+                  name: recognitionResponse.object.objectName,
+                  category: recognitionResponse.object.category,
+                  contextLength: objectContext.length,
+                });
+              } else {
+                console.error('[HomeScreen] ❌ Object recognition failed:', recognitionResponse.error);
+                setErrorMessage(recognitionResponse.error || '物品识别失败');
+                setShowErrorToast(true);
+              }
+            } catch (error) {
+              console.error('[HomeScreen] ❌ Object recognition error:', error);
+              setErrorMessage(
+                `物品识别失败: ${
+                  error instanceof Error ? error.message : '未知错误'
+                }`
+              );
+              setShowErrorToast(true);
+            }
+          } else {
+            console.log(
+              '[HomeScreen] ⚠️ Object keyword detected but no image available'
+            );
+          }
+        }
+
+        // 3. If no object keyword, check for scene keywords and trigger scene analysis
+        const detectedKeyword = !objectKeyword ? detectVisualKeywords(inputText) : null;
 
         if (detectedKeyword) {
           console.log(
@@ -555,16 +608,27 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
           }
         }
 
-        // 3. 准备背景故事（如果可用）
-        const backgroundStory = backgroundContext
-          ? formatStoryForAI(backgroundContext)
-          : undefined;
+        // 4. 准备背景故事和物品识别上下文（如果可用）
+        let combinedContext = '';
 
-        // 4. 调用 AI 获取回复并播放 TTS
+        // Add background story if available
+        if (backgroundContext) {
+          combinedContext += formatStoryForAI(backgroundContext);
+        }
+
+        // Add object recognition context if available (higher priority)
+        if (objectContext) {
+          if (combinedContext) {
+            combinedContext += '\n\n';
+          }
+          combinedContext += objectContext;
+        }
+
+        // 5. 调用 AI 获取回复并播放 TTS
         await sendMessage(inputText, {
           modelType: 'haiku',
           enableTTS: true, // 启用语音播放
-          backgroundStory, // 传递背景故事
+          backgroundStory: combinedContext || undefined, // 传递合并后的上下文（背景故事 + 物品识别）
           sceneContext: sceneUnderstanding.currentScene, // 直接传递场景数据，避免状态更新延迟
         });
 
