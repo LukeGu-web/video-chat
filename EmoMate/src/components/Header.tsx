@@ -3,12 +3,8 @@ import { View, Text, TouchableOpacity, Modal, Pressable } from 'react-native';
 import { isDebugMode } from '../utils/debug';
 
 interface HeaderProps {
-  characterName?: string;
-  onGoBack?: () => void;
   onGoToChatHistory?: () => void;
   onGoToSceneHistory?: () => void;
-  onGoToEmotionTest?: () => void;
-  onGoToEnvironmentTest?: () => void;
 }
 
 interface MenuOption {
@@ -19,12 +15,8 @@ interface MenuOption {
 }
 
 const Header: React.FC<HeaderProps> = ({
-  characterName = 'AI伴侣',
-  onGoBack,
   onGoToChatHistory,
   onGoToSceneHistory,
-  onGoToEmotionTest,
-  onGoToEnvironmentTest,
 }) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
 
@@ -47,28 +39,6 @@ const Header: React.FC<HeaderProps> = ({
         onGoToSceneHistory?.();
       },
     },
-    ...(isDebugMode() && onGoToEmotionTest
-      ? [
-          {
-            id: 'emotionTest',
-            label: '情绪测试',
-            icon: '🧪',
-            onPress: () => {
-              setIsModalVisible(false);
-              onGoToEmotionTest?.();
-            },
-          },
-          {
-            id: 'environmentTest',
-            label: '环境测试',
-            icon: '🌳',
-            onPress: () => {
-              setIsModalVisible(false);
-              onGoToEnvironmentTest?.();
-            },
-          },
-        ]
-      : []),
   ];
 
   const handleSettingsPress = () => {

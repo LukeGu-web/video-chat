@@ -11,8 +11,6 @@ type RootStackParamList = {
   Home: undefined;
   ChatHistory: undefined;
   Hiyori: undefined;
-  EmotionTest: undefined;
-  EnvironmentTest: undefined;
   SceneHistory: undefined;
 };
 

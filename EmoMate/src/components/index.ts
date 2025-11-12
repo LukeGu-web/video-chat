@@ -8,7 +8,6 @@ export { default as CurrentSpeechBubble } from './CurrentSpeechBubble';
 export { default as HiyoriWebView } from './HiyoriWebView';
 export { default as Live2DCharacter } from './Live2DCharacter';
 export { BasicEmotionDetector } from './BasicEmotionDetector';
-export { ChatEmotionAnalyzer } from './ChatEmotionAnalyzer';
 export { EmotionProvider, useEmotionContext } from './EmotionProvider';
 export { EmotionAwareCharacter } from './EmotionAwareCharacter';
 export {

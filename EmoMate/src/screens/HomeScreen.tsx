@@ -42,8 +42,6 @@ type RootStackParamList = {
   Home: undefined;
   ChatHistory: undefined;
   Hiyori: undefined;
-  EmotionTest: undefined;
-  EnvironmentTest: undefined;
   SceneHistory: undefined;
 };
 
@@ -383,10 +381,6 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
     navigation.navigate('SceneHistory');
   };
 
-  const handleGoToEmotionTest = () => {
-    navigation.navigate('EmotionTest');
-  };
-
   // Handle object recognition
   const handleRecognizeObject = async () => {
     if (!lastCapturedFrameRef.current) {
@@ -438,10 +432,6 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
     } finally {
       setIsRecognizing(false);
     }
-  };
-
-  const handleGoToEnvironmentTest = () => {
-    navigation.navigate('EnvironmentTest');
   };
 
   // Manual scene analysis test
@@ -780,12 +770,8 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
         />
 
         <Header
-          characterName={selectedCharacter || 'AI伴侣'}
-          onGoBack={handleGoBack}
           onGoToChatHistory={handleGoToChatHistory}
           onGoToSceneHistory={handleGoToSceneHistory}
-          onGoToEmotionTest={handleGoToEmotionTest}
-          onGoToEnvironmentTest={handleGoToEnvironmentTest}
         />
 
         {/* Main Content Area - Full screen with character at bottom */}
