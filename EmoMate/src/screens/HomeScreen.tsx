@@ -12,7 +12,10 @@ import { SafeAreaView as SafeAreaViewRN } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useUserStore, ChatMessage, useAIStatus } from '../store';
 import { useSpeechToText, useChatAI } from '../utils';
-import { useSceneUnderstanding, detectVisualKeywords } from '../utils/useSceneUnderstanding';
+import {
+  useSceneUnderstanding,
+  detectVisualKeywords,
+} from '../utils/useSceneUnderstanding';
 import { PERSONALITY_PROMPTS, getClaudeApiKey } from '../constants';
 import {
   Header,
@@ -103,9 +106,55 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
 
   // Step 5.2: Scene Understanding hook with caching
   const apiKey = getClaudeApiKey();
+
   const sceneUnderstanding = useSceneUnderstanding(apiKey || '', {
     enabled: true,
   });
+
+  // Stable callback for frame capture (prevents useEffect re-triggering)
+  const handleFrameCaptured = useCallback((frameBase64: string, timestamp: number) => {
+    // Step 5.2: Store last captured frame for visual QA and scene understanding
+    const frameSize = Math.round((frameBase64.length * 0.75) / 1024);
+    console.log('[HomeScreen] 📷 Frame captured from camera:', {
+      frameSizeKB: frameSize,
+      timestamp: new Date(timestamp).toISOString(),
+      timestampMs: timestamp,
+    });
+    lastCapturedFrameRef.current = frameBase64;
+  }, []);
+
+  // Debug: Log API key once on mount
+  useEffect(() => {
+    console.log('[HomeScreen] 🔑 API Key status:', {
+      hasApiKey: !!apiKey,
+      keyLength: apiKey?.length || 0,
+      keyPreview: apiKey ? `${apiKey.substring(0, 10)}...` : 'undefined',
+    });
+  }, []); // Only log once
+
+  // Debug: Log scene understanding state (throttled)
+  const lastLogTime = useRef(0);
+  useEffect(() => {
+    const now = Date.now();
+    if (now - lastLogTime.current < 5000) return; // Throttle to once per 5 seconds
+    lastLogTime.current = now;
+
+    console.log('[HomeScreen] 🔍 Scene Understanding State:', {
+      isAnalyzing: sceneUnderstanding.isAnalyzing,
+      hasCurrentScene: !!sceneUnderstanding.currentScene,
+      currentLocation: sceneUnderstanding.currentScene?.location,
+      totalAPICalls: sceneUnderstanding.totalAPICalls,
+      error: sceneUnderstanding.error,
+      timerEnabled: sceneUnderstanding.timerState.enabled,
+      nextCaptureIn: sceneUnderstanding.timerState.nextCaptureIn,
+      nextAnalysisIn: sceneUnderstanding.timerState.nextAnalysisIn,
+    });
+  }, [
+    sceneUnderstanding.isAnalyzing,
+    sceneUnderstanding.currentScene,
+    sceneUnderstanding.error,
+    sceneUnderstanding.timerState,
+  ]);
 
   // Handle errors (including background errors)
   useEffect(() => {
@@ -155,19 +204,29 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
 
   // Step 5.3: Background pause - Stop scene detection when app goes to background
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
-      if (nextAppState === 'active') {
-        console.log('[HomeScreen] 📱 App is active - starting scene timer');
-        sceneUnderstanding.startTimer();
-      } else if (nextAppState === 'background' || nextAppState === 'inactive') {
-        console.log('[HomeScreen] 📴 App is background/inactive - stopping scene timer');
-        sceneUnderstanding.stopTimer();
+    const subscription = AppState.addEventListener(
+      'change',
+      (nextAppState: AppStateStatus) => {
+        if (nextAppState === 'active') {
+          console.log('[HomeScreen] 📱 App is active - starting scene timer');
+          sceneUnderstanding.startTimer();
+        } else if (
+          nextAppState === 'background' ||
+          nextAppState === 'inactive'
+        ) {
+          console.log(
+            '[HomeScreen] 📴 App is background/inactive - stopping scene timer'
+          );
+          sceneUnderstanding.stopTimer();
+        }
       }
-    });
+    );
 
     // Start timer if app is currently active
     if (AppState.currentState === 'active') {
-      console.log('[HomeScreen] 📱 Initial state: App is active - starting scene timer');
+      console.log(
+        '[HomeScreen] 📱 Initial state: App is active - starting scene timer'
+      );
       sceneUnderstanding.startTimer();
     }
 
@@ -177,6 +236,126 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty dependency - only run once on mount
+
+  // Register photo capture callback for scene understanding timer
+  useEffect(() => {
+    console.log('[HomeScreen] 🔧 Registering photo capture callback...');
+    sceneUnderstanding.setPhotoCaptureCallback(async () => {
+      console.log('[HomeScreen] 📸 Scene timer requesting photo capture');
+      const hasFrame = !!lastCapturedFrameRef.current;
+      const frameSize = lastCapturedFrameRef.current
+        ? Math.round((lastCapturedFrameRef.current.length * 0.75) / 1024)
+        : 0;
+
+      console.log('[HomeScreen] 📊 Frame status:', {
+        hasFrame,
+        frameSizeKB: frameSize,
+      });
+
+      if (lastCapturedFrameRef.current) {
+        console.log(
+          '[HomeScreen] ✅ Returning captured frame for scene analysis'
+        );
+        return lastCapturedFrameRef.current;
+      } else {
+        console.warn(
+          '[HomeScreen] ⚠️ No captured frame available for scene analysis'
+        );
+        return null;
+      }
+    });
+    console.log(
+      '[HomeScreen] ✅ Photo capture callback registered for scene understanding'
+    );
+  }, [sceneUnderstanding]);
+
+  // Monitor scene updates and sync to userStore
+  useEffect(() => {
+    const current = sceneUnderstanding.currentScene;
+    if (current) {
+      setCurrentScene(current);
+      console.log('[HomeScreen] 📝 Auto-updated scene from timer:', {
+        location: current.location,
+        objects: current.objects.slice(0, 3),
+        confidence: current.confidence,
+        timestamp: new Date(current.timestamp).toLocaleTimeString(),
+      });
+    }
+  }, [sceneUnderstanding.currentScene, setCurrentScene]);
+
+  // Initial scene detection on app startup
+  useEffect(() => {
+    const performInitialSceneDetection = async () => {
+      console.log(
+        '[HomeScreen] 🚀 App startup - checking for initial scene detection'
+      );
+
+      // Check if we have a valid cached scene
+      const cached = sceneUnderstanding.currentScene;
+      const hasValidScene =
+        cached &&
+        cached.timestamp &&
+        Date.now() - cached.timestamp < 30 * 60 * 1000; // 30 minutes
+
+      if (hasValidScene && cached) {
+        console.log(
+          '[HomeScreen] ✅ Valid scene cache found, skipping initial detection:',
+          {
+            location: cached.location,
+            age:
+              Math.floor((Date.now() - cached.timestamp) / 60000) + ' minutes',
+          }
+        );
+        return;
+      }
+
+      console.log(
+        '[HomeScreen] 🔍 No valid scene cache, waiting for camera frame...'
+      );
+
+      // Poll for camera frame availability (check every 2 seconds, max 30 seconds)
+      let attempts = 0;
+      const maxAttempts = 15; // 15 attempts * 2 seconds = 30 seconds max wait
+
+      const checkFrameInterval = setInterval(async () => {
+        attempts++;
+
+        if (lastCapturedFrameRef.current) {
+          console.log(
+            '[HomeScreen] 📸 Camera frame available, performing initial scene detection...'
+          );
+          clearInterval(checkFrameInterval);
+
+          try {
+            await sceneUnderstanding.analyzeScene(
+              lastCapturedFrameRef.current,
+              undefined // No user question (manual trigger)
+            );
+            console.log(
+              '[HomeScreen] ✅ Initial scene detection completed successfully'
+            );
+          } catch (error) {
+            console.error(
+              '[HomeScreen] ❌ Initial scene detection failed:',
+              error
+            );
+          }
+        } else if (attempts >= maxAttempts) {
+          console.warn(
+            '[HomeScreen] ⚠️ Timeout waiting for camera frame, will wait for next timer cycle'
+          );
+          clearInterval(checkFrameInterval);
+        } else {
+          console.log(
+            `[HomeScreen] ⏳ Waiting for camera frame... (attempt ${attempts}/${maxAttempts})`
+          );
+        }
+      }, 2000); // Check every 2 seconds
+    };
+
+    performInitialSceneDetection();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
 
   const handleGoBack = () => {
     navigation.goBack();
@@ -197,6 +376,48 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
   const handleGoToEnvironmentTest = () => {
     navigation.navigate('EnvironmentTest');
   };
+
+  // Manual scene analysis test
+  const handleManualSceneTest = useCallback(async () => {
+    console.log('[HomeScreen] 🧪 Manual scene test triggered');
+    console.log('[HomeScreen] 📊 Current state:', {
+      hasApiKey: !!apiKey,
+      hasFrame: !!lastCapturedFrameRef.current,
+      frameSize: lastCapturedFrameRef.current
+        ? Math.round((lastCapturedFrameRef.current.length * 0.75) / 1024)
+        : 0,
+      isAnalyzing: sceneUnderstanding.isAnalyzing,
+    });
+
+    if (!apiKey) {
+      console.error('[HomeScreen] ❌ No API Key configured!');
+      setErrorMessage('API Key 未配置，请检查 .env 文件');
+      setShowErrorToast(true);
+      return;
+    }
+
+    if (!lastCapturedFrameRef.current) {
+      console.warn('[HomeScreen] ⚠️ No frame captured yet, waiting...');
+      setErrorMessage('摄像头还未捕获帧，请稍候再试');
+      setShowErrorToast(true);
+      return;
+    }
+
+    try {
+      console.log('[HomeScreen] 🚀 Starting manual scene analysis...');
+      await sceneUnderstanding.analyzeScene(
+        lastCapturedFrameRef.current,
+        '手动测试场景分析'
+      );
+      console.log('[HomeScreen] ✅ Manual scene analysis completed');
+    } catch (error) {
+      console.error('[HomeScreen] ❌ Manual scene analysis failed:', error);
+      setErrorMessage(
+        `场景分析失败: ${error instanceof Error ? error.message : '未知错误'}`
+      );
+      setShowErrorToast(true);
+    }
+  }, [apiKey, sceneUnderstanding]);
 
   // 生成唯一消息ID
   const generateMessageId = () => {
@@ -226,12 +447,16 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
         const detectedKeyword = detectVisualKeywords(inputText);
 
         if (detectedKeyword) {
-          console.log(`[HomeScreen] 🎯 Visual keyword detected: "${detectedKeyword}"`);
+          console.log(
+            `[HomeScreen] 🎯 Visual keyword detected: "${detectedKeyword}"`
+          );
 
           // Check if we have a captured frame
           if (lastCapturedFrameRef.current) {
             try {
-              console.log('[HomeScreen] 🔍 Starting scene analysis with caching...');
+              console.log(
+                '[HomeScreen] 🔍 Starting scene analysis with caching...'
+              );
 
               // Use sceneUnderstanding.analyzeScene to ensure caching
               await sceneUnderstanding.analyzeScene(
@@ -240,25 +465,34 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
               );
 
               // Update userStore with the analyzed scene for AI context
-              if (sceneUnderstanding.currentScene) {
-                setCurrentScene(sceneUnderstanding.currentScene);
+              const analyzedScene = sceneUnderstanding.currentScene;
+              if (analyzedScene) {
+                setCurrentScene(analyzedScene);
                 console.log('[HomeScreen] 📝 Updated userStore.currentScene:', {
-                  location: sceneUnderstanding.currentScene.location,
-                  objects: sceneUnderstanding.currentScene.objects,
-                  timestamp: sceneUnderstanding.currentScene.timestamp,
+                  location: analyzedScene.location,
+                  objects: analyzedScene.objects,
+                  timestamp: analyzedScene.timestamp,
                 });
               } else {
-                console.warn('[HomeScreen] ⚠️ No scene data returned from analysis');
+                console.warn(
+                  '[HomeScreen] ⚠️ No scene data returned from analysis'
+                );
               }
 
               console.log('[HomeScreen] ✅ Scene analysis complete and cached');
             } catch (error) {
               console.error('[HomeScreen] ❌ Scene analysis error:', error);
-              setErrorMessage(`场景分析失败: ${error instanceof Error ? error.message : '未知错误'}`);
+              setErrorMessage(
+                `场景分析失败: ${
+                  error instanceof Error ? error.message : '未知错误'
+                }`
+              );
               setShowErrorToast(true);
             }
           } else {
-            console.log('[HomeScreen] ⚠️ Visual keyword detected but no image available');
+            console.log(
+              '[HomeScreen] ⚠️ Visual keyword detected but no image available'
+            );
           }
         }
 
@@ -425,11 +659,8 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
           onEmotionDetected={setFacialEmotion}
           isActive={true}
           detectionInterval={3000}
-          onFrameCaptured={(frameBase64) => {
-            // Step 5.2: Store last captured frame for visual QA
-            lastCapturedFrameRef.current = frameBase64;
-          }}
-          frameCaptureInterval={30000}
+          onFrameCaptured={handleFrameCaptured}
+          frameCaptureInterval={5000} // 5 seconds - faster initial capture for scene understanding
         />
 
         {/* Debug Background Info (only in debug mode) */}
@@ -453,6 +684,39 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
             </Text>
             <Text className='text-xs text-white' numberOfLines={2}>
               故事: {backgroundContext.story.substring(0, 60)}...
+            </Text>
+          </View>
+        )}
+
+        {/* Debug Scene Understanding Test Button (only in debug mode) */}
+        {isDebugMode() && (
+          <View className='absolute right-0 p-3 rounded-lg top-80 bg-black/70'>
+            <Text className='mb-2 text-xs font-bold text-white'>
+              场景理解调试
+            </Text>
+            <TouchableOpacity
+              onPress={handleManualSceneTest}
+              className='px-3 py-2 mb-1 bg-blue-600 rounded'
+              disabled={sceneUnderstanding.isAnalyzing}
+            >
+              <Text className='text-xs font-semibold text-white'>
+                {sceneUnderstanding.isAnalyzing
+                  ? '分析中...'
+                  : '手动测试场景分析'}
+              </Text>
+            </TouchableOpacity>
+            <Text className='mt-1 text-xs text-white'>
+              API调用: {sceneUnderstanding.totalAPICalls}
+            </Text>
+            <Text className='text-xs text-white'>
+              当前场景: {sceneUnderstanding.currentScene?.location || '无'}
+            </Text>
+            <Text className='text-xs text-white'>
+              定时器: {sceneUnderstanding.timerState.enabled ? '开启' : '关闭'}
+            </Text>
+            <Text className='text-xs text-white'>
+              下次拍照:{' '}
+              {Math.floor(sceneUnderstanding.timerState.nextCaptureIn / 1000)}s
             </Text>
           </View>
         )}

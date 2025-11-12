@@ -468,16 +468,50 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
 
   // Scene understanding frame capture using takeSnapshot
   useEffect(() => {
-    if (!isActive || !onFrameCaptured || !hasPermission) return;
+    console.log('[BasicEmotionDetector] 🔧 Frame capture effect triggered', {
+      isActive,
+      hasOnFrameCaptured: !!onFrameCaptured,
+      hasPermission,
+      frameCaptureInterval,
+    });
+
+    if (!isActive) {
+      console.log('[BasicEmotionDetector] ⏸️ Frame capture disabled: isActive = false');
+      return;
+    }
+    if (!onFrameCaptured) {
+      console.log('[BasicEmotionDetector] ⏸️ Frame capture disabled: no onFrameCaptured callback');
+      return;
+    }
+    if (!hasPermission) {
+      console.log('[BasicEmotionDetector] ⏸️ Frame capture disabled: no camera permission');
+      return;
+    }
+
+    console.log('[BasicEmotionDetector] ✅ Starting frame capture with interval:', frameCaptureInterval, 'ms');
 
     // Delay first capture to ensure camera is ready
     const initialDelay = setTimeout(() => {
+      console.log('[BasicEmotionDetector] ⏰ Initial delay complete, starting frame capture...');
       const captureFrame = async () => {
         const now = Date.now();
-        if (now - lastFrameCapture.current < frameCaptureInterval) return;
+        const timeSinceLastCapture = now - lastFrameCapture.current;
+        console.log('[BasicEmotionDetector] 🎬 captureFrame called', {
+          timeSinceLastCapture,
+          frameCaptureInterval,
+          shouldCapture: timeSinceLastCapture >= frameCaptureInterval,
+        });
+
+        if (now - lastFrameCapture.current < frameCaptureInterval) {
+          console.log('[BasicEmotionDetector] ⏭️ Skipping capture (too soon)');
+          return;
+        }
 
         try {
+          console.log('[BasicEmotionDetector] 📸 Attempting to capture frame...');
+
           if (!cameraRef.current) {
+            console.warn('[BasicEmotionDetector] ⚠️ Camera ref not ready, skipping frame capture');
             debugLog('BasicEmotionDetector', 'Camera ref not ready, skipping frame capture');
             return;
           }
@@ -519,15 +553,23 @@ export const BasicEmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
       };
 
       // Start interval after initial delay
+      console.log('[BasicEmotionDetector] ⏱️ Setting up interval with period:', frameCaptureInterval, 'ms');
       const interval = setInterval(captureFrame, frameCaptureInterval);
 
       // Capture first frame immediately after delay
+      console.log('[BasicEmotionDetector] 🎬 Capturing first frame immediately...');
       captureFrame();
 
-      return () => clearInterval(interval);
+      return () => {
+        console.log('[BasicEmotionDetector] 🛑 Clearing frame capture interval');
+        clearInterval(interval);
+      };
     }, 2000); // Wait 2 seconds for camera to be ready
 
-    return () => clearTimeout(initialDelay);
+    return () => {
+      console.log('[BasicEmotionDetector] 🛑 Clearing initial delay timeout');
+      clearTimeout(initialDelay);
+    };
   }, [isActive, onFrameCaptured, frameCaptureInterval, hasPermission]);
 
   // Cleanup timeout on component unmount
