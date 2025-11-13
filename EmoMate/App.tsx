@@ -10,7 +10,7 @@ import {
   ChatHistoryScreen,
   SceneHistoryScreen,
 } from './src/screens';
-import { TTSQueue, initializeTTSCache } from './src/utils/ttsQueue'; // Phase 3: TTS 预热 + 缓存
+import { TTSQueue, initializeTTSCache } from './src/capabilities/speak/ttsQueue'; // Phase 3: TTS 预热 + 缓存
 import './global.css';
 
 export type RootStackParamList = {

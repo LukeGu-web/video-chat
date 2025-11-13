@@ -17,7 +17,7 @@ import type {
   SentenceWithScore,
   BufferStats,
   SmartBufferOptions
-} from '../types/smartBuffer';
+} from '../../types/smartBuffer';
 
 export class SmartSentenceBuffer {
   private conversationType: ConversationType;

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useHybridTTS, TTSProvider } from './useHybridTTS';
+import { useHybridTTS, TTSProvider } from '../capabilities/speak/useHybridTTS';
 import {
   CLAUDE_API_CONFIG,
   getClaudeApiKey,
@@ -12,9 +12,9 @@ import {
   detectConversationType,
   getResponseLengthConfig,
 } from '../constants/ai';
-import { SentenceBuffer, parseSSEChunk } from './sentenceDetector'; // Phase 2: 句子检测
-import { TTSQueue } from './ttsQueue'; // Phase 2: TTS队列管理
-import { SmartSentenceBuffer } from './smartSentenceBuffer'; // Phase 3: 智能句子过滤
+import { SentenceBuffer, parseSSEChunk } from '../capabilities/speak/sentenceDetector'; // Phase 2: 句子检测
+import { TTSQueue } from '../capabilities/speak/ttsQueue'; // Phase 2: TTS队列管理
+import { SmartSentenceBuffer } from '../capabilities/speak/smartSentenceBuffer'; // Phase 3: 智能句子过滤
 import { useUserStore } from '../store/userStore'; // Environment context
 import { buildEnvironmentPrompt } from './buildEnvironmentPrompt'; // Environment awareness
 import { buildScenePrompt, isSceneDataFresh } from './buildScenePrompt'; // Scene understanding (Step 5.1)

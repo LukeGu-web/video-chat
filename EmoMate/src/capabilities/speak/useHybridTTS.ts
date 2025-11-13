@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useTTS } from './useTTS';
 import { useElevenLabsTTS } from './useElevenLabsTTS';
-import { getElevenLabsApiKey } from '../constants/ai';
+import { getElevenLabsApiKey } from '../../constants/ai';
 
 export type TTSProvider = 'expo' | 'elevenlabs';
 

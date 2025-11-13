@@ -6,10 +6,10 @@ import {
   getEmotionalVoiceSettings,
   getLanLanVoiceId,
   preprocessTextForNaturalSpeech
-} from '../constants/ai';
-import { base64ToUint8Array, safeDeleteFile } from './fileSystemHelpers';
+} from '../../constants/ai';
+import { base64ToUint8Array, safeDeleteFile } from '../../utils/fileSystemHelpers';
 import { SoundPlayer } from './soundPlayer';
-import { audioModeManager } from './audioModeManager';
+import { audioModeManager } from '../../utils/audioModeManager';
 
 export interface UseElevenLabsTTSReturn {
   isSpeaking: boolean;

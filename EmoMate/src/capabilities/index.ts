@@ -5,7 +5,7 @@
  * - vision: Visual recognition and analysis
  * - motion: Animation and motion control
  * - listen: Speech recognition
- * - speak: Text-to-speech (to be added in Phase 2)
+ * - speak: Text-to-speech synthesis
  * - emotion: Emotion analysis (to be added in Phase 3)
  */
 
@@ -18,4 +18,7 @@ export * from './motion';
 // Listen capabilities
 export * from './listen';
 
-// Note: Speak and Emotion capabilities will be added in subsequent phases
+// Speak capabilities (Phase 2)
+export * from './speak';
+
+// Note: Emotion capabilities will be added in Phase 3

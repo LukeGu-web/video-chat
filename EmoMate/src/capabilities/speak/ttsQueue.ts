@@ -17,8 +17,8 @@ import {
   getEmotionalVoiceSettings,
   getLanLanVoiceId,
   preprocessTextForNaturalSpeech,
-} from '../constants/ai';
-import { base64ToUint8Array, safeDeleteFile, ensureDirectoryExists } from './fileSystemHelpers';
+} from '../../constants/ai';
+import { base64ToUint8Array, safeDeleteFile, ensureDirectoryExists } from '../../utils/fileSystemHelpers';
 import Sound from 'react-native-sound';
 
 /**
