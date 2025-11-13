@@ -8,9 +8,9 @@
  * - Motion priority and transition management
  */
 
-import { EmotionType } from '../types/emotion';
-import { HiyoriMotion } from '../store';
-import { debugLog } from './debug';
+import { EmotionType } from '../../types/emotion';
+import { HiyoriMotion } from '../../store';
+import { debugLog } from '../../utils/debug';
 
 // ==================== Type Definitions ====================
 

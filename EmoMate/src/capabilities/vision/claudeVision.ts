@@ -12,7 +12,7 @@ import {
   ObjectRecognitionData,
   ObjectRecognitionRequest,
   ObjectRecognitionResponse,
-} from '../types/scene';
+} from '../../types/scene';
 import { compressBase64Image, formatByteSize } from './imageCompression';
 
 /**

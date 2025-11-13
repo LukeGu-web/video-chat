@@ -12,7 +12,7 @@ import {
   MotionSelection,
   calculateMotionTransition,
   isTemporaryMotion,
-} from '../utils/motionMapper';
+} from '../capabilities/motion/motionMapper';
 
 interface EmotionAwareCharacterProps {
   size?: number;

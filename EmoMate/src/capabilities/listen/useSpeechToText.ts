@@ -4,7 +4,7 @@ import {
   useSpeechRecognitionEvent,
   getSupportedLocales,
 } from 'expo-speech-recognition';
-import { audioModeManager } from './audioModeManager';
+import { audioModeManager } from '../../utils/audioModeManager';
 
 export interface SpeechToTextResult {
   transcript: string;

@@ -1,7 +1,7 @@
 import { useMemo, useEffect, useRef } from 'react';
 import { Frame } from 'react-native-vision-camera';
 import { useFaceDetector, FaceDetectionOptions, Face } from 'react-native-vision-camera-face-detector';
-import type { EmotionType, FaceData, EmotionDetectionResult } from '../types/emotion';
+import type { EmotionType, FaceData, EmotionDetectionResult } from '../../../types/emotion';
 
 // Re-export Face type for backward compatibility
 export type MLKitFace = Face;

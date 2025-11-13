@@ -4,7 +4,7 @@
  */
 
 import * as ImageManipulator from 'expo-image-manipulator';
-import { SceneComparisonResult } from '../types/scene';
+import { SceneComparisonResult } from '../../types/scene';
 
 /**
  * Thumbnail configuration for image comparison

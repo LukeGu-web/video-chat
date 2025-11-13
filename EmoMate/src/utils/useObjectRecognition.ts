@@ -11,7 +11,7 @@ import {
   ObjectRecognitionResponse,
   AnalysisMode,
 } from '../types/scene';
-import { recognizeObjectWithClaude } from './claudeVision';
+import { recognizeObjectWithClaude } from '../capabilities/vision/claudeVision';
 
 /**
  * MMKV Storage instance for object recognition records
@@ -45,7 +45,10 @@ export interface ObjectRecognitionConfig {
  * Object Recognition Hook
  * Provides methods to recognize objects and manage recognition history
  */
-export function useObjectRecognition(apiKey: string, config?: ObjectRecognitionConfig) {
+export function useObjectRecognition(
+  apiKey: string,
+  config?: ObjectRecognitionConfig
+) {
   const maxRecords = config?.maxRecords || MAX_RECORDS;
 
   // State for records
@@ -64,7 +67,9 @@ export function useObjectRecognition(apiKey: string, config?: ObjectRecognitionC
         // Sort by createdAt descending (newest first)
         parsed.sort((a, b) => b.createdAt - a.createdAt);
         setRecords(parsed);
-        console.log(`[ObjectRecognition] Loaded ${parsed.length} records from storage`);
+        console.log(
+          `[ObjectRecognition] Loaded ${parsed.length} records from storage`
+        );
       } else {
         setRecords([]);
         console.log('[ObjectRecognition] No stored records found');
@@ -85,7 +90,9 @@ export function useObjectRecognition(apiKey: string, config?: ObjectRecognitionC
         const recordsToSave = newRecords.slice(0, maxRecords);
         storage.set(STORAGE_KEYS.RECORDS, JSON.stringify(recordsToSave));
         setRecords(recordsToSave);
-        console.log(`[ObjectRecognition] Saved ${recordsToSave.length} records to storage`);
+        console.log(
+          `[ObjectRecognition] Saved ${recordsToSave.length} records to storage`
+        );
       } catch (err) {
         console.error('[ObjectRecognition] Failed to save records:', err);
         setError('保存记录失败');
@@ -98,7 +105,10 @@ export function useObjectRecognition(apiKey: string, config?: ObjectRecognitionC
    * Recognize an object and save the result
    */
   const recognizeObject = useCallback(
-    async (imageBase64: string, userPrompt: string): Promise<ObjectRecognitionResponse> => {
+    async (
+      imageBase64: string,
+      userPrompt: string
+    ): Promise<ObjectRecognitionResponse> => {
       if (!apiKey) {
         const errorMsg = 'API key not configured';
         setError(errorMsg);
@@ -202,7 +212,7 @@ export function useObjectRecognition(apiKey: string, config?: ObjectRecognitionC
    * Clear all records
    */
   const clearAllRecords = useCallback(() => {
-    storage.delete(STORAGE_KEYS.RECORDS);
+    storage.remove(STORAGE_KEYS.RECORDS);
     setRecords([]);
     console.log('[ObjectRecognition] Cleared all records');
   }, []);
