@@ -13,7 +13,7 @@ import {
   WEATHER_DESCRIPTORS,
   type SceneMetadata,
   type WeatherType,
-} from '../config/backgroundScenes';
+} from '../constants';
 
 // ==================== Types ====================
 
@@ -61,10 +61,25 @@ const ACTIVITY_DESCRIPTORS: Record<string, string[]> = {
 };
 
 const SCENE_DETAILS: Record<string, string[]> = {
-  morning: ['阳光透过窗帘照进来', '空气清新舒爽', '一切都刚刚苏醒', '晨光很柔和'],
+  morning: [
+    '阳光透过窗帘照进来',
+    '空气清新舒爽',
+    '一切都刚刚苏醒',
+    '晨光很柔和',
+  ],
   noon: ['阳光正好', '有点热但还好', '光线很明亮', '一天过了一半了'],
-  afternoon: ['阳光从窗外斜射进来', '时间过得挺快', '光线很舒服', '下午的氛围很惬意'],
-  evening: ['夕阳的余晖洒进来', '天色渐渐暗下来', '灯光亮起来了', '傍晚的空气凉凉的'],
+  afternoon: [
+    '阳光从窗外斜射进来',
+    '时间过得挺快',
+    '光线很舒服',
+    '下午的氛围很惬意',
+  ],
+  evening: [
+    '夕阳的余晖洒进来',
+    '天色渐渐暗下来',
+    '灯光亮起来了',
+    '傍晚的空气凉凉的',
+  ],
   night: ['夜深人静', '星星在闪烁', '月光很美', '安静得只听到自己的呼吸'],
   day: ['阳光很好', '天气宜人', '氛围很舒适', '一切都刚刚好'],
 };
@@ -150,8 +165,10 @@ function generateStoryVariables(
   weather: WeatherType,
   date: Date
 ): Partial<StoryVariables> {
-  const weatherInfo = WEATHER_DESCRIPTORS[weather] || WEATHER_DESCRIPTORS.default;
-  const activities = ACTIVITY_DESCRIPTORS[scene.location] || ACTIVITY_DESCRIPTORS.default;
+  const weatherInfo =
+    WEATHER_DESCRIPTORS[weather] || WEATHER_DESCRIPTORS.default;
+  const activities =
+    ACTIVITY_DESCRIPTORS[scene.location] || ACTIVITY_DESCRIPTORS.default;
   const sceneDetails = SCENE_DETAILS[scene.timePeriod] || SCENE_DETAILS.day;
   const plans = PLANS[scene.dayType] || PLANS.everyday;
 
@@ -173,7 +190,10 @@ function generateStoryVariables(
 /**
  * Fill template with variables
  */
-function fillTemplate(template: string, variables: Partial<StoryVariables>): string {
+function fillTemplate(
+  template: string,
+  variables: Partial<StoryVariables>
+): string {
   let result = template;
 
   Object.entries(variables).forEach(([key, value]) => {
