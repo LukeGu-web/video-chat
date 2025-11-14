@@ -240,6 +240,21 @@ export const SCENE_CONFIG: SceneMetadata[] = [
 
   // ========== Weekend Scenes ==========
 
+  // Weekend Morning (6:00-10:00)
+  {
+    id: 'weekend_morning_bedroom',
+    dayType: 'weekend',
+    timePeriod: 'morning',
+    location: 'bedroom',
+    imagePath: 'everyday/morning/bedroom.jpeg', // Reuse everyday bedroom image
+    description: 'Relaxing weekend morning in bedroom',
+    storyTemplateId: 'weekend_morning',
+    timeRange: [6, 10],
+    tags: ['home', 'relax', 'weekend-morning'],
+    priority: 10,
+    weatherVariants: ['default', 'sunny', 'rainy', 'cloudy'],
+  },
+
   // Weekend Day (7:00-19:00)
   {
     id: 'weekend_day_cafe',
@@ -403,6 +418,15 @@ export const STORY_TEMPLATES: Record<string, StoryTemplate> = {
     contexts: ['night', 'quiet', 'private', 'introspective'],
   },
 
+  weekend_morning: {
+    id: 'weekend_morning',
+    templates: [
+      '周末的早晨～{time}醒来，不用赶着上学真好呢。{activity_desc}，看着窗外{weather_desc}。{mood_desc}',
+      '今天是周末，{time}慢慢醒来。{scene_detail}，{mood_desc}想着{plan}',
+    ],
+    contexts: ['weekend', 'morning', 'relaxed', 'leisure'],
+  },
+
   weekend_cafe: {
     id: 'weekend_cafe',
     templates: [
@@ -460,40 +484,52 @@ export const WEATHER_DESCRIPTORS: Record<WeatherType, {
 
 /**
  * Get appropriate scene based on current time and context
+ * Uses a fallback strategy to ensure a scene is always found
  */
 export function getSceneForContext(
   dayType: DayType,
   currentHour: number,
   weather?: WeatherType
 ): SceneMetadata | null {
-  // Filter scenes by day type
+  // Strategy 1: Try exact match (dayType + timeRange + weather)
   let candidates = SCENE_CONFIG.filter(scene => scene.dayType === dayType);
 
-  // Further filter by time range if available
-  candidates = candidates.filter(scene => {
+  // Filter by time range
+  const timeCandidates = candidates.filter(scene => {
     if (!scene.timeRange) return true;
     const [start, end] = scene.timeRange;
     return currentHour >= start && currentHour < end;
   });
 
-  // Filter by weather variant if specified
-  if (weather && weather !== 'default') {
-    const weatherAware = candidates.filter(
+  // Try with weather filtering first
+  let finalCandidates = timeCandidates;
+  if (weather && weather !== 'default' && timeCandidates.length > 0) {
+    const weatherAware = timeCandidates.filter(
       scene => scene.weatherVariants?.includes(weather)
     );
     if (weatherAware.length > 0) {
-      candidates = weatherAware;
+      finalCandidates = weatherAware;
     }
   }
 
-  // Sort by priority and pick highest
-  if (candidates.length === 0) return null;
+  // Strategy 2: If no time-matched scenes, use any scene for this dayType
+  if (finalCandidates.length === 0 && candidates.length > 0) {
+    console.warn(`[BackgroundContext] No scenes found for ${dayType} at hour ${currentHour}, using fallback`);
+    finalCandidates = candidates;
+  }
 
-  candidates.sort((a, b) => (b.priority || 0) - (a.priority || 0));
+  // Strategy 3: If still no scenes, use any scene from config
+  if (finalCandidates.length === 0) {
+    console.warn(`[BackgroundContext] No scenes found for ${dayType}, using any available scene`);
+    finalCandidates = SCENE_CONFIG;
+  }
+
+  // Sort by priority and pick highest
+  finalCandidates.sort((a, b) => (b.priority || 0) - (a.priority || 0));
 
   // Add some randomness among top candidates
-  const topPriority = candidates[0].priority || 0;
-  const topCandidates = candidates.filter(
+  const topPriority = finalCandidates[0].priority || 0;
+  const topCandidates = finalCandidates.filter(
     scene => (scene.priority || 0) === topPriority
   );
 
@@ -502,6 +538,7 @@ export function getSceneForContext(
 
 /**
  * Get image path with weather variant
+ * Only uses weather variant if the scene explicitly supports it
  */
 export function getSceneImagePath(
   scene: SceneMetadata,
@@ -509,13 +546,23 @@ export function getSceneImagePath(
 ): string {
   const basePath = scene.imagePath;
 
-  // If weather variant requested and supported
+  // Only use weather variant if:
+  // 1. Weather is specified and not default
+  // 2. Scene explicitly supports this weather variant
   if (weather && weather !== 'default' && scene.weatherVariants?.includes(weather)) {
     // Try to use weather variant (e.g., bedroom_rainy.jpeg)
     const parts = basePath.split('.');
     const ext = parts.pop();
     const pathWithoutExt = parts.join('.');
-    return `${pathWithoutExt}_${weather}.${ext}`;
+    const weatherPath = `${pathWithoutExt}_${weather}.${ext}`;
+
+    console.log(`[BackgroundContext] Using weather variant: ${weatherPath}`);
+    return weatherPath;
+  }
+
+  // Fallback to base path (no weather variant)
+  if (weather && weather !== 'default' && !scene.weatherVariants?.includes(weather)) {
+    console.log(`[BackgroundContext] Scene ${scene.id} doesn't support weather '${weather}', using default image`);
   }
 
   return basePath;

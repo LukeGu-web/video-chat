@@ -248,15 +248,20 @@ export async function generateBackgroundContext(): Promise<BackgroundContext> {
   const currentHour = now.getHours();
   const weather = await getCurrentWeather();
 
-  // Get appropriate scene
+  console.log(`[BackgroundContext] Generating context: dayType=${dayType}, hour=${currentHour}, weather=${weather}`);
+
+  // Get appropriate scene (with fallback strategy)
   const scene = getSceneForContext(dayType, currentHour, weather);
 
   if (!scene) {
-    // Fallback to a default scene
+    // This should never happen due to fallback logic, but just in case
+    console.error('[BackgroundContext] Failed to find any scene, this should not happen!');
     throw new Error('No appropriate scene found for current context');
   }
 
-  // Get image path with weather variant
+  console.log(`[BackgroundContext] Selected scene: ${scene.id}`);
+
+  // Get image path with weather variant (automatically handles unsupported weather)
   const imagePath = getSceneImagePath(scene, weather);
 
   // Generate story
