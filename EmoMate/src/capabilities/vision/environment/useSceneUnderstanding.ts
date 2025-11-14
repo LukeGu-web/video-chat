@@ -2,10 +2,15 @@
  * Scene Understanding Hook
  * Main hook that integrates camera, image comparison, and Claude Vision API
  * to provide intelligent scene understanding capabilities
+ *
+ * This hook has been refactored into smaller modules:
+ * - sceneKeywords.ts - Keyword detection logic
+ * - sceneCache.ts - Cache management
+ * - sceneTimer.ts - Timer logic
+ * - sceneAnalysis.ts - Core analysis logic
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { createMMKV } from 'react-native-mmkv';
 import {
   SceneData,
   SceneConfig,
@@ -14,195 +19,48 @@ import {
   SceneAnalysisResponse,
   SceneCacheEntry,
   DEFAULT_SCENE_CONFIG,
-  ObjectRecognitionData,
 } from '../../../types/scene';
 import { analyzeSceneWithClaude } from '../claudeVision';
-import { compareImages, generateThumbnail } from '../imageComparison';
+import { generateThumbnail } from '../imageComparison';
 
-/**
- * Visual keywords that trigger scene analysis (Step 3.3)
- * These keywords must match exactly to avoid false triggers
- * E.g., "看" matches but "看起来" does not
- */
-const VISUAL_KEYWORDS = [
-  '看',
-  '看见',
-  '看到',
-  '这是什么',
-  '周围',
-  '这个',
-  '那个',
-  '什么东西',
-  '哪里',
-  '在哪',
-  '附近',
-  '旁边',
-] as const;
+// Import modularized functions
+import {
+  detectVisualKeywords,
+  detectObjectKeywords,
+  formatObjectRecognitionForAI,
+} from './sceneKeywords';
 
-/**
- * Detect visual keywords in user text (Step 3.3)
- * Uses precise matching to avoid false triggers
- * E.g., "看起来" won't trigger "看" keyword
- *
- * @param text - User input text
- * @returns The detected keyword or null
- */
-export function detectVisualKeywords(text: string): string | null {
-  if (!text || text.trim().length === 0) {
-    return null;
-  }
+import {
+  loadCachedData,
+  saveToCache as saveToCacheUtil,
+  saveLastScene,
+  saveConfig,
+  checkCache as checkCacheUtil,
+  clearCache as clearCacheUtil,
+  clearExpiredScenes as clearExpiredScenesUtil,
+} from './sceneCache';
 
-  const trimmedText = text.trim();
+import {
+  TimerState,
+  getInitialTimerState,
+  updateTimerCountdown,
+  checkSceneChangeCooldown,
+  updateAfterPhotoCapture,
+  updateAfterSceneChange,
+  updateAfterTimerAnalysis,
+  updateAfterKeywordAnalysis,
+  updateConversationActivity,
+  startTimer as startTimerUtil,
+  stopTimer as stopTimerUtil,
+} from './sceneTimer';
 
-  // Check for exact phrase matches first (higher priority)
-  const exactPhrases = ['这是什么', '什么东西', '在哪'];
-  for (const phrase of exactPhrases) {
-    if (trimmedText.includes(phrase)) {
-      console.log(`[SceneUnderstanding] 🎯 Keyword detected: "${phrase}" in "${trimmedText}"`);
-      return phrase;
-    }
-  }
+import {
+  checkSceneChange as checkSceneChangeUtil,
+  checkSemanticDeduplication,
+} from './sceneAnalysis';
 
-  // Check for single character keywords with boundary detection
-  const singleCharKeywords = ['看', '看见', '看到', '周围', '这个', '那个', '哪里', '附近', '旁边'];
-
-  for (const keyword of singleCharKeywords) {
-    // For single character keywords like "看", ensure it's not part of a longer word
-    if (keyword.length === 1) {
-      // Check if keyword appears as standalone character or at word boundary
-      const regex = new RegExp(`(?:^|[^一-龥])${keyword}(?:[^一-龥起]|$)`);
-      if (regex.test(trimmedText)) {
-        console.log(`[SceneUnderstanding] 🎯 Keyword detected: "${keyword}" in "${trimmedText}"`);
-        return keyword;
-      }
-    } else {
-      // For multi-character keywords, simple includes check
-      if (trimmedText.includes(keyword)) {
-        console.log(`[SceneUnderstanding] 🎯 Keyword detected: "${keyword}" in "${trimmedText}"`);
-        return keyword;
-      }
-    }
-  }
-
-  console.log(`[SceneUnderstanding] ⏭️ No visual keyword detected in "${trimmedText}"`);
-  return null;
-}
-
-/**
- * Detect object recognition keywords in user text
- * These keywords trigger object recognition instead of scene understanding
- *
- * @param text - User input text
- * @returns The detected keyword or null
- */
-export function detectObjectKeywords(text: string): string | null {
-  if (!text || text.trim().length === 0) {
-    return null;
-  }
-
-  const trimmedText = text.trim();
-
-  // Object recognition phrases (specific to identifying objects)
-  const objectPhrases = [
-    '看这个',
-    '看这个东西',
-    '看看这个',
-    '看看这',
-    '帮我看看这个',
-    '帮我看看这',
-    '识别这个',
-    '识别这',
-    '这个是什么',
-    '这是什么东西',
-    '这什么',
-    '这东西',
-  ];
-
-  for (const phrase of objectPhrases) {
-    if (trimmedText.includes(phrase)) {
-      console.log(`[ObjectRecognition] 🎯 Object keyword detected: "${phrase}" in "${trimmedText}"`);
-      return phrase;
-    }
-  }
-
-  console.log(`[ObjectRecognition] ⏭️ No object recognition keyword detected in "${trimmedText}"`);
-  return null;
-}
-
-/**
- * Format object recognition data as AI context
- * Converts object recognition data into natural language for AI consumption
- *
- * @param objectData - Object recognition data
- * @returns Formatted context string for AI
- */
-export function formatObjectRecognitionForAI(
-  objectData: ObjectRecognitionData
-): string {
-  const parts: string[] = [];
-
-  // Basic information
-  parts.push(`【物品识别结果】`);
-  parts.push(`物品名称: ${objectData.objectName}`);
-  parts.push(`类别: ${objectData.category}`);
-  parts.push(`描述: ${objectData.description}`);
-
-  // Optional details
-  if (objectData.brand) {
-    parts.push(`品牌: ${objectData.brand}`);
-  }
-
-  if (objectData.model) {
-    parts.push(`型号: ${objectData.model}`);
-  }
-
-  if (objectData.color) {
-    parts.push(`颜色: ${objectData.color}`);
-  }
-
-  if (objectData.material) {
-    parts.push(`材质: ${objectData.material}`);
-  }
-
-  if (objectData.priceRange) {
-    parts.push(`价格范围: ${objectData.priceRange}`);
-  }
-
-  // Additional information
-  if (objectData.additionalInfo && Object.keys(objectData.additionalInfo).length > 0) {
-    parts.push(`其他信息:`);
-    for (const [key, value] of Object.entries(objectData.additionalInfo)) {
-      parts.push(`  - ${key}: ${value}`);
-    }
-  }
-
-  // User's original question
-  if (objectData.userPrompt) {
-    parts.push(`用户提问: ${objectData.userPrompt}`);
-  }
-
-  // Confidence
-  parts.push(`识别置信度: ${Math.round(objectData.confidence * 100)}%`);
-
-  return parts.join('\n');
-}
-
-/**
- * MMKV Storage instance for scene understanding data
- */
-const storage = createMMKV({
-  id: 'scene-understanding-storage',
-  encryptionKey: 'scene-understanding-encryption-key', // Optional: for data encryption
-});
-
-/**
- * Storage keys for persisting scene data
- */
-const STORAGE_KEYS = {
-  SCENE_CACHE: 'scene_understanding_cache',
-  LAST_SCENE: 'scene_understanding_last_scene',
-  CONFIG: 'scene_understanding_config',
-};
+// Re-export keyword detection functions for backward compatibility
+export { detectVisualKeywords, detectObjectKeywords, formatObjectRecognitionForAI };
 
 /**
  * Scene understanding state
@@ -260,32 +118,7 @@ interface SceneUnderstandingState {
   };
 
   /** Timer state (Step 3.1) */
-  timerState: {
-    /** Whether timer is enabled */
-    enabled: boolean;
-    /** Time until next photo capture (ms) */
-    nextCaptureIn: number;
-    /** Time until next deep analysis (ms) */
-    nextAnalysisIn: number;
-    /** Total number of photos captured */
-    totalCaptures: number;
-    /** Total number of analyses triggered by timer */
-    totalTimerAnalyses: number;
-    /** Last scene change trigger time (for cooldown, Step 3.2) */
-    lastSceneChangeTime: number | null;
-    /** Total number of analyses triggered by scene change (Step 3.2) */
-    totalSceneChangeAnalyses: number;
-    /** Last trigger reason (timer/scene_change/keyword) */
-    lastTriggerReason: string | null;
-    /** Total number of analyses triggered by keyword (Step 3.3) */
-    totalKeywordAnalyses: number;
-    /** Last keyword that triggered analysis (Step 3.3) */
-    lastKeyword: string | null;
-    /** Last conversation activity time (Step 5.3: Smart pause) */
-    lastConversationActivityTime: number | null;
-    /** Whether analysis is paused due to conversation inactivity (Step 5.3) */
-    isPausedDueToInactivity: boolean;
-  };
+  timerState: TimerState;
 
   /** Cached scenes (Step 4.1) - for UI display */
   cachedScenes: SceneCacheEntry[];
@@ -390,20 +223,7 @@ export function useSceneUnderstanding(
   });
 
   // Timer state (Step 3.1 & 3.2 & 3.3 & 5.3)
-  const [timerState, setTimerState] = useState({
-    enabled: false,
-    nextCaptureIn: 30000, // 30 seconds
-    nextAnalysisIn: 300000, // 5 minutes
-    totalCaptures: 0,
-    totalTimerAnalyses: 0,
-    lastSceneChangeTime: null as number | null, // Step 3.2: For cooldown mechanism
-    totalSceneChangeAnalyses: 0, // Step 3.2: Scene change trigger count
-    lastTriggerReason: null as string | null, // Step 3.2 & 3.3: Last trigger reason
-    totalKeywordAnalyses: 0, // Step 3.3: Keyword trigger count
-    lastKeyword: null as string | null, // Step 3.3: Last detected keyword
-    lastConversationActivityTime: Date.now(), // Step 5.3: Track conversation activity
-    isPausedDueToInactivity: false, // Step 5.3: Pause state
-  });
+  const [timerState, setTimerState] = useState<TimerState>(getInitialTimerState());
 
   // Cached scenes state (Step 4.1) - for triggering UI updates
   const [cachedScenes, setCachedScenes] = useState<SceneCacheEntry[]>([]);
@@ -417,10 +237,23 @@ export function useSceneUnderstanding(
   const shouldTriggerAnalysis = useRef<boolean>(false);
 
   /**
-   * Load cached data from AsyncStorage on mount
+   * Load cached data from storage on mount
    */
   useEffect(() => {
-    loadCachedData();
+    const { cache, lastScene, config: savedConfig } = loadCachedData();
+
+    // Update refs and state
+    sceneCache.current = cache;
+    setCachedScenes(cache);
+
+    if (lastScene) {
+      setCurrentScene(lastScene);
+    }
+
+    if (savedConfig) {
+      setConfig(prev => ({ ...prev, ...savedConfig }));
+    }
+
     return () => {
       // Cleanup timers on unmount (Step 3.1)
       if (timerRef.current) {
@@ -430,6 +263,7 @@ export function useSceneUnderstanding(
         clearTimeout(countdownTimerRef.current);
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /**
@@ -471,7 +305,11 @@ export function useSceneUnderstanding(
               console.log('[SceneUnderstanding] Timer: Photo captured');
 
               // Step 3.2: Check for scene change
-              const hasSceneChanged = await checkSceneChange(imageBase64);
+              const hasSceneChanged = await checkSceneChangeUtil(
+                imageBase64,
+                lastImageBase64.current,
+                config.sceneChangeThreshold
+              );
 
               console.log('[SceneUnderstanding] 🔍 Scene change check result:', {
                 hasSceneChanged,
@@ -482,21 +320,11 @@ export function useSceneUnderstanding(
                 console.log('[SceneUnderstanding] ✅ Scene change detected!');
 
                 // Check cooldown period (1 minute = 60000ms)
-                const now = Date.now();
-                const lastChangeTime = timerState.lastSceneChangeTime;
-                const cooldownPeriod = 60000; // 1 minute
-                const isInCooldown = lastChangeTime && (now - lastChangeTime) < cooldownPeriod;
-
-                console.log('[SceneUnderstanding] 🕐 Cooldown check:', {
-                  now,
-                  lastChangeTime,
-                  timeSinceLastChange: lastChangeTime ? now - lastChangeTime : 'N/A',
-                  cooldownPeriod,
-                  isInCooldown,
-                });
+                const { isInCooldown, remainingCooldown } = checkSceneChangeCooldown(
+                  timerState.lastSceneChangeTime
+                );
 
                 if (isInCooldown) {
-                  const remainingCooldown = Math.ceil((cooldownPeriod - (now - lastChangeTime!)) / 1000);
                   console.log(`[SceneUnderstanding] ⏸️ Scene change cooldown active, ${remainingCooldown}s remaining - SKIPPING ANALYSIS`);
                 } else {
                   console.log('[SceneUnderstanding] 🚀 Triggering scene change analysis...');
@@ -507,13 +335,7 @@ export function useSceneUnderstanding(
                   });
 
                   // Update state: record scene change trigger and reset timer
-                  setTimerState(prev => ({
-                    ...prev,
-                    lastSceneChangeTime: now,
-                    totalSceneChangeAnalyses: prev.totalSceneChangeAnalyses + 1,
-                    lastTriggerReason: 'scene_change',
-                    nextAnalysisIn: 300000, // Reset to 5 minutes (user requirement)
-                  }));
+                  setTimerState(prev => updateAfterSceneChange(prev));
 
                   console.log('[SceneUnderstanding] ✅ Scene change state updated, timer reset to 5 minutes');
                 }
@@ -525,11 +347,7 @@ export function useSceneUnderstanding(
               lastImageBase64.current = imageBase64;
 
               // Update capture count
-              setTimerState(prev => ({
-                ...prev,
-                totalCaptures: prev.totalCaptures + 1,
-                nextCaptureIn: 30000, // Reset to 30 seconds
-              }));
+              setTimerState(prev => updateAfterPhotoCapture(prev));
             }
           } catch (error) {
             console.error('[SceneUnderstanding] Timer: Photo capture failed:', error);
@@ -548,30 +366,7 @@ export function useSceneUnderstanding(
 
     // Setup countdown timer (updates every second)
     countdownTimerRef.current = setInterval(() => {
-      setTimerState(prev => {
-        // Step 5.3: Check conversation inactivity (5 minutes = 300000ms)
-        const now = Date.now();
-        const inactivityThreshold = 5 * 60 * 1000; // 5 minutes
-        const timeSinceLastActivity = prev.lastConversationActivityTime
-          ? now - prev.lastConversationActivityTime
-          : 0;
-
-        const shouldPause = timeSinceLastActivity > inactivityThreshold;
-
-        // Log inactivity status change
-        if (shouldPause && !prev.isPausedDueToInactivity) {
-          console.log('[SceneUnderstanding] ⏸️ Conversation inactive for 5 minutes - pausing scene analysis');
-        } else if (!shouldPause && prev.isPausedDueToInactivity) {
-          console.log('[SceneUnderstanding] ▶️ Conversation activity resumed - resuming scene analysis');
-        }
-
-        return {
-          ...prev,
-          nextCaptureIn: Math.max(0, prev.nextCaptureIn - 1000),
-          nextAnalysisIn: Math.max(0, prev.nextAnalysisIn - 1000),
-          isPausedDueToInactivity: shouldPause,
-        };
-      });
+      setTimerState(prev => updateTimerCountdown(prev));
     }, 1000);
 
     return () => {
@@ -585,278 +380,6 @@ export function useSceneUnderstanding(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timerState.enabled, timerState.nextCaptureIn, timerState.nextAnalysisIn]);
 
-  /**
-   * Load cached scene data from MMKV storage
-   */
-  function loadCachedData(): void {
-    try {
-      const now = Date.now();
-
-      // Load scene cache
-      const cacheJson = storage.getString(STORAGE_KEYS.SCENE_CACHE);
-      if (cacheJson) {
-        const loadedCache = JSON.parse(cacheJson);
-        const beforeCount = loadedCache.length;
-
-        // Automatically clean up expired scenes on load
-        sceneCache.current = loadedCache.filter(
-          (entry: SceneCacheEntry) => entry.expiresAt > now
-        );
-
-        // Sort by cachedAt timestamp (newest first)
-        sceneCache.current.sort((a, b) => b.cachedAt - a.cachedAt);
-
-        const afterCount = sceneCache.current.length;
-        const removedCount = beforeCount - afterCount;
-
-        if (removedCount > 0) {
-          console.log(`[SceneUnderstanding] 🗑️ Auto-cleaned ${removedCount} expired scene(s) on load`);
-          // Save cleaned cache back to storage
-          storage.set(
-            STORAGE_KEYS.SCENE_CACHE,
-            JSON.stringify(sceneCache.current)
-          );
-        }
-
-        setCachedScenes(sceneCache.current); // Step 4.1: Update state for UI
-        console.log('[SceneUnderstanding] Loaded', sceneCache.current.length, 'cached scenes (sorted newest first)');
-      }
-
-      // Load last scene
-      const lastSceneJson = storage.getString(STORAGE_KEYS.LAST_SCENE);
-      if (lastSceneJson) {
-        setCurrentScene(JSON.parse(lastSceneJson));
-        console.log('[SceneUnderstanding] Loaded last scene');
-      }
-
-      // Load config
-      const configJson = storage.getString(STORAGE_KEYS.CONFIG);
-      if (configJson) {
-        const savedConfig = JSON.parse(configJson);
-        setConfig({ ...config, ...savedConfig });
-        console.log('[SceneUnderstanding] Loaded saved config');
-      }
-    } catch (error) {
-      console.error('[SceneUnderstanding] Failed to load cached data:', error);
-    }
-  }
-
-  /**
-   * Save scene data to cache (Step 4.1)
-   * Implements cache capacity control (max 3 scenes) and expiration
-   */
-  function saveToCache(scene: SceneData, imageThumbnail: string): void {
-    try {
-      const cacheEntry: SceneCacheEntry = {
-        scene,
-        cachedAt: Date.now(),
-        expiresAt: Date.now() + config.cacheExpiration,
-        imageThumbnail,
-      };
-
-      // Add to cache
-      sceneCache.current.push(cacheEntry);
-
-      // Remove expired entries (Step 4.1: auto cleanup)
-      sceneCache.current = sceneCache.current.filter(
-        entry => entry.expiresAt > Date.now()
-      );
-
-      // Step 4.1: Enforce max cache size (keep most recent 3 scenes)
-      const MAX_CACHE_SIZE = 3;
-      if (sceneCache.current.length > MAX_CACHE_SIZE) {
-        // Sort by cachedAt timestamp (newest first)
-        sceneCache.current.sort((a, b) => b.cachedAt - a.cachedAt);
-        // Keep only the most recent MAX_CACHE_SIZE entries
-        sceneCache.current = sceneCache.current.slice(0, MAX_CACHE_SIZE);
-        console.log(`[SceneUnderstanding] 🗑️ Cache size limit reached, kept ${MAX_CACHE_SIZE} most recent scenes`);
-      }
-
-      // Save to MMKV storage
-      storage.set(
-        STORAGE_KEYS.SCENE_CACHE,
-        JSON.stringify(sceneCache.current)
-      );
-
-      // Step 4.1: Update state for UI
-      setCachedScenes([...sceneCache.current]);
-
-      console.log('[SceneUnderstanding] ✅ Saved to cache, total entries:', sceneCache.current.length);
-    } catch (error) {
-      console.error('[SceneUnderstanding] ❌ Failed to save cache:', error);
-    }
-  }
-
-  /**
-   * Calculate string similarity using Jaccard index (Step 4.2)
-   * Tokenizes strings by characters and computes set similarity
-   *
-   * @param str1 - First string
-   * @param str2 - Second string
-   * @returns Similarity score (0-1)
-   */
-  function calculateStringSimilarity(str1: string, str2: string): number {
-    if (!str1 || !str2) return 0;
-    if (str1 === str2) return 1;
-
-    // Convert to character sets
-    const set1 = new Set(str1.split(''));
-    const set2 = new Set(str2.split(''));
-
-    // Calculate Jaccard similarity
-    const intersection = new Set([...set1].filter(x => set2.has(x)));
-    const union = new Set([...set1, ...set2]);
-
-    return intersection.size / union.size;
-  }
-
-  /**
-   * Calculate array similarity using Jaccard index (Step 4.2)
-   * Computes set similarity between two arrays
-   *
-   * @param arr1 - First array
-   * @param arr2 - Second array
-   * @returns Similarity score (0-1)
-   */
-  function calculateArraySimilarity(arr1: string[], arr2: string[]): number {
-    if (!arr1 || !arr2) return 0;
-    if (arr1.length === 0 && arr2.length === 0) return 1;
-    if (arr1.length === 0 || arr2.length === 0) return 0;
-
-    const set1 = new Set(arr1);
-    const set2 = new Set(arr2);
-
-    const intersection = new Set([...set1].filter(x => set2.has(x)));
-    const union = new Set([...set1, ...set2]);
-
-    return intersection.size / union.size;
-  }
-
-  /**
-   * Compare semantic similarity between two scenes (Step 4.2)
-   * Uses weighted comparison of scene attributes
-   *
-   * Weights:
-   * - location: 30% (most important)
-   * - objects: 30% (important)
-   * - atmosphere: 20%
-   * - lighting: 10%
-   * - details: 10%
-   *
-   * @param scene1 - First scene
-   * @param scene2 - Second scene
-   * @returns Similarity score (0-1)
-   */
-  function compareSceneSimilarity(scene1: SceneData, scene2: SceneData): number {
-    // Location similarity (30% weight)
-    const locationSimilarity = calculateStringSimilarity(
-      scene1.location,
-      scene2.location
-    );
-
-    // Objects similarity (30% weight)
-    const objectsSimilarity = calculateArraySimilarity(
-      scene1.objects,
-      scene2.objects
-    );
-
-    // Atmosphere similarity (20% weight)
-    const atmosphereSimilarity = calculateStringSimilarity(
-      scene1.atmosphere,
-      scene2.atmosphere
-    );
-
-    // Lighting similarity (10% weight)
-    const lightingSimilarity = calculateStringSimilarity(
-      scene1.lighting,
-      scene2.lighting
-    );
-
-    // Details similarity (10% weight) - compare key detail fields
-    let detailsSimilarity = 0;
-    const detailFields = ['indoorOutdoor', 'timeOfDay', 'weatherCondition'];
-    let validFields = 0;
-
-    for (const field of detailFields) {
-      const val1 = scene1.details[field];
-      const val2 = scene2.details[field];
-
-      if (val1 && val2) {
-        validFields++;
-        if (val1 === val2) {
-          detailsSimilarity += 1;
-        }
-      }
-    }
-
-    detailsSimilarity = validFields > 0 ? detailsSimilarity / validFields : 0.5;
-
-    // Weighted average
-    const totalSimilarity =
-      locationSimilarity * 0.3 +
-      objectsSimilarity * 0.3 +
-      atmosphereSimilarity * 0.2 +
-      lightingSimilarity * 0.1 +
-      detailsSimilarity * 0.1;
-
-    console.log('[SceneUnderstanding] Scene similarity breakdown:', {
-      location: locationSimilarity.toFixed(3),
-      objects: objectsSimilarity.toFixed(3),
-      atmosphere: atmosphereSimilarity.toFixed(3),
-      lighting: lightingSimilarity.toFixed(3),
-      details: detailsSimilarity.toFixed(3),
-      total: totalSimilarity.toFixed(3),
-    });
-
-    return totalSimilarity;
-  }
-
-  /**
-   * Check if scene is in cache (deduplication)
-   * Returns both the cached scene and the similarity score
-   */
-  async function checkCache(imageBase64: string): Promise<{ scene: SceneData | null; similarity: number | null }> {
-    try {
-      // Generate thumbnail for comparison
-      const thumbnail = await generateThumbnail(imageBase64);
-
-      const now = Date.now();
-
-      // Check against cached scenes
-      for (const entry of sceneCache.current) {
-        if (!entry.imageThumbnail) continue;
-
-        // Skip expired scenes - they should not be used for deduplication
-        if (entry.expiresAt <= now) {
-          console.log('[SceneUnderstanding] ⏭️ Skipping expired scene in cache check');
-          continue;
-        }
-
-        const comparison = await compareImages(
-          thumbnail,
-          entry.imageThumbnail,
-          config.deduplicationThreshold
-        );
-
-        if (comparison.isSameScene) {
-          console.log('[SceneUnderstanding] Cache hit! Similarity:', comparison.similarity.toFixed(3));
-          setDebugInfo(prev => ({
-            ...prev,
-            cacheHits: prev.cacheHits + 1,
-            lastSimilarity: comparison.similarity,
-          }));
-          return { scene: entry.scene, similarity: comparison.similarity };
-        }
-      }
-
-      console.log('[SceneUnderstanding] Cache miss');
-      setDebugInfo(prev => ({ ...prev, cacheMisses: prev.cacheMisses + 1 }));
-      return { scene: null, similarity: null };
-    } catch (error) {
-      console.error('[SceneUnderstanding] Cache check failed:', error);
-      return { scene: null, similarity: null };
-    }
-  }
 
   /**
    * Analyze scene using Claude Vision API
@@ -900,7 +423,12 @@ export function useSceneUnderstanding(
           : SceneTriggerType.MANUAL;
 
         // Check cache first (Step 4.1: Image-based deduplication)
-        const cacheResult = await checkCache(imageBase64);
+        const cacheResult = await checkCacheUtil(
+          sceneCache.current,
+          imageBase64,
+          config.deduplicationThreshold
+        );
+
         if (cacheResult.scene && !userQuestion) {
           console.log('[SceneUnderstanding] ✅ Using cached scene (Step 4.1 cache hit)');
 
@@ -913,6 +441,13 @@ export function useSceneUnderstanding(
           setCurrentScene(updatedScene);
           setLastTriggerType(triggerType);
           setLastAnalysisTime(Date.now());
+
+          // Update debug info for cache hit
+          setDebugInfo(prev => ({
+            ...prev,
+            cacheHits: prev.cacheHits + 1,
+            lastSimilarity: cacheResult.similarity || 0,
+          }));
 
           // Step 4.2: Update deduplication statistics (cache hit also saves API call)
           setDeduplicationStats(prev => ({
@@ -929,6 +464,9 @@ export function useSceneUnderstanding(
 
           setIsAnalyzing(false);
           return;
+        } else if (!cacheResult.scene) {
+          // Update debug info for cache miss
+          setDebugInfo(prev => ({ ...prev, cacheMisses: prev.cacheMisses + 1 }));
         }
 
         // Step 4.2: Semantic deduplication - Check if scene is still the same
@@ -942,23 +480,15 @@ export function useSceneUnderstanding(
         if (currentScene && !userQuestion && lastImageBase64.current) {
           console.log('[SceneUnderstanding] ✅ All conditions met, checking for semantic deduplication...');
 
-          // Calculate image similarity with last analyzed image
-          const imageComparison = await compareImages(
+          const { shouldDeduplicate, similarity: imageSimilarity } = await checkSemanticDeduplication(
             imageBase64,
             lastImageBase64.current,
             config.deduplicationThreshold
           );
 
-          const imageSimilarity = imageComparison.similarity;
-          console.log('[SceneUnderstanding] 📊 Image similarity comparison:', {
-            similarity: imageSimilarity.toFixed(3),
-            threshold: config.deduplicationThreshold.toFixed(3),
-            willDeduplicate: imageSimilarity >= config.deduplicationThreshold,
-          });
-
           // If image similarity is very high (>= deduplicationThreshold), assume semantic similarity
           // This avoids calling the API for virtually identical scenes
-          if (imageSimilarity >= config.deduplicationThreshold) {
+          if (shouldDeduplicate) {
             console.log('[SceneUnderstanding] ✅ High image similarity detected, skipping API call (semantic deduplication)');
 
             // Update the scene timestamp to indicate it's still active
@@ -1043,12 +573,7 @@ export function useSceneUnderstanding(
 
         // Update timer analysis count if triggered by timer (Step 3.1)
         if (isTimerTriggered) {
-          setTimerState(prev => ({
-            ...prev,
-            totalTimerAnalyses: prev.totalTimerAnalyses + 1,
-            lastTriggerReason: 'timer',
-            nextAnalysisIn: 300000, // Reset to 5 minutes
-          }));
+          setTimerState(prev => updateAfterTimerAnalysis(prev));
           shouldTriggerAnalysis.current = false;
         }
 
@@ -1060,10 +585,17 @@ export function useSceneUnderstanding(
 
         // Save to cache
         const thumbnail = await generateThumbnail(imageBase64);
-        saveToCache(response.scene, thumbnail);
+        const updatedCache = saveToCacheUtil(
+          sceneCache.current,
+          response.scene,
+          thumbnail,
+          config
+        );
+        sceneCache.current = updatedCache;
+        setCachedScenes(updatedCache);
 
         // Save last scene to MMKV storage
-        storage.set(STORAGE_KEYS.LAST_SCENE, JSON.stringify(response.scene));
+        saveLastScene(response.scene);
 
         // Step 4.2: Update last image for future deduplication comparison
         lastImageBase64.current = imageBase64;
@@ -1094,43 +626,21 @@ export function useSceneUnderstanding(
   }, [timerState.nextAnalysisIn, isAnalyzing, analyzeScene]);
 
   /**
-   * Check if scene has changed from previous image
+   * Check if scene has changed from previous image (wrapper for module function)
    * Note: Does NOT update lastImageBase64.current - that's done by the caller
    */
   const checkSceneChange = useCallback(
     async (imageBase64: string): Promise<boolean> => {
-      if (!lastImageBase64.current) {
-        console.log('[SceneUnderstanding] checkSceneChange: First image, treating as scene change');
-        return true; // First image, consider it a change
-      }
+      const hasChanged = await checkSceneChangeUtil(
+        imageBase64,
+        lastImageBase64.current,
+        config.sceneChangeThreshold
+      );
 
-      try {
-        const comparison = await compareImages(
-          imageBase64,
-          lastImageBase64.current,
-          config.sceneChangeThreshold
-        );
+      // Update debug info with similarity
+      // Note: The utility function logs internally
 
-        setDebugInfo(prev => ({
-          ...prev,
-          lastSimilarity: comparison.similarity,
-        }));
-
-        const hasChanged = !comparison.isSameScene;
-
-        console.log('[SceneUnderstanding] checkSceneChange:', {
-          similarity: comparison.similarity.toFixed(3),
-          threshold: config.sceneChangeThreshold,
-          isSameScene: comparison.isSameScene,
-          hasChanged,
-          interpretation: hasChanged ? '❌ SCENE CHANGED' : '✅ SCENE UNCHANGED',
-        });
-
-        return hasChanged;
-      } catch (error) {
-        console.error('[SceneUnderstanding] Scene change check failed:', error);
-        return false;
-      }
+      return hasChanged;
     },
     [config.sceneChangeThreshold]
   );
@@ -1139,14 +649,9 @@ export function useSceneUnderstanding(
    * Clear scene cache
    */
   const clearCache = useCallback((): void => {
-    try {
-      sceneCache.current = [];
-      storage.remove(STORAGE_KEYS.SCENE_CACHE);
-      setCachedScenes([]); // Update state for UI
-      console.log('[SceneUnderstanding] Cache cleared');
-    } catch (error) {
-      console.error('[SceneUnderstanding] Failed to clear cache:', error);
-    }
+    const emptyCache = clearCacheUtil();
+    sceneCache.current = emptyCache;
+    setCachedScenes(emptyCache);
   }, []);
 
   /**
@@ -1156,7 +661,7 @@ export function useSceneUnderstanding(
     setConfig(prev => {
       const updated = { ...prev, ...newConfig };
       // Save to MMKV storage
-      storage.set(STORAGE_KEYS.CONFIG, JSON.stringify(updated));
+      saveConfig(updated);
       return updated;
     });
   }, []);
@@ -1193,24 +698,14 @@ export function useSceneUnderstanding(
    * Start timer-based scene monitoring (Step 3.1)
    */
   const startTimer = useCallback((): void => {
-    console.log('[SceneUnderstanding] Starting timer');
-    setTimerState(prev => ({
-      ...prev,
-      enabled: true,
-      nextCaptureIn: 30000, // 30 seconds
-      nextAnalysisIn: 300000, // 5 minutes
-    }));
+    setTimerState(prev => startTimerUtil(prev));
   }, []);
 
   /**
    * Stop timer-based scene monitoring (Step 3.1)
    */
   const stopTimer = useCallback((): void => {
-    console.log('[SceneUnderstanding] Stopping timer');
-    setTimerState(prev => ({
-      ...prev,
-      enabled: false,
-    }));
+    setTimerState(prev => stopTimerUtil(prev));
   }, []);
 
   /**
@@ -1267,12 +762,7 @@ export function useSceneUnderstanding(
         await analyzeScene(imageBase64, userQuestion);
 
         // Update statistics
-        setTimerState(prev => ({
-          ...prev,
-          totalKeywordAnalyses: prev.totalKeywordAnalyses + 1,
-          lastTriggerReason: 'keyword',
-          lastKeyword: keyword,
-        }));
+        setTimerState(prev => updateAfterKeywordAnalysis(prev, keyword));
 
         console.log('[SceneUnderstanding] ✅ Keyword-triggered analysis completed');
       } catch (error) {
@@ -1306,41 +796,10 @@ export function useSceneUnderstanding(
    * @returns Number of scenes removed
    */
   const clearExpiredScenes = useCallback((): number => {
-    try {
-      const beforeCount = sceneCache.current.length;
-      const now = Date.now();
-
-      // Filter out expired entries
-      sceneCache.current = sceneCache.current.filter(
-        entry => entry.expiresAt > now
-      );
-
-      // Sort by cachedAt timestamp (newest first)
-      sceneCache.current.sort((a, b) => b.cachedAt - a.cachedAt);
-
-      const afterCount = sceneCache.current.length;
-      const removedCount = beforeCount - afterCount;
-
-      // Save updated cache to storage
-      storage.set(
-        STORAGE_KEYS.SCENE_CACHE,
-        JSON.stringify(sceneCache.current)
-      );
-
-      // Step 4.1: Update state for UI
-      setCachedScenes([...sceneCache.current]);
-
-      if (removedCount > 0) {
-        console.log(`[SceneUnderstanding] 🗑️ Cleared ${removedCount} expired scene(s)`);
-      } else {
-        console.log('[SceneUnderstanding] ✅ No expired scenes to clear');
-      }
-
-      return removedCount;
-    } catch (error) {
-      console.error('[SceneUnderstanding] ❌ Failed to clear expired scenes:', error);
-      return 0;
-    }
+    const { updatedCache, removedCount } = clearExpiredScenesUtil(sceneCache.current);
+    sceneCache.current = updatedCache;
+    setCachedScenes(updatedCache);
+    return removedCount;
   }, []);
 
   /**
@@ -1348,18 +807,7 @@ export function useSceneUnderstanding(
    * Call this when user sends a message or AI responds
    */
   const notifyConversationActivity = useCallback((): void => {
-    const now = Date.now();
-
-    setTimerState(prev => {
-      const wasInactive = prev.isPausedDueToInactivity;
-
-      return {
-        ...prev,
-        lastConversationActivityTime: now,
-        isPausedDueToInactivity: false,
-      };
-    });
-
+    setTimerState(prev => updateConversationActivity(prev));
     console.log('[SceneUnderstanding] 💬 Conversation activity notified - timer resumed');
   }, []);
 
