@@ -13,7 +13,7 @@ export type TTSMode = 'simple' | 'streaming';
 /**
  * TTS queue item status
  */
-export type TTSQueueStatus =
+export type TTSItemStatus =
   | 'pending'       // Waiting for synthesis
   | 'synthesizing'  // Currently synthesizing
   | 'ready'         // Ready to play
@@ -27,7 +27,7 @@ export type TTSQueueStatus =
 export interface TTSQueueItem {
   id: string;
   text: string;
-  status: TTSQueueStatus;
+  status: TTSItemStatus;
   audioUri?: string;
   error?: string;
   retryCount?: number;

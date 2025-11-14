@@ -6,7 +6,7 @@ import {
   ITTSQueue,
   TTSQueueConfig,
   TTSQueueItem,
-  TTSQueueStatus,
+  TTSQueueStatus as TTSQueueStatusInfo,
   TTSSynthesisOptions,
 } from '../../../types/speak';
 import { ElevenLabsProvider } from '../providers/ElevenLabsProvider';
@@ -369,7 +369,7 @@ export class TTSQueue implements ITTSQueue {
   /**
    * Get current queue status (for debugging)
    */
-  getStatus(): TTSQueueStatus {
+  getStatus(): TTSQueueStatusInfo {
     return {
       total: this.queue.length,
       pending: this.queue.filter((i) => i.status === 'pending').length,
