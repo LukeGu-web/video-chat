@@ -1,5 +1,5 @@
 import React, { createContext, useContext, ReactNode } from 'react';
-import { useEmotionState, UseEmotionStateReturn } from '../utils/useEmotionState';
+import { useEmotionState, UseEmotionStateReturn } from '../capabilities/emotion/useEmotionState';
 import { debugLog } from '../utils/debug';
 
 interface EmotionProviderProps {

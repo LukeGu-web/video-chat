@@ -17,8 +17,8 @@ import {
   detectVisualKeywords,
   detectObjectKeywords,
   formatObjectRecognitionForAI,
-} from '../utils/useSceneUnderstanding';
-import { useObjectRecognition } from '../utils/useObjectRecognition';
+} from '../capabilities/vision/environment/useSceneUnderstanding';
+import { useObjectRecognition } from '../capabilities/vision/environment/useObjectRecognition';
 import { PERSONALITY_PROMPTS, getClaudeApiKey } from '../constants';
 import {
   Header,

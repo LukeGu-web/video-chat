@@ -4,8 +4,8 @@ import {
   LightingCondition,
   ActivityType,
   EnvironmentContext,
-} from '../types/environment';
-import { debugLog } from './debug';
+} from '../../../types/environment';
+import { debugLog } from '../../../utils/debug';
 
 /**
  * Analyze detected objects to infer activity type

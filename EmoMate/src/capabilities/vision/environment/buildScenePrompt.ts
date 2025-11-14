@@ -5,7 +5,7 @@
  * that enhance AI's contextual awareness of user's visual environment
  */
 
-import { SceneData } from '../types/scene';
+import { SceneData } from '../../../types/scene';
 
 /**
  * Generate scene-aware AI prompt from SceneData

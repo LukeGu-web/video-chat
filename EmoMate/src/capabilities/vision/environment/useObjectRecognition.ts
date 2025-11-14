@@ -10,8 +10,8 @@ import {
   ObjectRecognitionRequest,
   ObjectRecognitionResponse,
   AnalysisMode,
-} from '../types/scene';
-import { recognizeObjectWithClaude } from '../capabilities/vision/claudeVision';
+} from '../../../types/scene';
+import { recognizeObjectWithClaude } from '../claudeVision';
 
 /**
  * MMKV Storage instance for object recognition records

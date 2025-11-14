@@ -5,7 +5,7 @@
  * that enhance AI's contextual awareness
  */
 
-import { EnvironmentContext } from '../types/environment';
+import { EnvironmentContext } from '../../../types/environment';
 import { getEnvironmentDescription } from './environmentAnalysis';
 
 /**

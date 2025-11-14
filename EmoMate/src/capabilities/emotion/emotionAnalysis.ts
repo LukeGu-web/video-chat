@@ -1,6 +1,6 @@
-import { EmotionType, FaceData } from '../types/emotion';
-import { CLAUDE_API_CONFIG, getClaudeApiKey } from '../constants/ai';
-import { debugLog } from './debug';
+import { EmotionType, FaceData } from '../../types/emotion';
+import { CLAUDE_API_CONFIG, getClaudeApiKey } from '../../constants/ai';
+import { debugLog } from '../../utils/debug';
 
 export function getEmotionFromFace(face: FaceData): EmotionType {
   const {

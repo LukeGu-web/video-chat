@@ -12,3 +12,6 @@ export * from './imageComparison';
 
 // Face detection
 export * from './face/faceDetection';
+
+// Environment awareness
+export * from './environment';

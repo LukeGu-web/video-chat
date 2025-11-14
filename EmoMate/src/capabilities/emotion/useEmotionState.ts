@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
-import { EmotionType, EmotionState } from '../types/emotion';
+import { EmotionType, EmotionState } from '../../types/emotion';
 import { combineEmotions } from './emotionAnalysis';
-import { debugLog } from './debug';
+import { debugLog } from '../../utils/debug';
 
 export interface UseEmotionStateReturn {
   facialEmotion: EmotionType | null;

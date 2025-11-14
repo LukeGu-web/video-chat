@@ -16,8 +16,8 @@ import { SentenceBuffer, parseSSEChunk } from '../capabilities/speak/sentenceDet
 import { TTSQueue } from '../capabilities/speak/ttsQueue'; // Phase 2: TTS队列管理
 import { SmartSentenceBuffer } from '../capabilities/speak/smartSentenceBuffer'; // Phase 3: 智能句子过滤
 import { useUserStore } from '../store/userStore'; // Environment context
-import { buildEnvironmentPrompt } from './buildEnvironmentPrompt'; // Environment awareness
-import { buildScenePrompt, isSceneDataFresh } from './buildScenePrompt'; // Scene understanding (Step 5.1)
+import { buildEnvironmentPrompt } from '../capabilities/vision/environment/buildEnvironmentPrompt'; // Environment awareness
+import { buildScenePrompt, isSceneDataFresh } from '../capabilities/vision/environment/buildScenePrompt'; // Scene understanding (Step 5.1)
 import { SceneData } from '../types/scene'; // Scene data type
 
 export interface ChatMessage {

@@ -15,9 +15,9 @@ import {
   SceneCacheEntry,
   DEFAULT_SCENE_CONFIG,
   ObjectRecognitionData,
-} from '../types/scene';
-import { analyzeSceneWithClaude } from '../capabilities/vision/claudeVision';
-import { compareImages, generateThumbnail } from '../capabilities/vision/imageComparison';
+} from '../../../types/scene';
+import { analyzeSceneWithClaude } from '../claudeVision';
+import { compareImages, generateThumbnail } from '../imageComparison';
 
 /**
  * Visual keywords that trigger scene analysis (Step 3.3)
