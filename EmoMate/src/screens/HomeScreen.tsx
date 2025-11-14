@@ -11,14 +11,15 @@ import {
 import { SafeAreaView as SafeAreaViewRN } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useUserStore, ChatMessage, useAIStatus } from '../store';
-import { useSpeechToText, useChatAI } from '../utils';
+import { useChatAI } from '../hooks/';
+import { useSpeechToText } from '../capabilities/listen';
 import {
   useSceneUnderstanding,
   detectVisualKeywords,
   detectObjectKeywords,
   formatObjectRecognitionForAI,
-} from '../capabilities/vision/environment/useSceneUnderstanding';
-import { useObjectRecognition } from '../capabilities/vision/environment/useObjectRecognition';
+  useObjectRecognition,
+} from '../capabilities/vision';
 import { PERSONALITY_PROMPTS, getClaudeApiKey } from '../constants';
 import {
   Header,

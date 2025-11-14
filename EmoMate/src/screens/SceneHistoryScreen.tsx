@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useSceneUnderstanding } from '../capabilities/vision/environment/useSceneUnderstanding';
-import { useObjectRecognition } from '../capabilities/vision/environment/useObjectRecognition';
+import {
+  useSceneUnderstanding,
+  useObjectRecognition,
+} from '../capabilities/vision';
 import { getClaudeApiKey } from '../constants/ai';
 
 type RootStackParamList = {

@@ -6,5 +6,4 @@
 export * from './environmentAnalysis';
 export * from './buildEnvironmentPrompt';
 export * from './buildScenePrompt';
-export * from './useObjectRecognition';
 export * from './useSceneUnderstanding';

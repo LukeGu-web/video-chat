@@ -15,3 +15,6 @@ export * from './face/faceDetection';
 
 // Environment awareness
 export * from './environment';
+
+// Object recognition
+export * from './object';
