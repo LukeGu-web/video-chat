@@ -1,5 +1,4 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useHybridTTS, TTSProvider } from '../capabilities/speak/useHybridTTS';
 import {
   CLAUDE_API_CONFIG,
   getClaudeApiKey,
@@ -13,7 +12,7 @@ import {
   getResponseLengthConfig,
 } from '../constants/ai';
 import { SentenceBuffer, parseSSEChunk } from '../capabilities/speak/sentenceDetector'; // Phase 2: 句子检测
-import { TTSQueue } from '../capabilities/speak/ttsQueue'; // Phase 2: TTS队列管理
+import { TTSQueue } from '../capabilities/speak'; // Phase 2: TTS队列管理 - NEW ARCHITECTURE
 import { SmartSentenceBuffer } from '../capabilities/speak/smartSentenceBuffer'; // Phase 3: 智能句子过滤
 import { useUserStore } from '../store/userStore'; // Environment context
 import { buildEnvironmentPrompt } from '../capabilities/vision/environment/buildEnvironmentPrompt'; // Environment awareness
@@ -33,7 +32,6 @@ export interface ChatAIConfig {
   modelType?: 'haiku' | 'sonnet';
   apiKey?: string;
   enableTTS?: boolean; // 是否启用语音合成
-  ttsProvider?: TTSProvider; // TTS 提供商选择
   voiceId?: string; // ElevenLabs 语音 ID
   userEmotion?: string; // 用户当前情绪状态
   backgroundStory?: string; // 背景故事上下文
@@ -46,12 +44,10 @@ export interface UseChatAIReturn {
   isSpeaking: boolean; // TTS 播放状态
   isGenerating: boolean; // TTS 生成状态
   error: string | null;
-  currentTTSProvider: TTSProvider; // 当前TTS提供商
   sendMessage: (content: string, config?: ChatAIConfig) => Promise<void>;
   clearMessages: () => void;
   setPersonality: (personality: string) => void;
   stopSpeaking: () => void; // 停止 TTS 播放
-  switchTTSProvider: (provider: TTSProvider) => void; // 切换TTS提供商
   currentSegment: string; // 当前正在播放的语音片段
   enableProactiveMode: (enabled: boolean) => void; // 启用/禁用主动对话
   isProactiveModeEnabled: boolean; // 主动对话模式状态
@@ -95,20 +91,8 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
   const [isStreamSpeaking, setIsStreamSpeaking] = useState(false); // TTS queue playing
   const [currentStreamSegment, setCurrentStreamSegment] = useState(''); // Current sentence being spoken
 
-  // 集成混合 TTS 功能
-  const {
-    isSpeaking,
-    isGenerating,
-    speak,
-    stop: stopTTS,
-    error: ttsError,
-    currentProvider,
-    switchProvider,
-    currentSegment,
-  } = useHybridTTS({
-    preferredProvider: initialConfig?.ttsProvider || 'elevenlabs',
-    fallbackToExpo: true,
-  });
+  // Proactive message TTS queue reference
+  const proactiveTTSQueue = useRef<TTSQueue | null>(null);
 
   const generateMessageId = () => {
     return `msg_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
@@ -177,7 +161,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
 
   // 启动主动对话检测
   const startProactiveConversation = useCallback(() => {
-    if (!isProactiveModeEnabled || isLoading || isSpeaking) return;
+    if (!isProactiveModeEnabled || isLoading || isStreamSpeaking) return;
 
     clearProactiveTimer();
     hasShownProactiveMessage.current = false;
@@ -206,7 +190,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
         }, PROACTIVE_CONVERSATION_CONFIG.silenceDetection.mediumPause - PROACTIVE_CONVERSATION_CONFIG.silenceDetection.shortPause);
       }
     }, PROACTIVE_CONVERSATION_CONFIG.silenceDetection.shortPause);
-  }, [isProactiveModeEnabled, isLoading, isSpeaking]);
+  }, [isProactiveModeEnabled, isLoading, isStreamSpeaking, clearProactiveTimer]);
 
   // 发送主动消息
   const sendProactiveMessage = useCallback(
@@ -222,15 +206,33 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
 
       setMessages((prev) => [...prev, proactiveMessage]);
 
-      // 自动播放主动消息
-      setTimeout(() => {
-        const voiceId = 'hkfHEbBvdQFNX4uWHqRF';
-        speak(content, voiceId, 'caring').catch(() => {
+      // 自动播放主动消息 using TTSQueue
+      setTimeout(async () => {
+        try {
+          const voiceId = 'hkfHEbBvdQFNX4uWHqRF';
+          const ttsQueue = new TTSQueue({
+            onItemStart: (item) => {
+              setCurrentStreamSegment(item.text);
+              setIsStreamSpeaking(true);
+            },
+            onItemEnd: () => {
+              setCurrentStreamSegment('');
+              setIsStreamSpeaking(false);
+            },
+          });
+          proactiveTTSQueue.current = ttsQueue;
+
+          await ttsQueue.enqueue(content, { voiceId, emotion: 'caring' });
+          await ttsQueue.waitForCompletion();
+        } catch (error) {
           // TTS error handled silently
-        });
+          console.warn('[ChatAI] Proactive message TTS error:', error);
+        } finally {
+          proactiveTTSQueue.current = null;
+        }
       }, 300);
     },
-    [isProactiveModeEnabled, speak]
+    [isProactiveModeEnabled]
   );
 
   // Phase 1: Non-streaming API call (kept for fallback)
@@ -590,17 +592,16 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
 
       // Initialize TTS queue (Phase 3: Store in ref for interruption)
       const voiceId = enhancedConfig?.voiceId || 'hkfHEbBvdQFNX4uWHqRF';
+      const userEmotion = enhancedConfig?.userEmotion;
       const ttsQueue = new TTSQueue({
-        voiceId,
-        userEmotion: enhancedConfig?.userEmotion,
         // Phase 3: Callbacks for subtitle display
-        onPlayStart: (text) => {
-          setCurrentStreamSegment(text);
+        onItemStart: (item) => {
+          setCurrentStreamSegment(item.text);
           if (!isStreamSpeaking) {
             setIsStreamSpeaking(true);
           }
         },
-        onPlayEnd: (text) => {
+        onItemEnd: () => {
           // Check if there are more items in queue
           const status = ttsQueue.getStatus();
           if (
@@ -630,7 +631,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
             // Enqueue sentence for TTS
             if (enhancedConfig?.enableTTS !== false) {
               console.log(`[ChatAI] 🎵 Phase 2: 加入TTS队列: "${sentence}"`);
-              await ttsQueue.enqueue(sentence);
+              await ttsQueue.enqueue(sentence, { voiceId, emotion: userEmotion });
             }
           }
         );
@@ -709,10 +710,9 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
   /**
    * Stop all audio playback (Phase 3: Enhanced for user interruption)
    * Stops:
-   * 1. Current TTS queue playback
-   * 2. Transition audio
-   * 3. Hybrid TTS playback (fallback)
-   * 4. Clears all loading/generating/speaking states
+   * 1. Current TTS queue playback (conversation)
+   * 2. Proactive message TTS queue
+   * 3. Clears all loading/generating/speaking states
    */
   const stopSpeaking = useCallback(async () => {
     console.log('[ChatAI] 🛑 User interruption - stopping all audio');
@@ -723,32 +723,28 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     setIsStreamSpeaking(false);
     setCurrentStreamSegment('');
 
-    // 1. Stop TTS queue if active
+    // 1. Stop conversation TTS queue if active
     if (currentTTSQueue.current) {
       try {
         await currentTTSQueue.current.cancel();
-        console.log('[ChatAI] ✅ TTS queue cancelled');
+        console.log('[ChatAI] ✅ Conversation TTS queue cancelled');
       } catch (error) {
-        console.error('[ChatAI] Error cancelling TTS queue:', error);
+        console.error('[ChatAI] Error cancelling conversation TTS queue:', error);
       }
       currentTTSQueue.current = null;
     }
 
-    // 3. Stop hybrid TTS (fallback, in case queue didn't work)
-    try {
-      stopTTS();
-      console.log('[ChatAI] ✅ Hybrid TTS stopped');
-    } catch (error) {
-      console.error('[ChatAI] Error stopping hybrid TTS:', error);
+    // 2. Stop proactive message TTS queue if active
+    if (proactiveTTSQueue.current) {
+      try {
+        await proactiveTTSQueue.current.cancel();
+        console.log('[ChatAI] ✅ Proactive TTS queue cancelled');
+      } catch (error) {
+        console.error('[ChatAI] Error cancelling proactive TTS queue:', error);
+      }
+      proactiveTTSQueue.current = null;
     }
-  }, [stopTTS]);
-
-  const switchTTSProvider = useCallback(
-    (provider: TTSProvider) => {
-      switchProvider(provider);
-    },
-    [switchProvider]
-  );
+  }, []);
 
   const enableProactiveMode = useCallback(
     (enabled: boolean) => {
@@ -777,7 +773,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
   // 当语音播放状态改变时，调整主动对话检测
   useEffect(() => {
     if (
-      !isSpeaking &&
+      !isStreamSpeaking &&
       !isLoading &&
       isProactiveModeEnabled &&
       messages.length > 0
@@ -785,11 +781,11 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       setTimeout(() => {
         startProactiveConversation();
       }, 2000); // 语音结束后2秒开始检测
-    } else if (isSpeaking || isLoading) {
+    } else if (isStreamSpeaking || isLoading) {
       clearProactiveTimer();
     }
   }, [
-    isSpeaking,
+    isStreamSpeaking,
     isLoading,
     isProactiveModeEnabled,
     messages.length,
@@ -797,24 +793,18 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     clearProactiveTimer,
   ]);
 
-  // 合并错误信息
-  const combinedError = error || ttsError;
-
   return {
     messages,
     isLoading,
-    // Phase 3: Use streaming states instead of hybrid TTS states
-    isSpeaking: isStreamSpeaking || isSpeaking, // Combine both for backward compatibility
-    isGenerating: isStreamGenerating || isGenerating, // Combine both for backward compatibility
-    error: combinedError,
-    currentTTSProvider: currentProvider,
+    // Phase 3: Use streaming TTS states from TTSQueue
+    isSpeaking: isStreamSpeaking,
+    isGenerating: isStreamGenerating,
+    error,
     sendMessage,
     clearMessages,
     setPersonality,
     stopSpeaking,
-    switchTTSProvider,
-    // Phase 3: Use streaming segment or fallback to hybrid TTS segment
-    currentSegment: currentStreamSegment || currentSegment,
+    currentSegment: currentStreamSegment,
     enableProactiveMode,
     isProactiveModeEnabled,
   };

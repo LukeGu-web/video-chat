@@ -28,15 +28,9 @@ export { TTSQueue } from './queue/TTSQueue';
 export { CACHE_PHRASES } from './core/constants';
 export { synthesizeWithElevenLabs } from './core/elevenLabsAPI';
 
-// ==================== OLD ARCHITECTURE (To be deprecated) ====================
+// ==================== LEGACY INFRASTRUCTURE (Still in use) ====================
 
-// Legacy TTS Hooks - Will be replaced by new hooks/useTTS.ts
-// export * from './useTTS';
-// export * from './useElevenLabsTTS';
-// export * from './useHybridTTS';
-
-// Legacy TTS Infrastructure - Will be replaced by new modular architecture
+// These modules are still used and will be refactored in future phases
 export * from './soundPlayer';
 export * from './sentenceDetector';
 export * from './smartSentenceBuffer';
-// export * from './ttsQueue';  // Replaced by queue/TTSQueue.ts
