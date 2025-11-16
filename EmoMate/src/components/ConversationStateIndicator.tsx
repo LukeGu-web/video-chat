@@ -115,19 +115,16 @@ export const ConversationStateIndicator: React.FC<Props> = ({
   const config = STATE_CONFIG[state];
 
   return (
-    <View className="px-4 py-2">
+    <View className='px-4 py-2'>
       <Animated.View
-        style={{
-          transform: [{ scale: pulseAnim }],
-        }}
-        className="flex-row items-center rounded-full px-4 py-2 self-center shadow-sm"
-        style={{ backgroundColor: config.bgColor }}
+        style={[
+          { transform: [{ scale: pulseAnim }] },
+          { backgroundColor: config.bgColor },
+        ]}
+        className='flex-row items-center self-center px-4 py-2 rounded-full shadow-sm'
       >
-        <Text className="text-xl mr-2">{config.icon}</Text>
-        <Text
-          className="text-sm font-medium"
-          style={{ color: config.color }}
-        >
+        <Text className='mr-2 text-xl'>{config.icon}</Text>
+        <Text className='text-sm font-medium' style={{ color: config.color }}>
           {config.label}
         </Text>
       </Animated.View>
@@ -168,7 +165,10 @@ export function useConversationState(
 /**
  * Mini version for compact display
  */
-export const MiniStateIndicator: React.FC<Props> = ({ state, visible = true }) => {
+export const MiniStateIndicator: React.FC<Props> = ({
+  state,
+  visible = true,
+}) => {
   if (!visible || state === ConversationState.IDLE) {
     return null;
   }
@@ -177,12 +177,12 @@ export const MiniStateIndicator: React.FC<Props> = ({ state, visible = true }) =
 
   return (
     <View
-      className="flex-row items-center rounded-full px-3 py-1"
+      className='flex-row items-center px-3 py-1 rounded-full'
       style={{ backgroundColor: config.bgColor }}
     >
-      <Text className="text-base mr-1">{config.icon}</Text>
+      <Text className='mr-1 text-base'>{config.icon}</Text>
       <View
-        className="w-2 h-2 rounded-full"
+        className='w-2 h-2 rounded-full'
         style={{ backgroundColor: config.color }}
       />
     </View>

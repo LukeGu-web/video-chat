@@ -1,9 +1,8 @@
 /**
- * Environment awareness module
- * Exports scene understanding and environment analysis utilities
+ * Scene understanding module
+ * Exports scene analysis and prompt building utilities
  */
 
-export * from './environmentAnalysis';
-export * from './buildEnvironmentPrompt';
 export * from './buildScenePrompt';
 export * from './useSceneUnderstanding';
+export * from './sceneAnalysis';

@@ -14,8 +14,7 @@ import {
 import { SentenceBuffer, parseSSEChunk } from '../capabilities/speak/sentenceDetector'; // Phase 2: 句子检测
 import { TTSQueue } from '../capabilities/speak'; // Phase 2: TTS队列管理 - NEW ARCHITECTURE
 import { SmartSentenceBuffer } from '../capabilities/speak/smartSentenceBuffer'; // Phase 3: 智能句子过滤
-import { useUserStore } from '../store/userStore'; // Environment context
-import { buildEnvironmentPrompt } from '../capabilities/vision/environment/buildEnvironmentPrompt'; // Environment awareness
+import { useUserStore } from '../store/userStore'; // Scene context
 import { buildScenePrompt, isSceneDataFresh } from '../capabilities/vision/environment/buildScenePrompt'; // Scene understanding (Step 5.1)
 import { SceneData } from '../types/scene'; // Scene data type
 
@@ -75,8 +74,8 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
   );
   const [isProactiveModeEnabled, setIsProactiveModeEnabled] = useState(true);
 
-  // Get current environment and scene context from store (Step 5.1)
-  const { currentEnvironment, currentScene } = useUserStore();
+  // Get current scene context from store (Step 5.1)
+  const { currentScene } = useUserStore();
 
   // 主动对话相关状态
   const lastUserMessageTime = useRef<number>(Date.now());
@@ -260,13 +259,6 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     // 构建API消息格式，包含人格、情绪、上下文信息和背景故事
     const personalityText = config.personality || currentPersonality;
 
-    // Build environment context prompt (sensor data)
-    const environmentPrompt = buildEnvironmentPrompt(
-      currentEnvironment,
-      true,
-      5
-    );
-
     // Build scene context prompt (Step 5.1: Scene understanding)
     // Prioritize sceneContext from config (Step 5.2: Avoid state update delay)
     const sceneToUse = config.sceneContext !== undefined ? config.sceneContext : currentScene;
@@ -292,12 +284,10 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       console.log('[ChatAI] ⚠️ No scene prompt (scene not fresh or missing)');
     }
 
-    // Combine environment and scene prompts
-    const contextPrompt = [environmentPrompt, scenePrompt]
-      .filter(p => p.trim().length > 0)
-      .join('\n');
+    // Use scene prompt as context
+    const contextPrompt = scenePrompt;
 
-    console.log('[ChatAI] 📝 Final context prompt length:', contextPrompt.length);
+    console.log('[ChatAI] 📝 Context prompt length:', contextPrompt.length);
 
     const systemMessage = buildSystemPrompt(
       personalityText,
@@ -373,13 +363,6 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     const lengthConfig = getResponseLengthConfig(conversationType);
     const personalityText = config.personality || currentPersonality;
 
-    // Build environment context prompt for streaming (sensor data)
-    const environmentPrompt = buildEnvironmentPrompt(
-      currentEnvironment,
-      true,
-      5
-    );
-
     // Build scene context prompt (Step 5.1: Scene understanding)
     // Prioritize sceneContext from config (Step 5.2: Avoid state update delay)
     const sceneToUse = config.sceneContext !== undefined ? config.sceneContext : currentScene;
@@ -405,12 +388,10 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       console.log('[ChatAI] ⚠️ No scene prompt (scene not fresh or missing)');
     }
 
-    // Combine environment and scene prompts
-    const contextPrompt = [environmentPrompt, scenePrompt]
-      .filter(p => p.trim().length > 0)
-      .join('\n');
+    // Use scene prompt as context
+    const contextPrompt = scenePrompt;
 
-    console.log('[ChatAI] 📝 Final context prompt length:', contextPrompt.length);
+    console.log('[ChatAI] 📝 Context prompt length:', contextPrompt.length);
 
     const systemMessage = buildSystemPrompt(
       personalityText,

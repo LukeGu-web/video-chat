@@ -90,9 +90,12 @@ const contextualEmotionMotions: Partial<Record<EmotionType, Partial<Record<strin
 
 // ==================== Text Pattern Matching ====================
 
+// Boolean context keys that can be set to true
+type BooleanContextKeys = 'isGreeting' | 'isQuestion' | 'isEncouragement' | 'isCelebration' | 'isEmpathy';
+
 interface TextPattern {
   pattern: RegExp;
-  contextKey: keyof ConversationContext;
+  contextKey: BooleanContextKeys;
   priority: MotionPriority;
 }
 

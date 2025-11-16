@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useRef } from 'react';
+import { useMemo, useEffect } from 'react';
 import { Frame } from 'react-native-vision-camera';
 import { useFaceDetector, FaceDetectionOptions, Face } from 'react-native-vision-camera-face-detector';
 import type { EmotionType, FaceData, EmotionDetectionResult } from '../../../types/emotion';
@@ -79,20 +79,20 @@ export function analyzeEmotionFromMLKitFace(face: Face): EmotionDetectionResult 
 
   // Emotion analysis algorithm based on facial probabilities
   if (smilingProb > 0.6) {
-    // High smiling probability = happy
-    emotion = 'happy';
+    // High smiling probability = joy
+    emotion = 'joy';
     confidence = Math.min(smilingProb, 0.95);
   } else if (avgEyeOpen > 0.8 && smilingProb < 0.3) {
-    // Wide eyes + low smile = surprised
-    emotion = 'surprised';
+    // Wide eyes + low smile = surprise
+    emotion = 'surprise';
     confidence = Math.min(avgEyeOpen, 0.85);
   } else if (avgEyeOpen < 0.4 && smilingProb < 0.2) {
-    // Eyes closed + no smile = sad
-    emotion = 'sad';
+    // Eyes closed + no smile = sadness
+    emotion = 'sadness';
     confidence = Math.min(1.0 - avgEyeOpen, 0.8);
   } else if (smilingProb < 0.1 && avgEyeOpen > 0.5) {
-    // No smile + normal eyes = angry
-    emotion = 'angry';
+    // No smile + normal eyes = anger
+    emotion = 'anger';
     confidence = Math.min(1.0 - smilingProb, 0.75);
   }
 
