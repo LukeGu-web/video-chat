@@ -73,9 +73,6 @@ export const useSpeechToText = (): UseSpeechToTextReturn => {
 
   useSpeechRecognitionEvent('end', async () => {
     setIsListening(false);
-
-    // Note: No AudioMode switching needed after recording
-    // TTS playback now uses react-native-sound which manages its own audio session
   });
 
   useSpeechRecognitionEvent('result', (event) => {
@@ -140,9 +137,14 @@ export const useSpeechToText = (): UseSpeechToTextReturn => {
       // Reference: https://snack.expo.dev/@keith-kurak/ios---recording-sound-forces-future-playback-to-earpiece
       try {
         await audioModeManager.setPlaybackMode(); // Sets allowsRecording: false
-        console.log('[SpeechToText] Audio mode set to playback after stopping recording');
+        console.log(
+          '[SpeechToText] Audio mode set to playback after stopping recording'
+        );
       } catch (error) {
-        console.warn('[SpeechToText] Failed to set playback mode after recording:', error);
+        console.warn(
+          '[SpeechToText] Failed to set playback mode after recording:',
+          error
+        );
       }
     } catch (err) {
       setError(`Failed to stop speech recognition: ${err}`);

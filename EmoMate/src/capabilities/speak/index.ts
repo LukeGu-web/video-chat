@@ -19,7 +19,12 @@ export { ElevenLabsProvider } from './providers/ElevenLabsProvider';
 export { ExpoSpeechProvider } from './providers/ExpoSpeechProvider';
 
 // Cache
-export { AudioCache, globalAudioCache, initializeTTSCache, preCacheCommonPhrases } from './cache/AudioCache';
+export {
+  AudioCache,
+  globalAudioCache,
+  initializeTTSCache,
+  preCacheCommonPhrases,
+} from './cache/AudioCache';
 
 // Queue
 export { TTSQueue } from './queue/TTSQueue';
@@ -31,6 +36,5 @@ export { synthesizeWithElevenLabs } from './core/elevenLabsAPI';
 // ==================== LEGACY INFRASTRUCTURE (Still in use) ====================
 
 // These modules are still used and will be refactored in future phases
-export * from './soundPlayer';
 export * from './sentenceDetector';
 export * from './smartSentenceBuffer';
