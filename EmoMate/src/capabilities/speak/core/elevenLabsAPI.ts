@@ -116,8 +116,34 @@ async function makeElevenLabsRequest(
           reject(new Error(`Failed to process audio data: ${error}`));
         }
       } else {
+        let errorMessage = `ElevenLabs API error: ${xhr.status}`;
+
+        if (xhr.response instanceof Blob) {
+          try {
+            const errorReader = new FileReader();
+            errorReader.onloadend = async () => {
+              try {
+                const errorText = errorReader.result as string;
+                console.error(
+                  `[ElevenLabsAPI] Error response (${xhr.status}):`,
+                  errorText
+                );
+                await safeDeleteFile(file.uri);
+                reject(new Error(`${errorMessage} - ${errorText}`));
+              } catch (e) {
+                console.error(`[ElevenLabsAPI] Could not parse error response`);
+                await safeDeleteFile(file.uri);
+                reject(new Error(errorMessage));
+              }
+            };
+            errorReader.readAsText(xhr.response);
+            return; // Wait for errorReader.onloadend
+          } catch (e) {
+            console.error(`[ElevenLabsAPI] Could not read error blob:`, e);
+          }
+        }
         await safeDeleteFile(file.uri);
-        reject(new Error(`ElevenLabs API error: ${xhr.status}`));
+        reject(new Error(errorMessage));
       }
     };
 
