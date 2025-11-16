@@ -8,7 +8,10 @@ import {
   getLanLanVoiceId,
   preprocessTextForNaturalSpeech,
 } from '../../../constants/ai';
-import { base64ToUint8Array, safeDeleteFile } from '../../../utils/fileSystemHelpers';
+import {
+  base64ToUint8Array,
+  safeDeleteFile,
+} from '../../../utils/fileSystemHelpers';
 import { TTSSynthesisOptions, TTSSynthesisResult } from '../../../types/speak';
 
 /**
@@ -24,7 +27,7 @@ export async function synthesizeWithElevenLabs(
   options?: TTSSynthesisOptions
 ): Promise<TTSSynthesisResult> {
   // Validate API key
-  const apiKey = getElevenLabsApiKey();
+  const apiKey = getElevenLabsApiKey()?.trim();
   if (!apiKey) {
     throw new Error('ElevenLabs API key not configured');
   }
@@ -36,17 +39,24 @@ export async function synthesizeWithElevenLabs(
   const processedText = preprocessTextForNaturalSpeech(text);
 
   // Create temporary file
-  const fileName = `elevenlabs_${Date.now()}_${Math.random().toString(36).substring(7)}.mp3`;
+  const fileName = `elevenlabs_${Date.now()}_${Math.random()
+    .toString(36)
+    .substring(7)}.mp3`;
   const file = new File(Paths.document, fileName);
   file.create();
 
   try {
     // Make API request using XMLHttpRequest
-    const audioUri = await makeElevenLabsRequest(url, apiKey, {
-      text: processedText,
-      model_id: ELEVENLABS_CONFIG.defaultModel,
-      voice_settings: voiceSettings,
-    }, file);
+    const audioUri = await makeElevenLabsRequest(
+      url,
+      apiKey,
+      {
+        text: processedText,
+        model_id: ELEVENLABS_CONFIG.defaultModel,
+        voice_settings: voiceSettings,
+      },
+      file
+    );
 
     return {
       audioUri,
