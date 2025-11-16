@@ -1,7 +1,5 @@
 // src/capabilities/speak/queue/TTSQueue.ts
 
-import Sound from 'react-native-sound';
-import { setAudioModeAsync } from 'expo-audio';
 import {
   ITTSQueue,
   TTSQueueConfig,
@@ -237,40 +235,23 @@ export class TTSQueue implements ITTSQueue {
         console.log(`[TTSQueue] 🔊 Playing ${item.id}: "${item.text}"`);
         item.status = 'playing';
 
-        // Force react-native-sound to use speaker (this overrides expo-audio)
-        try {
-          Sound.setCategory('Playback', true); // true = force speaker output
-          console.log('[TTSQueue] ✅ react-native-sound category set to Playback (speaker)');
-        } catch (error) {
-          console.warn('[TTSQueue] ⚠️ Failed to set Sound category:', error);
-        }
-
-        // Set expo-audio mode to maximize volume output
-        try {
-          await setAudioModeAsync({
-            playsInSilentMode: true,
-            allowsRecording: false, // CRITICAL: Disable recording for louder output
-            shouldPlayInBackground: true,
-            interruptionMode: 'duckOthers',
-            interruptionModeAndroid: 'duckOthers',
-            shouldRouteThroughEarpiece: false, // CRITICAL: Use speaker, not earpiece
-          });
-          console.log('[TTSQueue] ✅ expo-audio mode set: allowsRecording=false, speaker output');
-        } catch (error) {
-          console.warn('[TTSQueue] ⚠️ Failed to set audio mode:', error);
-        }
-
         // Callback: Playback started
         if (this.config.onItemStart) {
           this.config.onItemStart(item);
         }
 
-        // Play using provider
+        // Play using provider (provider handles audio mode setup)
         await this.provider.play(item.audioUri, {
           onStart: () => {
             console.log(`[TTSQueue] ▶️ Started playing ${item.id}`);
           },
           onEnd: async () => {
+            // Check if cancelled during playback
+            if (this.isCancelled) {
+              console.log(`[TTSQueue] ⚠️ Playback completed but queue is cancelled, skipping cleanup`);
+              return;
+            }
+
             item.status = 'completed';
 
             // Callback: Playback ended
@@ -347,8 +328,15 @@ export class TTSQueue implements ITTSQueue {
     this.isCancelled = true;
     this.isPlaying = false;
 
-    // Stop current playback
+    // Stop current playback immediately
     await this.provider.stop();
+
+    // CRITICAL FIX: Mark all items as cancelled to prevent playNext from processing them
+    for (const item of this.queue) {
+      if (item.status === 'playing' || item.status === 'ready') {
+        item.status = 'failed'; // Mark as failed to skip in playNext
+      }
+    }
 
     // Cleanup all audio resources
     for (const item of this.queue) {
@@ -361,9 +349,16 @@ export class TTSQueue implements ITTSQueue {
       }
     }
 
+    // Clear queue and reset state
     this.queue = [];
     this.currentIndex = 0;
     this.activeSynthesisTasks = 0;
+
+    // Resolve any pending waitForCompletion promises
+    if (this.onPlaybackComplete) {
+      this.onPlaybackComplete();
+      this.onPlaybackComplete = undefined;
+    }
   }
 
   /**
@@ -383,8 +378,15 @@ export class TTSQueue implements ITTSQueue {
 
   /**
    * Reset cancelled state for reuse
+   * IMPORTANT: Call this before reusing a TTSQueue instance
    */
   reset(): void {
+    console.log('[TTSQueue] Resetting cancelled state');
     this.isCancelled = false;
+    this.queue = [];
+    this.currentIndex = 0;
+    this.activeSynthesisTasks = 0;
+    this.isPlaying = false;
+    this.onPlaybackComplete = undefined;
   }
 }

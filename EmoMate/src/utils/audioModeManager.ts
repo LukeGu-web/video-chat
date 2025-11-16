@@ -39,7 +39,7 @@ class AudioModeManager {
 
   /**
    * Set audio mode to playback (allowsRecording: false)
-   * This increases audio output volume
+   * This increases audio output volume and routes to speaker
    */
   async setPlaybackMode(): Promise<void> {
     if (this.currentMode === 'playback' && !this.isTransitioning) {
@@ -50,14 +50,14 @@ class AudioModeManager {
     try {
       await setAudioModeAsync({
         playsInSilentMode: true,
-        allowsRecording: false, // Disable recording for louder playback
+        allowsRecording: false, // CRITICAL: Disable recording for louder playback
         shouldPlayInBackground: true,
         interruptionMode: 'duckOthers',
         interruptionModeAndroid: 'duckOthers',
-        shouldRouteThroughEarpiece: false,
-      });
+        shouldRouteThroughEarpiece: false, // CRITICAL: Route to speaker, not earpiece
+      } as any); // Type assertion to allow iOS-specific parameters if needed
       this.currentMode = 'playback';
-      console.log('[AudioModeManager] ✅ Switched to PLAYBACK mode (allowsRecording: false)');
+      console.log('[AudioModeManager] ✅ Switched to PLAYBACK mode (allowsRecording: false, speaker output)');
     } catch (error) {
       console.error('[AudioModeManager] ❌ Failed to set playback mode:', error);
       throw error;
