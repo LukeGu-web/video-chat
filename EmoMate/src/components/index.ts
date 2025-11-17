@@ -1,5 +1,4 @@
 export * from './ChatBubble';
-export { default as LoadingDots } from './LoadingDots';
 export { default as Toast } from './Toast';
 export { default as Header } from './Header';
 export { default as ChatList } from './ChatList';
