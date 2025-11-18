@@ -30,8 +30,8 @@ export {
 export { TTSQueue } from './queue/TTSQueue';
 
 // Core
-export { CACHE_PHRASES } from './core/constants';
-export { synthesizeWithElevenLabs } from './core/elevenLabsAPI';
+export { CACHE_PHRASES } from '../../constants/speak';
+export { synthesizeWithElevenLabs } from './elevenLabsAPI';
 
 // ==================== LEGACY INFRASTRUCTURE (Still in use) ====================
 

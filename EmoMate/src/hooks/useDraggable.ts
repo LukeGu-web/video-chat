@@ -65,7 +65,7 @@ export function useDraggable(
   } = options;
 
   const [position, setPosition] = useState<Position>(initialPosition);
-  const scale = useSharedValue(ANIMATION_CONSTANTS.NORMAL_SCALE);
+  const scale = useSharedValue<number>(ANIMATION_CONSTANTS.NORMAL_SCALE);
 
   // Create PanResponder for drag handling
   const panResponder = useMemo(

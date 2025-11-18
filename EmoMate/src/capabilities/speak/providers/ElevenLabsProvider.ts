@@ -1,8 +1,12 @@
 // src/capabilities/speak/providers/ElevenLabsProvider.ts
 
 import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
-import { TTSProvider, TTSSynthesisOptions, TTSSynthesisResult } from '../../../types/speak';
-import { synthesizeWithElevenLabs } from '../core/elevenLabsAPI';
+import {
+  TTSProvider,
+  TTSSynthesisOptions,
+  TTSSynthesisResult,
+} from '../../../types/speak';
+import { synthesizeWithElevenLabs } from '../elevenLabsAPI';
 import { getElevenLabsApiKey } from '../../../constants/ai';
 import { audioModeManager } from '../../../utils/audioModeManager';
 
@@ -51,26 +55,32 @@ export class ElevenLabsProvider implements TTSProvider {
       // Set volume to maximum
       this.currentPlayer.volume = 1.0;
 
-      console.log('[ElevenLabsProvider] 🔊 Created audio player for:', audioUri);
+      console.log(
+        '[ElevenLabsProvider] 🔊 Created audio player for:',
+        audioUri
+      );
 
       // Set playback status listener
-      this.currentSubscription = this.currentPlayer.addListener('playbackStatusUpdate', (status) => {
-        if (status.playing && !this.isCurrentlyPlaying) {
-          this.isCurrentlyPlaying = true;
-          console.log('[ElevenLabsProvider] ▶️ Playback started');
-          callbacks?.onStart?.();
+      this.currentSubscription = this.currentPlayer.addListener(
+        'playbackStatusUpdate',
+        (status) => {
+          if (status.playing && !this.isCurrentlyPlaying) {
+            this.isCurrentlyPlaying = true;
+            console.log('[ElevenLabsProvider] ▶️ Playback started');
+            callbacks?.onStart?.();
+          }
+
+          if (status.didJustFinish) {
+            console.log('[ElevenLabsProvider] ✅ Playback finished');
+            this.isCurrentlyPlaying = false;
+
+            // Cleanup before calling callback
+            this.cleanupCurrentPlayer();
+
+            callbacks?.onEnd?.();
+          }
         }
-
-        if (status.didJustFinish) {
-          console.log('[ElevenLabsProvider] ✅ Playback finished');
-          this.isCurrentlyPlaying = false;
-
-          // Cleanup before calling callback
-          this.cleanupCurrentPlayer();
-
-          callbacks?.onEnd?.();
-        }
-      });
+      );
 
       // Start playback
       this.currentPlayer.play();

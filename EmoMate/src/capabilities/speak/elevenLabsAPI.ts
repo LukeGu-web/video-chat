@@ -7,12 +7,12 @@ import {
   getEmotionalVoiceSettings,
   getLanLanVoiceId,
   preprocessTextForNaturalSpeech,
-} from '../../../constants/ai';
+} from '../../constants/ai';
 import {
   base64ToUint8Array,
   safeDeleteFile,
-} from '../../../utils/fileSystemHelpers';
-import { TTSSynthesisOptions, TTSSynthesisResult } from '../../../types/speak';
+} from '../../utils/fileSystemHelpers';
+import { TTSSynthesisOptions, TTSSynthesisResult } from '../../types/speak';
 
 /**
  * Synthesize speech using ElevenLabs API
