@@ -4,7 +4,7 @@
  */
 
 import { EmotionType } from '../../../types/emotion';
-import { EMOTION_THRESHOLDS } from '../../../utils/vision/constants';
+import { EMOTION_THRESHOLDS } from '../../../constants/vision';
 
 /**
  * Emotion detection result
@@ -45,10 +45,18 @@ export interface FacialFeatures {
  * @param features - Facial features extracted from MLKit
  * @returns Emotion detection result with confidence
  */
-export const detectEmotionFromFace = (features: FacialFeatures): EmotionDetectionResult => {
+export const detectEmotionFromFace = (
+  features: FacialFeatures
+): EmotionDetectionResult => {
   'worklet';
 
-  const { smilingProbability, avgEyeOpen, mouthAspectRatio, pitchAngle, yawAngle } = features;
+  const {
+    smilingProbability,
+    avgEyeOpen,
+    mouthAspectRatio,
+    pitchAngle,
+    yawAngle,
+  } = features;
 
   // Use threshold constants
   const {
@@ -83,7 +91,11 @@ export const detectEmotionFromFace = (features: FacialFeatures): EmotionDetectio
   }
 
   // 3. Anger (愤怒) - No smile + eyes wide + tight mouth
-  if (smilingProbability < VERY_LOW_SMILE && avgEyeOpen > 0.6 && mouthAspectRatio > TIGHT_MOUTH_RATIO) {
+  if (
+    smilingProbability < VERY_LOW_SMILE &&
+    avgEyeOpen > 0.6 &&
+    mouthAspectRatio > TIGHT_MOUTH_RATIO
+  ) {
     return {
       emotion: 'anger',
       confidence: Math.min((1.0 - smilingProbability + avgEyeOpen) / 2, 0.8),
@@ -91,7 +103,11 @@ export const detectEmotionFromFace = (features: FacialFeatures): EmotionDetectio
   }
 
   // 4. Fear (恐惧) - Eyes very wide + mouth open + no smile
-  if (avgEyeOpen > VERY_HIGH_EYE_OPEN && smilingProbability < 0.3 && mouthAspectRatio < OPEN_MOUTH_RATIO) {
+  if (
+    avgEyeOpen > VERY_HIGH_EYE_OPEN &&
+    smilingProbability < 0.3 &&
+    mouthAspectRatio < OPEN_MOUTH_RATIO
+  ) {
     return {
       emotion: 'fear',
       confidence: Math.min(avgEyeOpen, 0.8),
@@ -128,7 +144,11 @@ export const detectEmotionFromFace = (features: FacialFeatures): EmotionDetectio
   }
 
   // 8. Anticipation (期待) - Eyes wide + slight smile + head slightly forward
-  if (avgEyeOpen > 0.7 && smilingProbability > 0.3 && smilingProbability < 0.6) {
+  if (
+    avgEyeOpen > 0.7 &&
+    smilingProbability > 0.3 &&
+    smilingProbability < 0.6
+  ) {
     return {
       emotion: 'anticipation',
       confidence: 0.7,

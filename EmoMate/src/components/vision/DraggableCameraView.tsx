@@ -5,8 +5,8 @@
 
 import React from 'react';
 import Animated from 'react-native-reanimated';
-import { useDraggable } from '../../hooks/ui';
-import type { Position } from '../../utils/vision/cameraUtils';
+import { useDraggable } from '../../hooks';
+import type { Position } from '../../utils/cameraUtils';
 
 /**
  * Draggable camera view props

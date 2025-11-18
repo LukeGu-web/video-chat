@@ -5,10 +5,14 @@
 
 import { useState, useMemo } from 'react';
 import { PanResponder } from 'react-native';
-import { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
-import { constrainPosition, Position } from '../../utils/vision/cameraUtils';
-import { CAMERA_CONSTANTS, ANIMATION_CONSTANTS } from '../../utils/vision/constants';
-import { debugLog } from '../../utils/debug';
+import {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+} from 'react-native-reanimated';
+import { constrainPosition, Position } from '../utils/cameraUtils';
+import { CAMERA_CONSTANTS, ANIMATION_CONSTANTS } from '../constants/vision';
+import { debugLog } from '../utils/debug';
 
 /**
  * Draggable hook options
@@ -50,7 +54,9 @@ export interface UseDraggableReturn {
  * @param options - Draggable configuration
  * @returns Draggable state and handlers
  */
-export function useDraggable(options: UseDraggableOptions = {}): UseDraggableReturn {
+export function useDraggable(
+  options: UseDraggableOptions = {}
+): UseDraggableReturn {
   const {
     initialPosition = { x: 20, y: 80 },
     containerWidth = CAMERA_CONSTANTS.CONTAINER_WIDTH,
@@ -99,7 +105,10 @@ export function useDraggable(options: UseDraggableOptions = {}): UseDraggableRet
           setPosition(finalPosition);
           onPositionChange?.(finalPosition);
 
-          debugLog('useDraggable', `Dragged to position: ${finalPosition.x}, ${finalPosition.y}`);
+          debugLog(
+            'useDraggable',
+            `Dragged to position: ${finalPosition.x}, ${finalPosition.y}`
+          );
         },
       }),
     [position, containerWidth, containerHeight, scale, onPositionChange]

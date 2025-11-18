@@ -10,8 +10,15 @@ import type { FaceDetectionOptions } from 'react-native-vision-camera-face-detec
 import { Worklets } from 'react-native-worklets-core';
 import { EmotionType } from '../../../types/emotion';
 import { debugLog, isDebugMode } from '../../../utils/debug';
-import { TIMEOUT_CONSTANTS, EMOTION_THRESHOLDS } from '../../../utils/vision/constants';
-import { calculateMouthAspectRatio, calculateAvgEyeOpen, MLKitLandmarks } from './faceFeatures';
+import {
+  TIMEOUT_CONSTANTS,
+  EMOTION_THRESHOLDS,
+} from '../../../constants/vision';
+import {
+  calculateMouthAspectRatio,
+  calculateAvgEyeOpen,
+  MLKitLandmarks,
+} from './faceFeatures';
 import { detectEmotionFromFace } from './emotionAlgorithm';
 
 /**
@@ -54,7 +61,9 @@ export interface UseFaceDetectionReturn {
  * @param options - Face detection configuration
  * @returns Face detection state and frame processor
  */
-export function useFaceDetection(options: UseFaceDetectionOptions): UseFaceDetectionReturn {
+export function useFaceDetection(
+  options: UseFaceDetectionOptions
+): UseFaceDetectionReturn {
   const {
     isActive,
     detectionInterval = TIMEOUT_CONSTANTS.DEFAULT_DETECTION_INTERVAL,
@@ -93,7 +102,9 @@ export function useFaceDetection(options: UseFaceDetectionOptions): UseFaceDetec
       setCurrentEmotion(emotion);
       setFaceDetected(true);
       onEmotionDetected(emotion);
-      debugLog('useFaceDetection', `MLKit detected emotion: ${emotion}`, { confidence });
+      debugLog('useFaceDetection', `MLKit detected emotion: ${emotion}`, {
+        confidence,
+      });
 
       // Clear existing timeout to prevent memory leak
       if (faceDetectedTimeoutRef.current) {
@@ -154,7 +165,10 @@ export function useFaceDetection(options: UseFaceDetectionOptions): UseFaceDetec
           const lastTime = lastMLKitDetection.current;
 
           // Only update if enough time has passed and confidence is high enough
-          if (now - lastTime >= detectionInterval && confidence > EMOTION_THRESHOLDS.MIN_CONFIDENCE) {
+          if (
+            now - lastTime >= detectionInterval &&
+            confidence > EMOTION_THRESHOLDS.MIN_CONFIDENCE
+          ) {
             lastMLKitDetection.current = now;
 
             // Call JS function from worklet context

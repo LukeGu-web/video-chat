@@ -16,8 +16,11 @@ import { View, Text, TouchableOpacity } from 'react-native';
 import { Camera } from 'react-native-vision-camera';
 import { EmotionDetectorProps } from '../../types/emotion';
 import { useFaceDetection } from '../../capabilities/vision/faceDetection';
-import { useCamera, useCameraPermissions } from '../../capabilities/vision/camera';
-import { CAMERA_CONSTANTS } from '../../utils/vision/constants';
+import {
+  useCamera,
+  useCameraPermissions,
+} from '../../capabilities/vision/camera';
+import { CAMERA_CONSTANTS } from '../../constants/vision';
 import { VisionCamera } from './VisionCamera';
 import { DraggableCameraView } from './DraggableCameraView';
 
@@ -60,12 +63,17 @@ export const EmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
       return;
     }
 
-    console.log('[EmotionDetector] Starting photo capture timer with interval:', frameCaptureInterval);
+    console.log(
+      '[EmotionDetector] Starting photo capture timer with interval:',
+      frameCaptureInterval
+    );
 
     // Periodic photo capture for scene understanding
     const capturePhoto = async () => {
       if (!cameraRef.current || !isActive) {
-        console.log('[EmotionDetector] Camera not ready or inactive, skipping capture');
+        console.log(
+          '[EmotionDetector] Camera not ready or inactive, skipping capture'
+        );
         return;
       }
 
@@ -75,7 +83,10 @@ export const EmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
           flash: 'off',
         });
 
-        console.log('[EmotionDetector] Photo captured successfully:', photo.path);
+        console.log(
+          '[EmotionDetector] Photo captured successfully:',
+          photo.path
+        );
 
         // Convert photo to base64
         const base64 = await fetch(`file://${photo.path}`)
@@ -95,7 +106,11 @@ export const EmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
               })
           );
 
-        console.log('[EmotionDetector] Photo converted to base64, size:', Math.round((base64.length * 0.75) / 1024), 'KB');
+        console.log(
+          '[EmotionDetector] Photo converted to base64, size:',
+          Math.round((base64.length * 0.75) / 1024),
+          'KB'
+        );
 
         // Call the callback with base64 and timestamp
         onFrameCaptured(base64, Date.now());
@@ -127,15 +142,17 @@ export const EmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
         containerWidth={CAMERA_CONSTANTS.CONTAINER_WIDTH}
         containerHeight={CAMERA_CONSTANTS.CONTAINER_HEIGHT}
       >
-        <View className="justify-center items-center w-full h-full bg-[#f8f9fa]">
-          <Text className="text-[9px] text-[#e74c3c] text-center px-1.5 pt-3.5">
+        <View className='justify-center items-center w-full h-full bg-[#f8f9fa]'>
+          <Text className='text-[9px] text-[#e74c3c] text-center px-1.5 pt-3.5'>
             Camera permission required
           </Text>
           <TouchableOpacity
             onPress={requestPermission}
-            className="bg-[#3498db] px-2 py-1 rounded mx-auto mt-2"
+            className='bg-[#3498db] px-2 py-1 rounded mx-auto mt-2'
           >
-            <Text className="text-white text-[9px] font-bold">Grant Permission</Text>
+            <Text className='text-white text-[9px] font-bold'>
+              Grant Permission
+            </Text>
           </TouchableOpacity>
         </View>
       </DraggableCameraView>
@@ -149,8 +166,10 @@ export const EmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
         containerWidth={CAMERA_CONSTANTS.CONTAINER_WIDTH}
         containerHeight={CAMERA_CONSTANTS.CONTAINER_HEIGHT}
       >
-        <View className="justify-center items-center w-full h-full bg-[#f5f5f5]">
-          <Text className="text-[10px] text-[#666] text-center">Camera Inactive</Text>
+        <View className='justify-center items-center w-full h-full bg-[#f5f5f5]'>
+          <Text className='text-[10px] text-[#666] text-center'>
+            Camera Inactive
+          </Text>
         </View>
       </DraggableCameraView>
     );
