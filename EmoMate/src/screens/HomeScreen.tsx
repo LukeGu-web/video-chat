@@ -29,8 +29,8 @@ import {
   EmotionProvider,
   useEmotionContext,
   EmotionAwareCharacter,
-  BasicEmotionDetector,
 } from '../components';
+import { EmotionDetector } from '../components/vision';
 import { useBackgroundContext } from '../hooks/useBackgroundContext';
 import {
   getBackgroundImageSource,
@@ -842,7 +842,7 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
         </View>
 
         {/* Facial Emotion Detection */}
-        <BasicEmotionDetector
+        <EmotionDetector
           onEmotionDetected={setFacialEmotion}
           isActive={true}
           detectionInterval={3000}

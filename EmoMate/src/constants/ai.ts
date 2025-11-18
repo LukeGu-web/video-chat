@@ -463,7 +463,7 @@ export const getAICapabilities = (): AICapability[] => {
       id: 'facial_recognition',
       name: '面部识别',
       description: '可以通过摄像头看到用户的面部表情，识别用户的真实情绪状态',
-      isAvailable: true, // BasicEmotionDetector 组件 (MLKit + 智能模拟)
+      isAvailable: true, // EmotionDetector 组件 (MLKit face detection)
       provider: 'MLKit + Device',
     },
     {
@@ -471,7 +471,7 @@ export const getAICapabilities = (): AICapability[] => {
       name: '情绪检测',
       description:
         '可以实时检测用户的情绪(开心、悲伤、惊讶、生气、中性)，通过面部表情和文字内容进行多模态分析',
-      isAvailable: true, // emotionAnalysis.ts + BasicEmotionDetector
+      isAvailable: true, // emotionAnalysis.ts + EmotionDetector
       provider: 'MLKit + Claude',
     },
     {
