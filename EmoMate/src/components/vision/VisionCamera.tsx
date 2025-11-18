@@ -26,7 +26,7 @@ export interface VisionCameraProps {
   /** Callback when camera switch is pressed */
   onSwitchCamera?: () => void;
   /** Optional camera ref for taking snapshots */
-  cameraRef?: React.RefObject<Camera>;
+  cameraRef?: React.RefObject<Camera | null>;
   /** Enable photo mode for snapshots */
   enablePhoto?: boolean;
 }

@@ -43,7 +43,7 @@ export const EmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
   } = props;
 
   // Camera ref for scene capture integration
-  const cameraRef = useRef<Camera>(null);
+  const cameraRef = useRef<Camera | null>(null);
 
   // Use capability hooks
   const { hasPermission, requestPermission } = useCameraPermissions();
@@ -54,17 +54,71 @@ export const EmotionDetector: React.FC<EmotionDetectorProps> = (props) => {
     onEmotionDetected,
   });
 
-  // Scene understanding integration
-  // Note: Scene capture is handled by useSceneUnderstanding hook in parent component
-  // This component only provides the camera ref for photo capture
+  // Scene understanding integration - Photo capture timer
   useEffect(() => {
-    // If onFrameCaptured is provided, the parent component should use
-    // useSceneUnderstanding hook and register the photo capture callback
-    if (onFrameCaptured) {
-      // Log that scene capture should be handled by parent
-      console.log('[EmotionDetector] Scene capture callback provided. Parent should use useSceneUnderstanding hook.');
+    if (!onFrameCaptured || !isActive || !hasPermission) {
+      return;
     }
-  }, [onFrameCaptured]);
+
+    console.log('[EmotionDetector] Starting photo capture timer with interval:', frameCaptureInterval);
+
+    // Periodic photo capture for scene understanding
+    const capturePhoto = async () => {
+      if (!cameraRef.current || !isActive) {
+        console.log('[EmotionDetector] Camera not ready or inactive, skipping capture');
+        return;
+      }
+
+      try {
+        console.log('[EmotionDetector] Attempting to capture photo...');
+        const photo = await cameraRef.current.takePhoto({
+          flash: 'off',
+        });
+
+        console.log('[EmotionDetector] Photo captured successfully:', photo.path);
+
+        // Convert photo to base64
+        const base64 = await fetch(`file://${photo.path}`)
+          .then((res) => res.blob())
+          .then(
+            (blob) =>
+              new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                  const base64String = reader.result as string;
+                  // Remove the data:image/jpeg;base64, prefix
+                  const base64Data = base64String.split(',')[1];
+                  resolve(base64Data);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+              })
+          );
+
+        console.log('[EmotionDetector] Photo converted to base64, size:', Math.round((base64.length * 0.75) / 1024), 'KB');
+
+        // Call the callback with base64 and timestamp
+        onFrameCaptured(base64, Date.now());
+      } catch (error) {
+        console.error('[EmotionDetector] Failed to capture photo:', error);
+      }
+    };
+
+    // Initial capture after a short delay
+    const initialTimeout = setTimeout(() => {
+      capturePhoto();
+    }, 2000); // 2 seconds delay to ensure camera is fully ready
+
+    // Set up interval for periodic captures
+    const interval = setInterval(() => {
+      capturePhoto();
+    }, frameCaptureInterval);
+
+    return () => {
+      clearTimeout(initialTimeout);
+      clearInterval(interval);
+    };
+  }, [onFrameCaptured, isActive, hasPermission, frameCaptureInterval]);
 
   // Render permission request UI
   if (!hasPermission) {
