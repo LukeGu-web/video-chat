@@ -116,7 +116,9 @@ export interface APIRequestConfig {
   contextMessages: Array<{ role: string; content: string }>;
   lengthConfig: {
     maxTokens: number;
-    targetCharacters: number;
+    maxCharacters: number;
+    targetSentences: number;
+    allowMultiParagraph: boolean;
   };
   apiKey: string;
 }

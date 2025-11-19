@@ -1,32 +1,16 @@
 /**
  * Scene Cache Management Module
  * Handles caching, storage, and retrieval of scene data
+ * Now uses Zustand store for state management
  */
 
-import { createMMKV } from 'react-native-mmkv';
 import { SceneData, SceneConfig, SceneCacheEntry } from '../../../types/scene';
 import { compareImages, generateThumbnail } from '../imageComparison';
 import { debugError } from '../../../utils/debug';
+import { useSceneStore } from '../../../store/sceneStore';
 
 /**
- * MMKV Storage instance for scene understanding data
- */
-export const storage = createMMKV({
-  id: 'scene-understanding-storage',
-  encryptionKey: 'scene-understanding-encryption-key', // Optional: for data encryption
-});
-
-/**
- * Storage keys for persisting scene data
- */
-export const STORAGE_KEYS = {
-  SCENE_CACHE: 'scene_understanding_cache',
-  LAST_SCENE: 'scene_understanding_last_scene',
-  CONFIG: 'scene_understanding_config',
-};
-
-/**
- * Load cached scene data from MMKV storage
+ * Load cached scene data from storage
  * Automatically cleans up expired scenes on load
  *
  * @returns Object containing loaded cache, last scene, and config
@@ -36,52 +20,12 @@ export function loadCachedData(): {
   lastScene: SceneData | null;
   config: Partial<SceneConfig> | null;
 } {
-  try {
-    const now = Date.now();
-    let cache: SceneCacheEntry[] = [];
-    let lastScene: SceneData | null = null;
-    let config: Partial<SceneConfig> | null = null;
-
-    // Load scene cache
-    const cacheJson = storage.getString(STORAGE_KEYS.SCENE_CACHE);
-    if (cacheJson) {
-      const loadedCache = JSON.parse(cacheJson);
-      const beforeCount = loadedCache.length;
-
-      // Automatically clean up expired scenes on load
-      cache = loadedCache.filter(
-        (entry: SceneCacheEntry) => entry.expiresAt > now
-      );
-
-      // Sort by cachedAt timestamp (newest first)
-      cache.sort((a, b) => b.cachedAt - a.cachedAt);
-
-      const afterCount = cache.length;
-      const removedCount = beforeCount - afterCount;
-
-      if (removedCount > 0) {
-        // Save cleaned cache back to storage
-        storage.set(STORAGE_KEYS.SCENE_CACHE, JSON.stringify(cache));
-      }
-    }
-
-    // Load last scene
-    const lastSceneJson = storage.getString(STORAGE_KEYS.LAST_SCENE);
-    if (lastSceneJson) {
-      lastScene = JSON.parse(lastSceneJson);
-    }
-
-    // Load config
-    const configJson = storage.getString(STORAGE_KEYS.CONFIG);
-    if (configJson) {
-      config = JSON.parse(configJson);
-    }
-
-    return { cache, lastScene, config };
-  } catch (error) {
-    debugError('SceneCache', 'Failed to load cached data', error);
-    return { cache: [], lastScene: null, config: null };
-  }
+  const store = useSceneStore.getState();
+  return {
+    cache: store.cache,
+    lastScene: store.lastScene,
+    config: store.config,
+  };
 }
 
 /**
@@ -101,35 +45,9 @@ export function saveToCache(
   config: SceneConfig
 ): SceneCacheEntry[] {
   try {
-    const cacheEntry: SceneCacheEntry = {
-      scene,
-      cachedAt: Date.now(),
-      expiresAt: Date.now() + config.cacheExpiration,
-      imageThumbnail,
-    };
-
-    // Add to cache
-    const updatedCache = [...cache, cacheEntry];
-
-    // Remove expired entries (Step 4.1: auto cleanup)
-    const filteredCache = updatedCache.filter(
-      entry => entry.expiresAt > Date.now()
-    );
-
-    // Step 4.1: Enforce max cache size (keep most recent 3 scenes)
-    const MAX_CACHE_SIZE = 3;
-    let finalCache = filteredCache;
-    if (filteredCache.length > MAX_CACHE_SIZE) {
-      // Sort by cachedAt timestamp (newest first)
-      finalCache = filteredCache.sort((a, b) => b.cachedAt - a.cachedAt);
-      // Keep only the most recent MAX_CACHE_SIZE entries
-      finalCache = finalCache.slice(0, MAX_CACHE_SIZE);
-    }
-
-    // Save to MMKV storage
-    storage.set(STORAGE_KEYS.SCENE_CACHE, JSON.stringify(finalCache));
-
-    return finalCache;
+    const store = useSceneStore.getState();
+    store.saveToCache(scene, imageThumbnail, config);
+    return store.cache;
   } catch (error) {
     debugError('SceneCache', 'Failed to save cache', error);
     return cache;
@@ -137,26 +55,28 @@ export function saveToCache(
 }
 
 /**
- * Save last scene to MMKV storage
+ * Save last scene to storage
  *
  * @param scene - Scene data to save
  */
 export function saveLastScene(scene: SceneData): void {
   try {
-    storage.set(STORAGE_KEYS.LAST_SCENE, JSON.stringify(scene));
+    const store = useSceneStore.getState();
+    store.saveLastScene(scene);
   } catch (error) {
     debugError('SceneCache', 'Failed to save last scene', error);
   }
 }
 
 /**
- * Save configuration to MMKV storage
+ * Save configuration to storage
  *
  * @param config - Scene configuration to save
  */
 export function saveConfig(config: SceneConfig): void {
   try {
-    storage.set(STORAGE_KEYS.CONFIG, JSON.stringify(config));
+    const store = useSceneStore.getState();
+    store.saveConfig(config);
   } catch (error) {
     debugError('SceneCache', 'Failed to save config', error);
   }
@@ -216,7 +136,8 @@ export async function checkCache(
  */
 export function clearCache(): SceneCacheEntry[] {
   try {
-    storage.remove(STORAGE_KEYS.SCENE_CACHE);
+    const store = useSceneStore.getState();
+    store.clearCache();
     return [];
   } catch (error) {
     debugError('SceneCache', 'Failed to clear cache', error);
@@ -236,22 +157,12 @@ export function clearExpiredScenes(cache: SceneCacheEntry[]): {
   removedCount: number;
 } {
   try {
-    const beforeCount = cache.length;
-    const now = Date.now();
-
-    // Filter out expired entries
-    const updatedCache = cache.filter(entry => entry.expiresAt > now);
-
-    // Sort by cachedAt timestamp (newest first)
-    updatedCache.sort((a, b) => b.cachedAt - a.cachedAt);
-
-    const afterCount = updatedCache.length;
-    const removedCount = beforeCount - afterCount;
-
-    // Save updated cache to storage
-    storage.set(STORAGE_KEYS.SCENE_CACHE, JSON.stringify(updatedCache));
-
-    return { updatedCache, removedCount };
+    const store = useSceneStore.getState();
+    const { removedCount } = store.clearExpiredScenes();
+    return {
+      updatedCache: store.cache,
+      removedCount,
+    };
   } catch (error) {
     debugError('SceneCache', 'Failed to clear expired scenes', error);
     return { updatedCache: cache, removedCount: 0 };

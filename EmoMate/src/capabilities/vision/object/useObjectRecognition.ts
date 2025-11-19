@@ -1,10 +1,10 @@
 /**
  * Object Recognition Hook
  * Manages storage and retrieval of object recognition records
+ * Now uses Zustand store for state management
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { createMMKV } from 'react-native-mmkv';
 import {
   ObjectRecognitionRecord,
   ObjectRecognitionRequest,
@@ -12,26 +12,7 @@ import {
   AnalysisMode,
 } from '../../../types/scene';
 import { recognizeObjectWithClaude } from '../claudeVision';
-
-/**
- * MMKV Storage instance for object recognition records
- */
-const storage = createMMKV({
-  id: 'object-recognition-storage',
-  encryptionKey: 'object-recognition-encryption-key',
-});
-
-/**
- * Storage keys
- */
-const STORAGE_KEYS = {
-  RECORDS: 'object-recognition-records',
-};
-
-/**
- * Maximum number of records to store
- */
-const MAX_RECORDS = 50;
+import { useObjectRecognitionStore } from '../../../store/objectRecognitionStore';
 
 /**
  * Object Recognition Hook Configuration
@@ -49,57 +30,18 @@ export function useObjectRecognition(
   apiKey: string,
   config?: ObjectRecognitionConfig
 ) {
-  const maxRecords = config?.maxRecords || MAX_RECORDS;
+  const store = useObjectRecognitionStore();
 
-  // State for records
-  const [records, setRecords] = useState<ObjectRecognitionRecord[]>([]);
+  // State for loading and error (not persisted)
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  /**
-   * Load records from storage
-   */
-  const loadRecords = useCallback(() => {
-    try {
-      const storedRecords = storage.getString(STORAGE_KEYS.RECORDS);
-      if (storedRecords) {
-        const parsed = JSON.parse(storedRecords) as ObjectRecognitionRecord[];
-        // Sort by createdAt descending (newest first)
-        parsed.sort((a, b) => b.createdAt - a.createdAt);
-        setRecords(parsed);
-        console.log(
-          `[ObjectRecognition] Loaded ${parsed.length} records from storage`
-        );
-      } else {
-        setRecords([]);
-        console.log('[ObjectRecognition] No stored records found');
-      }
-    } catch (err) {
-      console.error('[ObjectRecognition] Failed to load records:', err);
-      setRecords([]);
+  // Apply maxRecords configuration on mount
+  useEffect(() => {
+    if (config?.maxRecords && config.maxRecords !== store.maxRecords) {
+      store.setMaxRecords(config.maxRecords);
     }
-  }, []);
-
-  /**
-   * Save records to storage
-   */
-  const saveRecords = useCallback(
-    (newRecords: ObjectRecognitionRecord[]) => {
-      try {
-        // Keep only maxRecords newest records
-        const recordsToSave = newRecords.slice(0, maxRecords);
-        storage.set(STORAGE_KEYS.RECORDS, JSON.stringify(recordsToSave));
-        setRecords(recordsToSave);
-        console.log(
-          `[ObjectRecognition] Saved ${recordsToSave.length} records to storage`
-        );
-      } catch (err) {
-        console.error('[ObjectRecognition] Failed to save records:', err);
-        setError('保存记录失败');
-      }
-    },
-    [maxRecords]
-  );
+  }, [config?.maxRecords, store]);
 
   /**
    * Recognize an object and save the result
@@ -154,15 +96,14 @@ export function useObjectRecognition(
           });
 
           const newRecord: ObjectRecognitionRecord = {
-            id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            id: `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
             imageBase64: imageToStore,
             data: response.object,
             createdAt: Date.now(),
           };
 
-          // Add to records (newest first)
-          const updatedRecords = [newRecord, ...records];
-          saveRecords(updatedRecords);
+          // Add to store (will be persisted automatically)
+          store.addRecord(newRecord);
 
           console.log('[ObjectRecognition] ✅ Object recognized and saved:', {
             id: newRecord.id,
@@ -193,7 +134,7 @@ export function useObjectRecognition(
         setIsLoading(false);
       }
     },
-    [apiKey, records, saveRecords]
+    [apiKey, store]
   );
 
   /**
@@ -201,32 +142,28 @@ export function useObjectRecognition(
    */
   const deleteRecord = useCallback(
     (recordId: string) => {
-      const updatedRecords = records.filter((r) => r.id !== recordId);
-      saveRecords(updatedRecords);
+      store.deleteRecord(recordId);
       console.log(`[ObjectRecognition] Deleted record: ${recordId}`);
     },
-    [records, saveRecords]
+    [store]
   );
 
   /**
    * Clear all records
    */
   const clearAllRecords = useCallback(() => {
-    storage.remove(STORAGE_KEYS.RECORDS);
-    setRecords([]);
+    store.clearAllRecords();
     console.log('[ObjectRecognition] Cleared all records');
-  }, []);
+  }, [store]);
 
   /**
    * Get records by category
    */
   const getRecordsByCategory = useCallback(
     (category: string): ObjectRecognitionRecord[] => {
-      return records.filter(
-        (r) => r.data.category.toLowerCase() === category.toLowerCase()
-      );
+      return store.getRecordsByCategory(category);
     },
-    [records]
+    [store]
   );
 
   /**
@@ -234,45 +171,29 @@ export function useObjectRecognition(
    */
   const searchRecords = useCallback(
     (query: string): ObjectRecognitionRecord[] => {
-      const lowerQuery = query.toLowerCase();
-      return records.filter(
-        (r) =>
-          r.data.objectName.toLowerCase().includes(lowerQuery) ||
-          r.data.description.toLowerCase().includes(lowerQuery) ||
-          r.data.brand?.toLowerCase().includes(lowerQuery)
-      );
+      return store.searchRecords(query);
     },
-    [records]
+    [store]
   );
 
   /**
    * Get statistics
    */
   const getStats = useCallback(() => {
-    const categories = new Map<string, number>();
-    records.forEach((r) => {
-      const category = r.data.category;
-      categories.set(category, (categories.get(category) || 0) + 1);
-    });
+    return store.getStats();
+  }, [store]);
 
-    return {
-      totalRecords: records.length,
-      categories: Array.from(categories.entries()).map(([name, count]) => ({
-        name,
-        count,
-      })),
-      latestRecord: records[0] || null,
-    };
-  }, [records]);
-
-  // Load records on mount
-  useEffect(() => {
-    loadRecords();
-  }, [loadRecords]);
+  /**
+   * Reload records from storage
+   */
+  const loadRecords = useCallback(() => {
+    store.loadFromStorage();
+    console.log('[ObjectRecognition] Reloaded records from storage');
+  }, [store]);
 
   return {
-    // State
-    records,
+    // State (from store and local)
+    records: store.records,
     isLoading,
     error,
 

@@ -27,7 +27,10 @@ export interface UseSimpleDraggableReturn {
   isDragging: boolean;
   /** Animated style for the component */
   animatedStyle: {
-    transform: { translateX: Animated.Value; translateY: Animated.Value }[];
+    transform: (
+      | { translateX: Animated.Value; translateY?: undefined }
+      | { translateY: Animated.Value; translateX?: undefined }
+    )[];
   };
 }
 
