@@ -14,3 +14,4 @@ export {
   ConversationState,
 } from './ConversationStateIndicator';
 export { default as FunctionMonitor } from './FunctionMonitor';
+export { ObjectRecognitionButton } from './ObjectRecognitionButton';

@@ -1,17 +1,19 @@
 import React, { useEffect, useCallback, useState, useRef } from 'react';
 import {
   View,
-  TouchableOpacity,
   Text,
   ImageBackground,
   ActivityIndicator,
-  AppState,
-  AppStateStatus,
 } from 'react-native';
 import { SafeAreaView as SafeAreaViewRN } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useUserStore, ChatMessage, useAIStatus } from '../store';
-import { useChatAI } from '../hooks/';
+import {
+  useChatAI,
+  useToast,
+  useInitialSceneDetection,
+  useAppStateSceneTimer,
+} from '../hooks/';
 import { useAIConversationFlow } from '../hooks/useAIConversationFlow'; // Step 2.3: AI conversation flow hook
 import { useSpeechToText } from '../capabilities/listen';
 import {
@@ -26,6 +28,7 @@ import {
   CurrentSpeechBubble,
   EmotionAwareCharacter,
   FunctionMonitor,
+  ObjectRecognitionButton,
 } from '../components';
 import { EmotionDetector } from '../components/vision';
 import { useBackgroundContext } from '../hooks/useBackgroundContext';
@@ -54,9 +57,6 @@ interface Props {
 const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
   const setFacialEmotion = useEmotionStore((state) => state.setFacialEmotion);
   const {
-    selectedCharacter,
-    setSelectedCharacter,
-    addEmotionLog,
     chatHistory,
     addChatMessage,
     setCurrentScene,
@@ -95,13 +95,8 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
     currentSegment,
   } = useChatAI({ personality: PERSONALITY_PROMPTS.gentle, enableTTS: true });
 
-  // Toast state
-  const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
-  const [toastType, setToastType] = useState<'error' | 'success'>('error');
-
-  // Test mode state
-  const [isTestMode, setIsTestMode] = useState(false);
+  // Toast management
+  const { toastState, showError, showSuccess, dismissToast } = useToast();
 
   // Step 5.2: Visual QA - store last captured frame
   const lastCapturedFrameRef = useRef<string | null>(null);
@@ -121,13 +116,18 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
 
   // Stable callback for frame capture (prevents useEffect re-triggering)
   const handleFrameCaptured = useCallback(
-    (frameBase64: string, timestamp: number) => {
+    (frameBase64: string) => {
       // Store last captured frame for visual QA and scene understanding
       lastCapturedFrameRef.current = frameBase64;
       debugLog('HomeScreen', `Frame captured: ${Math.round((frameBase64.length * 0.75) / 1024)}KB`);
     },
     []
   );
+
+  // Stable callback to get captured frame
+  const getCapturedFrame = useCallback(() => {
+    return lastCapturedFrameRef.current;
+  }, []);
 
   // Sync background scene to monitor context
   useEffect(() => {
@@ -159,24 +159,25 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
   }, [
     sceneUnderstanding.isAnalyzing,
     sceneUnderstanding.totalAPICalls,
-    sceneUnderstanding.currentScene,
-    sceneUnderstanding.timerState,
+    sceneUnderstanding.currentScene?.location,
+    sceneUnderstanding.timerState.enabled,
+    sceneUnderstanding.timerState.nextCaptureIn,
     updateSceneUnderstanding,
   ]);
 
   // Debug: Log API key once on mount
   useEffect(() => {
     debugLog('HomeScreen', `API Key: ${apiKey ? 'configured' : 'missing'}`);
-  }, []);
+  }, [apiKey]);
 
   // Handle errors (including background errors)
   useEffect(() => {
     if (error || aiError || backgroundError) {
       const message = error || aiError || backgroundError?.message || '';
-      setToastMessage(message);
-      setToastType('error');
-      setShowToast(true);
+      showError(message);
     }
+    // showError is stable (empty deps), no need to include in deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [error, aiError, backgroundError]);
 
   // 统一的 AI 状态管理 - 直接使用Hiyori动作
@@ -196,58 +197,13 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
     }
   }, [isListening, isGenerating, isSpeaking, setAIStatus]);
 
-  const handleDismissToast = () => {
-    setShowToast(false);
-    setToastMessage('');
-  };
-
-  useEffect(() => {
-    // Character selection updated
-
-    // 示例：设置一个默认角色
-    if (!selectedCharacter) {
-      setSelectedCharacter('默认AI伴侣');
-    }
-
-    // 示例：添加一个情绪日志
-    addEmotionLog({
-      date: new Date().toISOString().split('T')[0],
-      emotion: '开心',
-    });
-  }, [selectedCharacter, setSelectedCharacter, addEmotionLog]);
-
   // Background pause - Stop scene detection when app goes to background
-  useEffect(() => {
-    const subscription = AppState.addEventListener(
-      'change',
-      (nextAppState: AppStateStatus) => {
-        if (nextAppState === 'active') {
-          debugLog('HomeScreen', 'App active - starting scene timer');
-          sceneUnderstanding.startTimer();
-        } else if (
-          nextAppState === 'background' ||
-          nextAppState === 'inactive'
-        ) {
-          debugLog('HomeScreen', 'App background - stopping scene timer');
-          sceneUnderstanding.stopTimer();
-        }
-      }
-    );
+  useAppStateSceneTimer({
+    sceneUnderstanding,
+    enabled: true,
+  });
 
-    // Start timer if app is currently active
-    if (AppState.currentState === 'active') {
-      debugLog('HomeScreen', 'Initial app state: active - starting scene timer');
-      sceneUnderstanding.startTimer();
-    }
-
-    return () => {
-      subscription.remove();
-      sceneUnderstanding.stopTimer();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Register photo capture callback for scene understanding timer
+  // Register photo capture callback for scene understanding timer (once)
   useEffect(() => {
     sceneUnderstanding.setPhotoCaptureCallback(async () => {
       if (lastCapturedFrameRef.current) {
@@ -258,7 +214,9 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
         return null;
       }
     });
-  }, [sceneUnderstanding]);
+    // Only register once on mount, sceneUnderstanding should be stable
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Monitor scene updates and sync to userStore
   useEffect(() => {
@@ -270,56 +228,11 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
   }, [sceneUnderstanding.currentScene, setCurrentScene]);
 
   // Initial scene detection on app startup
-  useEffect(() => {
-    const performInitialSceneDetection = async () => {
-      // Check if we have a valid cached scene
-      const cached = sceneUnderstanding.currentScene;
-      const hasValidScene =
-        cached &&
-        cached.timestamp &&
-        Date.now() - cached.timestamp < 30 * 60 * 1000; // 30 minutes
-
-      if (hasValidScene && cached) {
-        debugLog('HomeScreen', `Using cached scene: ${cached.location}`);
-        return;
-      }
-
-      debugLog('HomeScreen', 'Waiting for camera frame for initial scene detection');
-
-      // Poll for camera frame availability (check every 2 seconds, max 30 seconds)
-      let attempts = 0;
-      const maxAttempts = 15;
-
-      const checkFrameInterval = setInterval(async () => {
-        attempts++;
-
-        if (lastCapturedFrameRef.current) {
-          clearInterval(checkFrameInterval);
-          debugLog('HomeScreen', 'Starting initial scene detection');
-
-          try {
-            await sceneUnderstanding.analyzeScene(
-              lastCapturedFrameRef.current,
-              undefined
-            );
-            debugLog('HomeScreen', 'Initial scene detection completed');
-          } catch (error) {
-            debugError('HomeScreen', 'Initial scene detection failed', error);
-          }
-        } else if (attempts >= maxAttempts) {
-          debugWarn('HomeScreen', 'Timeout waiting for camera frame');
-          clearInterval(checkFrameInterval);
-        }
-      }, 2000);
-    };
-
-    performInitialSceneDetection();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const handleGoBack = () => {
-    navigation.goBack();
-  };
+  useInitialSceneDetection({
+    sceneUnderstanding,
+    getCapturedFrame,
+    enabled: true,
+  });
 
   const handleGoToChatHistory = () => {
     navigation.navigate('ChatHistory');
@@ -332,9 +245,7 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
   // Handle object recognition
   const handleRecognizeObject = async () => {
     if (!lastCapturedFrameRef.current) {
-      setToastMessage('请等待摄像头捕获画面');
-      setToastType('error');
-      setShowToast(true);
+      showError('请等待摄像头捕获画面');
       return;
     }
 
@@ -353,20 +264,14 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
 
       if (response.success) {
         debugLog('HomeScreen', `Object recognized: ${response.object.objectName}`);
-        setToastMessage(`识别成功: ${response.object.objectName}`);
-        setToastType('success');
-        setShowToast(true);
+        showSuccess(`识别成功: ${response.object.objectName}`);
       } else {
         debugError('HomeScreen', 'Recognition failed', response.error);
-        setToastMessage(response.error || '识别失败，请重试');
-        setToastType('error');
-        setShowToast(true);
+        showError(response.error || '识别失败，请重试');
       }
     } catch (error) {
       debugError('HomeScreen', 'Recognition error', error);
-      setToastMessage('识别过程中发生错误');
-      setToastType('error');
-      setShowToast(true);
+      showError('识别过程中发生错误');
     } finally {
       setIsRecognizing(false);
     }
@@ -377,16 +282,12 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
     debugLog('HomeScreen', 'Manual scene test triggered');
 
     if (!apiKey) {
-      setToastMessage('API Key 未配置，请检查 .env 文件');
-      setToastType('error');
-      setShowToast(true);
+      showError('API Key 未配置，请检查 .env 文件');
       return;
     }
 
     if (!lastCapturedFrameRef.current) {
-      setToastMessage('摄像头还未捕获帧，请稍候再试');
-      setToastType('error');
-      setShowToast(true);
+      showError('摄像头还未捕获帧，请稍候再试');
       return;
     }
 
@@ -399,18 +300,29 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
       debugLog('HomeScreen', 'Manual scene analysis completed');
     } catch (error) {
       debugError('HomeScreen', 'Manual scene analysis failed', error);
-      setToastMessage(
+      showError(
         `场景分析失败: ${error instanceof Error ? error.message : '未知错误'}`
       );
-      setToastType('error');
-      setShowToast(true);
     }
+    // showError is stable (empty deps), no need to include in deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiKey, sceneUnderstanding]);
 
   // 生成唯一消息ID
-  const generateMessageId = () => {
+  const generateMessageId = useCallback(() => {
     return `msg_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-  };
+  }, []);
+
+  // Stable callback for toast notifications in AI conversation flow
+  const setToast = useCallback((message: string, type: 'error' | 'success') => {
+    if (type === 'error') {
+      showError(message);
+    } else {
+      showSuccess(message);
+    }
+    // showError and showSuccess are stable (empty deps), no need to include in deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Step 2.3: Use AI conversation flow hook
   const { startConversation } = useAIConversationFlow({
@@ -420,31 +332,19 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
     backgroundContext,
     addChatMessage,
     setCurrentScene,
-    setToast: (message: string, type: 'error' | 'success') => {
-      setToastMessage(message);
-      setToastType(type);
-      setShowToast(true);
-    },
-    getCapturedFrame: () => lastCapturedFrameRef.current,
+    setToast,
+    getCapturedFrame,
     generateMessageId,
   });
 
-  // 核心语音对话流程（使用 AI conversation flow hook）
-  const handleVoiceConversation = useCallback(
-    async (userText: string) => {
-      await startConversation(userText);
-    },
-    [startConversation]
-  );
-
-  // 监听语音识别完成
+  // 监听语音识别完成并开始对话
   useEffect(() => {
     if (!isListening && transcript) {
       // 语音识别完成且有文本时，清空transcript并发送给AI
-      handleVoiceConversation(transcript);
+      startConversation(transcript);
       clearTranscript();
     }
-  }, [isListening, transcript, handleVoiceConversation, clearTranscript]);
+  }, [isListening, transcript, startConversation, clearTranscript]);
 
   // 监听AI消息并添加到聊天历史
   useEffect(() => {
@@ -472,23 +372,6 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
     }
   }, [messages, chatHistory, addChatMessage]);
 
-  if (isTestMode) {
-    return (
-      <SafeAreaViewRN className='flex-1 bg-background'>
-        {/* Test Mode Header */}
-        <View className='flex-row items-center justify-between p-4 bg-white border-b border-gray-200'>
-          <TouchableOpacity
-            onPress={() => setIsTestMode(false)}
-            className='px-4 py-2 bg-blue-500 rounded-lg'
-          >
-            <Text className='font-medium text-white'>返回聊天</Text>
-          </TouchableOpacity>
-          <View className='w-20' />
-        </View>
-      </SafeAreaViewRN>
-    );
-  }
-
   // Get background image source
   const backgroundSource = backgroundContext
     ? getBackgroundImageSource(backgroundContext.imagePath)
@@ -513,11 +396,11 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
       <SafeAreaViewRN className='flex-1'>
         {/* Toast (Error/Success) */}
         <Toast
-          message={toastMessage}
-          isVisible={showToast}
-          onDismiss={handleDismissToast}
+          message={toastState.message}
+          isVisible={toastState.isVisible}
+          onDismiss={dismissToast}
           duration={4000}
-          type={toastType}
+          type={toastState.type}
         />
 
         <Header
@@ -561,35 +444,11 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
         </View>
 
         {/* Object Recognition Button - Floating on left side */}
-        <View className='absolute px-4 left-8 bottom-8'>
-          <TouchableOpacity
-            onPress={handleRecognizeObject}
-            disabled={isRecognizing || objectRecognition.isLoading}
-            className={`w-20 h-20 rounded-full items-center justify-center shadow-lg ${
-              isRecognizing || objectRecognition.isLoading
-                ? 'bg-gray-400'
-                : 'bg-green-500'
-            }`}
-            style={{
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.3,
-              shadowRadius: 8,
-              elevation: 8,
-            }}
-          >
-            {isRecognizing || objectRecognition.isLoading ? (
-              <ActivityIndicator size='small' color='#fff' />
-            ) : (
-              <Text className='text-3xl'>📷</Text>
-            )}
-            <Text className='text-xs text-center text-white'>
-              {isRecognizing || objectRecognition.isLoading
-                ? '识别中...'
-                : '识别物品'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <ObjectRecognitionButton
+          onRecognize={handleRecognizeObject}
+          isRecognizing={isRecognizing}
+          disabled={objectRecognition.isLoading}
+        />
 
         {/* Facial Emotion Detection */}
         <EmotionDetector
