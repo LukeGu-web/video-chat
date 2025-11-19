@@ -3,7 +3,7 @@ import { View, Text } from 'react-native';
 import HiyoriWebView, { HiyoriBridge } from './HiyoriWebView';
 import { useAIStatus, HiyoriMotion } from '../store';
 import { debugLog, debugError, debugWarn } from '../utils/debug';
-import { useMonitorContext } from '../contexts/MonitorContext';
+import { useMonitorStore } from '../store/monitorStore';
 
 interface Live2DCharacterProps {
   status?: HiyoriMotion; // 直接使用HiyoriMotion类型
@@ -71,10 +71,10 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [shouldLoop, setShouldLoop] = useState(false);
 
-  // Monitor context for debug panel
-  const { updateLive2DStatus } = useMonitorContext();
+  // Monitor store for debug panel
+  const updateLive2DStatus = useMonitorStore((state) => state.updateLive2DStatus);
 
-  // Sync state to monitor context
+  // Sync state to monitor store
   useEffect(() => {
     updateLive2DStatus({
       currentMotion,

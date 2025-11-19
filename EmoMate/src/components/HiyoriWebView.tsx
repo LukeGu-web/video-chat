@@ -8,7 +8,7 @@ import {
   debugWarn,
   DebugTimer,
 } from '../utils/debug';
-import { useMonitorContext } from '../contexts/MonitorContext';
+import { useMonitorStore } from '../store/monitorStore';
 
 interface HiyoriWebViewProps {
   style?: any;
@@ -61,10 +61,10 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
       loadAttempts: 0,
     });
 
-    // Monitor context for debug panel
-    const { updateWebViewStatus } = useMonitorContext();
+    // Monitor store for debug panel
+    const updateWebViewStatus = useMonitorStore((state) => state.updateWebViewStatus);
 
-    // Sync state to monitor context
+    // Sync state to monitor store
     useEffect(() => {
       updateWebViewStatus({
         isWebViewReady: state.isWebViewReady,

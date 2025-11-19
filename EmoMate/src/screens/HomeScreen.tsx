@@ -24,8 +24,6 @@ import {
   VoiceControl,
   Toast,
   CurrentSpeechBubble,
-  EmotionProvider,
-  useEmotionContext,
   EmotionAwareCharacter,
   FunctionMonitor,
 } from '../components';
@@ -33,7 +31,7 @@ import { EmotionDetector } from '../components/vision';
 import { useBackgroundContext } from '../hooks/useBackgroundContext';
 import { getBackgroundImageSource } from '../utils/backgroundStory';
 import { debugLog, debugWarn, debugError } from '../utils/debug';
-import { MonitorProvider, useMonitorContext } from '../contexts/MonitorContext';
+import { useMonitorStore, useEmotionStore } from '../store';
 
 type RootStackParamList = {
   Welcome: undefined;
@@ -54,7 +52,7 @@ interface Props {
 
 // HomeScreen内容组件
 const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
-  const { setFacialEmotion } = useEmotionContext();
+  const setFacialEmotion = useEmotionStore((state) => state.setFacialEmotion);
   const {
     selectedCharacter,
     setSelectedCharacter,
@@ -71,9 +69,9 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
     error: backgroundError,
   } = useBackgroundContext();
 
-  // Monitor context for debug panel
-  const { updateBackgroundScene, updateSceneUnderstanding } =
-    useMonitorContext();
+  // Monitor store for debug panel
+  const updateBackgroundScene = useMonitorStore((state) => state.updateBackgroundScene);
+  const updateSceneUnderstanding = useMonitorStore((state) => state.updateSceneUnderstanding);
 
   const { setAIStatus } = useAIStatus();
   const {
@@ -612,15 +610,7 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-// 带情绪提供器和监控提供器的HomeScreen包装器
-const HomeScreen: React.FC<Props> = ({ navigation }) => {
-  return (
-    <MonitorProvider>
-      <EmotionProvider>
-        <HomeScreenContent navigation={navigation} />
-      </EmotionProvider>
-    </MonitorProvider>
-  );
-};
+// 直接导出 HomeScreenContent 作为 HomeScreen (不再需要 Provider)
+const HomeScreen: React.FC<Props> = HomeScreenContent;
 
 export default HomeScreen;

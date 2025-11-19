@@ -12,7 +12,7 @@ import {
   ScrollView,
   Animated,
 } from 'react-native';
-import { useMonitorContext } from '../contexts/MonitorContext';
+import { useMonitorStore } from '../store/monitorStore';
 import { isDebugMode } from '../utils/debug';
 import { useSimpleDraggable } from '../hooks/useSimpleDraggable';
 
@@ -137,7 +137,7 @@ export const FunctionMonitor: React.FC<FunctionMonitorProps> = ({
   onTestSceneAnalysis,
   isAnalyzing = false,
 }) => {
-  const { data } = useMonitorContext();
+  const data = useMonitorStore((state) => state.data);
   const [expandedSections, setExpandedSections] = useState({
     live2d: true,
     emotion: true,
