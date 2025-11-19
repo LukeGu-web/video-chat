@@ -1,22 +1,19 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   CLAUDE_API_CONFIG,
-  getClaudeApiKey,
   AI_ERROR_MESSAGES,
-  buildSystemPrompt,
   createPersonalitySystemPrompt,
   validateAndOptimizeResponse,
-  PROACTIVE_CONVERSATION_CONFIG,
-  selectProactiveTopic,
   detectConversationType,
-  getResponseLengthConfig,
 } from '../constants/ai';
-import { SentenceBuffer, parseSSEChunk } from '../capabilities/speak/sentenceDetector'; // Phase 2: 句子检测
+import { parseSSEChunk } from '../capabilities/speak/sentenceDetector'; // Phase 2: 句子检测
 import { TTSQueue } from '../capabilities/speak'; // Phase 2: TTS队列管理 - NEW ARCHITECTURE
 import { SmartSentenceBuffer } from '../capabilities/speak/smartSentenceBuffer'; // Phase 3: 智能句子过滤
 import { useUserStore } from '../store/userStore'; // Scene context
-import { buildScenePrompt, isSceneDataFresh } from '../capabilities/vision/environment/buildScenePrompt'; // Scene understanding (Step 5.1)
 import { SceneData } from '../types/scene'; // Scene data type
+import { buildAPIRequestConfig } from './ai/buildAIContext'; // Unified API config builder (Step 1.1: Refactoring)
+import { useProactiveConversation } from './ai/useProactiveConversation'; // Proactive conversation system (Step 1.2: Refactoring)
+import { detectUserEmotionFromText } from '../utils/emotionDetection'; // Emotion detection (Step 1.3: Refactoring)
 
 export interface ChatMessage {
   id: string;
@@ -77,11 +74,6 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
   // Get current scene context from store (Step 5.1)
   const { currentScene } = useUserStore();
 
-  // 主动对话相关状态
-  const lastUserMessageTime = useRef<number>(Date.now());
-  const proactiveTimer = useRef<NodeJS.Timeout | null>(null);
-  const hasShownProactiveMessage = useRef<boolean>(false);
-
   // Phase 3: Global TTS queue reference for user interruption
   const currentTTSQueue = useRef<TTSQueue | null>(null);
 
@@ -90,256 +82,34 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
   const [isStreamSpeaking, setIsStreamSpeaking] = useState(false); // TTS queue playing
   const [currentStreamSegment, setCurrentStreamSegment] = useState(''); // Current sentence being spoken
 
-  // Proactive message TTS queue reference
-  const proactiveTTSQueue = useRef<TTSQueue | null>(null);
-
   const generateMessageId = () => {
     return `msg_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   };
 
-  // 简单的情绪检测函数
-  const detectUserEmotion = (userMessage: string): string => {
-    const message = userMessage.toLowerCase();
-
-    // 开心相关词汇
-    if (
-      message.includes('开心') ||
-      message.includes('高兴') ||
-      message.includes('快乐') ||
-      message.includes('哈哈') ||
-      message.includes('嘿嘿') ||
-      message.includes('棒')
-    ) {
-      return 'happy';
-    }
-
-    // 难过相关词汇
-    if (
-      message.includes('难过') ||
-      message.includes('伤心') ||
-      message.includes('沮丧') ||
-      message.includes('哭') ||
-      message.includes('郁闷') ||
-      message.includes('失落')
-    ) {
-      return 'sad';
-    }
-
-    // 困惑相关词汇
-    if (
-      message.includes('困惑') ||
-      message.includes('不明白') ||
-      message.includes('不懂') ||
-      message.includes('？') ||
-      message.includes('怎么')
-    ) {
-      return 'confused';
-    }
-
-    // 紧张相关词汇
-    if (
-      message.includes('紧张') ||
-      message.includes('害怕') ||
-      message.includes('担心') ||
-      message.includes('不安') ||
-      message.includes('焦虑')
-    ) {
-      return 'nervous';
-    }
-
-    return 'neutral';
-  };
-
-  // 清理主动对话定时器
-  const clearProactiveTimer = useCallback(() => {
-    if (proactiveTimer.current) {
-      clearTimeout(proactiveTimer.current);
-      proactiveTimer.current = null;
-    }
-  }, []);
-
-  // 启动主动对话检测
-  const startProactiveConversation = useCallback(() => {
-    if (!isProactiveModeEnabled || isLoading || isStreamSpeaking) return;
-
-    clearProactiveTimer();
-    hasShownProactiveMessage.current = false;
-
-    // 设置短暂停顿检测
-    proactiveTimer.current = setTimeout(() => {
-      if (!hasShownProactiveMessage.current && isProactiveModeEnabled) {
-        hasShownProactiveMessage.current = true;
-        const topic = selectProactiveTopic('short', messages);
-        sendProactiveMessage(topic);
-
-        // 设置中等停顿检测
-        proactiveTimer.current = setTimeout(() => {
-          if (isProactiveModeEnabled) {
-            const mediumTopic = selectProactiveTopic('medium', messages);
-            sendProactiveMessage(mediumTopic);
-
-            // 设置长时间停顿检测
-            proactiveTimer.current = setTimeout(() => {
-              if (isProactiveModeEnabled) {
-                const longTopic = selectProactiveTopic('long', messages);
-                sendProactiveMessage(longTopic);
-              }
-            }, PROACTIVE_CONVERSATION_CONFIG.silenceDetection.longPause - PROACTIVE_CONVERSATION_CONFIG.silenceDetection.mediumPause);
-          }
-        }, PROACTIVE_CONVERSATION_CONFIG.silenceDetection.mediumPause - PROACTIVE_CONVERSATION_CONFIG.silenceDetection.shortPause);
-      }
-    }, PROACTIVE_CONVERSATION_CONFIG.silenceDetection.shortPause);
-  }, [isProactiveModeEnabled, isLoading, isStreamSpeaking, clearProactiveTimer]);
-
-  // 发送主动消息
-  const sendProactiveMessage = useCallback(
-    async (content: string) => {
-      if (!content.trim() || !isProactiveModeEnabled) return;
-
+  // Step 1.2: Use extracted proactive conversation hook
+  const proactiveConversation = useProactiveConversation({
+    enabled: isProactiveModeEnabled,
+    messages,
+    isLoading,
+    isSpeaking: isStreamSpeaking,
+    onProactiveMessage: async (content: string) => {
+      // Add proactive message to history
       const proactiveMessage: ChatMessage = {
         id: generateMessageId(),
         role: 'assistant',
         content: content.trim(),
         timestamp: Date.now(),
       };
-
       setMessages((prev) => [...prev, proactiveMessage]);
-
-      // 自动播放主动消息 using TTSQueue
-      setTimeout(async () => {
-        try {
-          const voiceId = 'hkfHEbBvdQFNX4uWHqRF';
-          const ttsQueue = new TTSQueue({
-            onItemStart: (item) => {
-              setCurrentStreamSegment(item.text);
-              setIsStreamSpeaking(true);
-            },
-            onItemEnd: () => {
-              setCurrentStreamSegment('');
-              setIsStreamSpeaking(false);
-            },
-          });
-          proactiveTTSQueue.current = ttsQueue;
-
-          await ttsQueue.enqueue(content, { voiceId, emotion: 'caring' });
-          await ttsQueue.waitForCompletion();
-        } catch (error) {
-          // TTS error handled silently
-          console.warn('[ChatAI] Proactive message TTS error:', error);
-        } finally {
-          proactiveTTSQueue.current = null;
-        }
-      }, 300);
     },
-    [isProactiveModeEnabled]
-  );
+    onSpeakingStateChange: (isSpeaking, segment) => {
+      setIsStreamSpeaking(isSpeaking);
+      setCurrentStreamSegment(segment);
+    },
+  });
 
-  // Phase 1: Non-streaming API call (kept for fallback)
-  const callClaudeAPI = async (
-    messages: ChatMessage[],
-    config: ChatAIConfig,
-    conversationType:
-      | 'simple'
-      | 'normal'
-      | 'detailed'
-      | 'storytelling' = 'normal'
-  ): Promise<string> => {
-    const apiKey = config.apiKey || getClaudeApiKey();
-    if (!apiKey) {
-      throw new Error(AI_ERROR_MESSAGES.API_KEY_MISSING);
-    }
-
-    const model = config.modelType
-      ? CLAUDE_API_CONFIG.models[config.modelType]
-      : CLAUDE_API_CONFIG.models[CLAUDE_API_CONFIG.defaultModel];
-
-    // 获取动态token配置
-    const lengthConfig = getResponseLengthConfig(conversationType);
-
-    // 构建API消息格式，包含人格、情绪、上下文信息和背景故事
-    const personalityText = config.personality || currentPersonality;
-
-    // Build scene context prompt (Step 5.1: Scene understanding)
-    // Prioritize sceneContext from config (Step 5.2: Avoid state update delay)
-    const sceneToUse = config.sceneContext !== undefined ? config.sceneContext : currentScene;
-    const isFresh = isSceneDataFresh(sceneToUse, 30);
-
-    console.log('[ChatAI] 🔍 Scene data check:', {
-      source: config.sceneContext !== undefined ? 'config.sceneContext' : 'userStore.currentScene',
-      hasScene: !!sceneToUse,
-      isFresh,
-      location: sceneToUse?.location,
-      objectsCount: sceneToUse?.objects?.length || 0,
-      timestamp: sceneToUse?.timestamp,
-      ageMinutes: sceneToUse?.timestamp ? (Date.now() - sceneToUse.timestamp) / 60000 : null,
-    });
-
-    const scenePrompt = isFresh
-      ? buildScenePrompt(sceneToUse, true, 5)
-      : '';
-
-    if (scenePrompt) {
-      console.log('[ChatAI] ✅ Scene prompt generated:', scenePrompt.substring(0, 200) + '...');
-    } else {
-      console.log('[ChatAI] ⚠️ No scene prompt (scene not fresh or missing)');
-    }
-
-    // Use scene prompt as context
-    const contextPrompt = scenePrompt;
-
-    console.log('[ChatAI] 📝 Context prompt length:', contextPrompt.length);
-
-    const systemMessage = buildSystemPrompt(
-      personalityText,
-      config.userEmotion,
-      conversationType,
-      config.backgroundStory,
-      contextPrompt // Add both environment and scene awareness
-    );
-
-    // 保留更多上下文消息以保持对话连贯性
-    const contextMessages = messages
-      .filter((msg) => msg.role !== 'system')
-      .slice(-10) // 保留最近10条消息作为上下文
-      .map((msg) => ({
-        role: msg.role,
-        content: msg.content,
-      }));
-
-    const requestBody = {
-      model,
-      max_tokens: lengthConfig.maxTokens, // 使用动态token配置
-      system: systemMessage,
-      messages: contextMessages,
-      stop_sequences: ['用户:', 'User:', '---'], // Phase 1: 添加停止序列优化 (移除 \n\n)
-    };
-
-    const response = await fetch(CLAUDE_API_CONFIG.baseURL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': CLAUDE_API_CONFIG.version,
-      },
-      body: JSON.stringify(requestBody),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => null);
-      throw new Error(
-        errorData?.error?.message ||
-          `${AI_ERROR_MESSAGES.API_CALL_FAILED}: ${response.status} ${response.statusText}`
-      );
-    }
-
-    const data = await response.json();
-    const rawResponse = data.content?.[0]?.text || '抱歉，我无法生成回复。';
-
-    // 验证和优化回应格式，传入对话类型
-    return validateAndOptimizeResponse(rawResponse, conversationType);
-  };
-
-  // Phase 2: Streaming API call with sentence-by-sentence TTS
+  // Step 1.4: Removed callClaudeAPI (non-streaming) - only using streaming API now
+  // Streaming API call with sentence-by-sentence TTS
   // Note: Using XMLHttpRequest for streaming in React Native
   const callClaudeAPIStreaming = async (
     messages: ChatMessage[],
@@ -351,69 +121,20 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       | 'storytelling' = 'normal',
     onSentence: (sentence: string) => void
   ): Promise<string> => {
-    const apiKey = config.apiKey || getClaudeApiKey();
-    if (!apiKey) {
-      throw new Error(AI_ERROR_MESSAGES.API_KEY_MISSING);
-    }
-
-    const model = config.modelType
-      ? CLAUDE_API_CONFIG.models[config.modelType]
-      : CLAUDE_API_CONFIG.models[CLAUDE_API_CONFIG.defaultModel];
-
-    const lengthConfig = getResponseLengthConfig(conversationType);
-    const personalityText = config.personality || currentPersonality;
-
-    // Build scene context prompt (Step 5.1: Scene understanding)
-    // Prioritize sceneContext from config (Step 5.2: Avoid state update delay)
-    const sceneToUse = config.sceneContext !== undefined ? config.sceneContext : currentScene;
-    const isFresh = isSceneDataFresh(sceneToUse, 30);
-
-    console.log('[ChatAI] 🔍 Scene data check:', {
-      source: config.sceneContext !== undefined ? 'config.sceneContext' : 'userStore.currentScene',
-      hasScene: !!sceneToUse,
-      isFresh,
-      location: sceneToUse?.location,
-      objectsCount: sceneToUse?.objects?.length || 0,
-      timestamp: sceneToUse?.timestamp,
-      ageMinutes: sceneToUse?.timestamp ? (Date.now() - sceneToUse.timestamp) / 60000 : null,
-    });
-
-    const scenePrompt = isFresh
-      ? buildScenePrompt(sceneToUse, true, 5)
-      : '';
-
-    if (scenePrompt) {
-      console.log('[ChatAI] ✅ Scene prompt generated:', scenePrompt.substring(0, 200) + '...');
-    } else {
-      console.log('[ChatAI] ⚠️ No scene prompt (scene not fresh or missing)');
-    }
-
-    // Use scene prompt as context
-    const contextPrompt = scenePrompt;
-
-    console.log('[ChatAI] 📝 Context prompt length:', contextPrompt.length);
-
-    const systemMessage = buildSystemPrompt(
-      personalityText,
-      config.userEmotion,
+    // Step 1.1: Use unified API config builder (eliminates 60+ lines of duplicate code)
+    const apiConfig = buildAPIRequestConfig(
+      messages,
+      config,
       conversationType,
-      config.backgroundStory,
-      contextPrompt // Add both environment and scene awareness
+      currentPersonality,
+      currentScene
     );
 
-    const contextMessages = messages
-      .filter((msg) => msg.role !== 'system')
-      .slice(-10)
-      .map((msg) => ({
-        role: msg.role,
-        content: msg.content,
-      }));
-
     const requestBody = {
-      model,
-      max_tokens: lengthConfig.maxTokens,
-      system: systemMessage,
-      messages: contextMessages,
+      model: apiConfig.model,
+      max_tokens: apiConfig.lengthConfig.maxTokens,
+      system: apiConfig.systemMessage,
+      messages: apiConfig.contextMessages,
       stop_sequences: ['用户:', 'User:', '---'],
       stream: true, // Enable streaming
     };
@@ -425,7 +146,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
 
       // Set headers
       xhr.setRequestHeader('Content-Type', 'application/json');
-      xhr.setRequestHeader('x-api-key', apiKey);
+      xhr.setRequestHeader('x-api-key', apiConfig.apiKey);
       xhr.setRequestHeader('anthropic-version', CLAUDE_API_CONFIG.version);
 
       let fullText = '';
@@ -553,11 +274,10 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       setMessages(updatedMessages);
 
       // Update proactive conversation timer
-      lastUserMessageTime.current = Date.now();
-      clearProactiveTimer();
+      proactiveConversation.resetTimer();
 
-      // Detect emotion
-      const detectedEmotion = detectUserEmotion(content);
+      // Detect emotion (Step 1.3: Use extracted function)
+      const detectedEmotion = detectUserEmotionFromText(content);
 
       // Detect conversation type
       const conversationType = detectConversationType(content, updatedMessages);
@@ -597,7 +317,6 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
 
       // Store current TTS queue for potential interruption
       currentTTSQueue.current = ttsQueue;
-      let firstSentenceReceived = false;
 
       try {
         // Phase 3: Set generating state
@@ -642,7 +361,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
 
         // Start proactive conversation detection
         setTimeout(() => {
-          startProactiveConversation();
+          proactiveConversation.startTimer();
         }, 1000);
       } catch (err) {
         console.error('[ChatAI] Phase 2 error:', err);
@@ -672,17 +391,15 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     [
       messages,
       currentPersonality,
-      startProactiveConversation,
-      clearProactiveTimer,
+      proactiveConversation,
     ]
   );
 
   const clearMessages = useCallback(() => {
     setMessages([]);
     setError(null);
-    clearProactiveTimer();
-    lastUserMessageTime.current = Date.now();
-  }, [clearProactiveTimer]);
+    proactiveConversation.resetTimer();
+  }, [proactiveConversation]);
 
   const setPersonality = useCallback((personality: string) => {
     setCurrentPersonality(personality);
@@ -692,7 +409,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
    * Stop all audio playback (Phase 3: Enhanced for user interruption)
    * Stops:
    * 1. Current TTS queue playback (conversation)
-   * 2. Proactive message TTS queue
+   * 2. Proactive message TTS queue (handled by proactiveConversation hook)
    * 3. Clears all loading/generating/speaking states
    */
   const stopSpeaking = useCallback(async () => {
@@ -715,41 +432,29 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       currentTTSQueue.current = null;
     }
 
-    // 2. Stop proactive message TTS queue if active
-    if (proactiveTTSQueue.current) {
-      try {
-        await proactiveTTSQueue.current.cancel();
-        console.log('[ChatAI] ✅ Proactive TTS queue cancelled');
-      } catch (error) {
-        console.error('[ChatAI] Error cancelling proactive TTS queue:', error);
-      }
-      proactiveTTSQueue.current = null;
-    }
-  }, []);
+    // 2. Stop proactive conversation timer and TTS (managed by hook)
+    proactiveConversation.stopTimer();
+  }, [proactiveConversation]);
 
   const enableProactiveMode = useCallback(
     (enabled: boolean) => {
       setIsProactiveModeEnabled(enabled);
       if (!enabled) {
-        clearProactiveTimer();
+        proactiveConversation.stopTimer();
       } else {
         // 如果启用且有消息，重新开始检测
         if (messages.length > 0) {
           setTimeout(() => {
-            startProactiveConversation();
+            proactiveConversation.startTimer();
           }, 1000);
         }
       }
     },
-    [clearProactiveTimer, startProactiveConversation, messages.length]
+    [proactiveConversation, messages.length]
   );
 
-  // 组件卸载时清理定时器
-  useEffect(() => {
-    return () => {
-      clearProactiveTimer();
-    };
-  }, [clearProactiveTimer]);
+  // 组件卸载时清理定时器 (handled by useProactiveConversation hook)
+  // useEffect removed - cleanup is now managed by the proactiveConversation hook
 
   // 当语音播放状态改变时，调整主动对话检测
   useEffect(() => {
@@ -760,18 +465,17 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       messages.length > 0
     ) {
       setTimeout(() => {
-        startProactiveConversation();
+        proactiveConversation.startTimer();
       }, 2000); // 语音结束后2秒开始检测
     } else if (isStreamSpeaking || isLoading) {
-      clearProactiveTimer();
+      proactiveConversation.stopTimer();
     }
   }, [
     isStreamSpeaking,
     isLoading,
     isProactiveModeEnabled,
     messages.length,
-    startProactiveConversation,
-    clearProactiveTimer,
+    proactiveConversation,
   ]);
 
   return {
