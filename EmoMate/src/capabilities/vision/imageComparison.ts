@@ -5,6 +5,7 @@
 
 import * as ImageManipulator from 'expo-image-manipulator';
 import { SceneComparisonResult } from '../../types/scene';
+import { debugError } from '../../utils/debug';
 
 /**
  * Thumbnail configuration for image comparison
@@ -35,9 +36,6 @@ const THUMBNAIL_CONFIG = {
  * @returns Thumbnail as base64 string
  */
 export async function generateThumbnail(imageBase64: string): Promise<string> {
-  console.log('[ImageComparison] generateThumbnail called');
-  console.log('[ImageComparison] Input image size:', imageBase64.length, 'bytes');
-
   try {
     // Ensure base64 string has data URI prefix
     let uri = imageBase64;
@@ -57,11 +55,9 @@ export async function generateThumbnail(imageBase64: string): Promise<string> {
       }
     );
 
-    console.log('[ImageComparison] Thumbnail generated successfully');
-    console.log('[ImageComparison] Thumbnail size:', result.base64?.length || 0, 'bytes');
     return result.base64 || '';
   } catch (error) {
-    console.error('[ImageComparison] Failed to generate thumbnail:', error);
+    debugError('ImageComparison', 'Failed to generate thumbnail', error);
     // Return original image on error (will be slower but still works)
     return imageBase64;
   }
@@ -93,12 +89,9 @@ async function calculatePixelDifference(
   thumb1: string,
   thumb2: string
 ): Promise<number> {
-  console.log('[ImageComparison] calculatePixelDifference called (FILE SIZE METHOD)');
-
   try {
     // Quick check: if strings are identical, return 0
     if (thumb1 === thumb2) {
-      console.log('[ImageComparison] Thumbnails are identical (exact match)');
       return 0;
     }
 
@@ -110,44 +103,24 @@ async function calculatePixelDifference(
     const sizeDiff = Math.abs(size1 - size2) / maxSize;
 
     // Convert size difference to similarity score
-    // Small size difference = high similarity
-    // Large size difference = low similarity
     let similarity = 0;
 
     if (sizeDiff < 0.05) {
       // < 5% size difference: Very similar (same scene)
-      // Map 0-5% diff to 95-100% similarity
-      similarity = 1.0 - (sizeDiff / 0.05) * 0.05;
-      // Boost very close sizes to near 100%
       similarity = 0.95 + (1.0 - sizeDiff / 0.05) * 0.05;
     } else if (sizeDiff < 0.15) {
       // 5-15% size difference: Moderate similarity (slight change)
-      // Map 5-15% diff to 70-95% similarity
-      const normalizedDiff = (sizeDiff - 0.05) / 0.10; // 0-1 range
-      similarity = 0.95 - normalizedDiff * 0.25; // 95% to 70%
+      const normalizedDiff = (sizeDiff - 0.05) / 0.10;
+      similarity = 0.95 - normalizedDiff * 0.25;
     } else {
       // > 15% size difference: Different scenes
-      // Map 15%+ diff to 0-70% similarity
-      const normalizedDiff = Math.min((sizeDiff - 0.15) / 0.35, 1.0); // Cap at 50% diff
-      similarity = 0.70 - normalizedDiff * 0.70; // 70% to 0%
+      const normalizedDiff = Math.min((sizeDiff - 0.15) / 0.35, 1.0);
+      similarity = 0.70 - normalizedDiff * 0.70;
     }
 
-    const difference = 1 - similarity;
-
-    console.log('[ImageComparison] File size comparison result:', {
-      size1,
-      size2,
-      sizeDiff: (sizeDiff * 100).toFixed(2) + '%',
-      similarity: similarity.toFixed(3),
-      difference: difference.toFixed(3),
-      interpretation: sizeDiff < 0.05 ? 'Same scene' :
-                     sizeDiff < 0.15 ? 'Slight change' :
-                     'Different scene',
-    });
-
-    return difference;
+    return 1 - similarity;
   } catch (error) {
-    console.error('[ImageComparison] Comparison failed:', error);
+    debugError('ImageComparison', 'Comparison failed', error);
     return 1.0;
   }
 }
@@ -167,8 +140,6 @@ async function calculatePerceptualHash(imageBase64: string): Promise<string> {
   // 2. Reduces to 8x8 size
   // 3. Computes DCT (Discrete Cosine Transform)
   // 4. Generates hash from DCT coefficients
-
-  console.log('[ImageComparison] calculatePerceptualHash - Not implemented yet');
   return 'PERCEPTUAL_HASH_PLACEHOLDER';
 }
 
@@ -190,12 +161,9 @@ export async function compareImages(
   image2Base64: string,
   threshold: number = 0.7
 ): Promise<SceneComparisonResult> {
-  console.log('[ImageComparison] compareImages called, threshold:', threshold);
-
   try {
     // Quick check: if images are identical, return 1.0 immediately
     if (image1Base64 === image2Base64) {
-      console.log('[ImageComparison] Images are identical (exact base64 match)');
       return {
         similarity: 1.0,
         isSameScene: true,
@@ -204,19 +172,10 @@ export async function compareImages(
     }
 
     // Generate thumbnails for both images
-    console.log('[ImageComparison] Generating thumbnails...');
     const [thumb1, thumb2] = await Promise.all([
       generateThumbnail(image1Base64),
       generateThumbnail(image2Base64)
     ]);
-
-    // DEBUG: Test if same image produces same thumbnail
-    console.log('[ImageComparison] DEBUG - Thumbnail info:', {
-      thumb1Length: thumb1.length,
-      thumb2Length: thumb2.length,
-      lengthDiff: Math.abs(thumb1.length - thumb2.length),
-      firstCharsMatch: thumb1.substring(0, 20) === thumb2.substring(0, 20),
-    });
 
     // Calculate difference using thumbnail comparison
     const difference = await calculatePixelDifference(thumb1, thumb2);
@@ -227,21 +186,13 @@ export async function compareImages(
     // Determine if scenes are the same based on threshold
     const isSameScene = similarity >= threshold;
 
-    console.log('[ImageComparison] Final comparison result:', {
-      difference: difference.toFixed(3),
-      similarity: similarity.toFixed(3),
-      isSameScene,
-      threshold,
-      explanation: `Difference=${difference.toFixed(3)} → Similarity=${similarity.toFixed(3)}`
-    });
-
     return {
       similarity,
       isSameScene,
       threshold,
     };
   } catch (error) {
-    console.error('[ImageComparison] Comparison failed:', error);
+    debugError('ImageComparison', 'Comparison failed', error);
 
     // Return conservative result on error (assume scenes are different)
     return {
@@ -284,15 +235,9 @@ export async function compareThumbnails(
   thumbnail1: string,
   thumbnail2: string
 ): Promise<number> {
-  console.log('[ImageComparison] compareThumbnails called');
-
   // Use same pixel difference algorithm
   const difference = await calculatePixelDifference(thumbnail1, thumbnail2);
-  const similarity = 1 - difference;
-
-  console.log('[ImageComparison] Thumbnail similarity:', similarity.toFixed(3));
-
-  return similarity;
+  return 1 - difference;
 }
 
 /**
@@ -309,9 +254,6 @@ export async function findMatchingThumbnail(
   cachedThumbnails: string[],
   deduplicationThreshold: number = 0.85
 ): Promise<number> {
-  console.log('[ImageComparison] findMatchingThumbnail called');
-  console.log('[ImageComparison] Comparing against', cachedThumbnails.length, 'thumbnails');
-
   // Generate thumbnail for new image
   const newThumbnail = await generateThumbnail(newImage);
 
@@ -320,12 +262,10 @@ export async function findMatchingThumbnail(
     const similarity = await compareThumbnails(newThumbnail, cachedThumbnails[i]);
 
     if (similarity >= deduplicationThreshold) {
-      console.log('[ImageComparison] Match found at index', i, 'similarity:', similarity.toFixed(3));
       return i;
     }
   }
 
-  console.log('[ImageComparison] No matching thumbnail found');
   return -1;
 }
 
@@ -341,9 +281,6 @@ export async function getImageDimensions(
 ): Promise<{ width: number; height: number }> {
   // TODO: Implement actual dimension extraction
   // For now, return mock dimensions
-
-  console.log('[ImageComparison] getImageDimensions - returning mock values');
-
   return {
     width: 1920,
     height: 1080,
@@ -360,9 +297,5 @@ export function getImageSizeKB(imageBase64: string): number {
   // Base64 encoding increases size by ~33%
   // So actual image size is approximately 75% of base64 string length
   const sizeBytes = (imageBase64.length * 0.75);
-  const sizeKB = sizeBytes / 1024;
-
-  console.log('[ImageComparison] Image size:', sizeKB.toFixed(2), 'KB');
-
-  return sizeKB;
+  return sizeBytes / 1024;
 }

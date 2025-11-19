@@ -31,7 +31,7 @@ import {
 import { EmotionDetector } from '../components/vision';
 import { useBackgroundContext } from '../hooks/useBackgroundContext';
 import { getBackgroundImageSource } from '../utils/backgroundStory';
-import { isDebugMode } from '../utils/debug';
+import { isDebugMode, debugLog, debugWarn, debugError } from '../utils/debug';
 
 type RootStackParamList = {
   Welcome: undefined;
@@ -118,50 +118,17 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
   // Stable callback for frame capture (prevents useEffect re-triggering)
   const handleFrameCaptured = useCallback(
     (frameBase64: string, timestamp: number) => {
-      // Step 5.2: Store last captured frame for visual QA and scene understanding
-      const frameSize = Math.round((frameBase64.length * 0.75) / 1024);
-      console.log('[HomeScreen] 📷 Frame captured from camera:', {
-        frameSizeKB: frameSize,
-        timestamp: new Date(timestamp).toISOString(),
-        timestampMs: timestamp,
-      });
+      // Store last captured frame for visual QA and scene understanding
       lastCapturedFrameRef.current = frameBase64;
+      debugLog('HomeScreen', `Frame captured: ${Math.round((frameBase64.length * 0.75) / 1024)}KB`);
     },
     []
   );
 
   // Debug: Log API key once on mount
   useEffect(() => {
-    console.log('[HomeScreen] 🔑 API Key status:', {
-      hasApiKey: !!apiKey,
-      keyLength: apiKey?.length || 0,
-      keyPreview: apiKey ? `${apiKey.substring(0, 10)}...` : 'undefined',
-    });
-  }, []); // Only log once
-
-  // Debug: Log scene understanding state (throttled)
-  const lastLogTime = useRef(0);
-  useEffect(() => {
-    const now = Date.now();
-    if (now - lastLogTime.current < 5000) return; // Throttle to once per 5 seconds
-    lastLogTime.current = now;
-
-    console.log('[HomeScreen] 🔍 Scene Understanding State:', {
-      isAnalyzing: sceneUnderstanding.isAnalyzing,
-      hasCurrentScene: !!sceneUnderstanding.currentScene,
-      currentLocation: sceneUnderstanding.currentScene?.location,
-      totalAPICalls: sceneUnderstanding.totalAPICalls,
-      error: sceneUnderstanding.error,
-      timerEnabled: sceneUnderstanding.timerState.enabled,
-      nextCaptureIn: sceneUnderstanding.timerState.nextCaptureIn,
-      nextAnalysisIn: sceneUnderstanding.timerState.nextAnalysisIn,
-    });
-  }, [
-    sceneUnderstanding.isAnalyzing,
-    sceneUnderstanding.currentScene,
-    sceneUnderstanding.error,
-    sceneUnderstanding.timerState,
-  ]);
+    debugLog('HomeScreen', `API Key: ${apiKey ? 'configured' : 'missing'}`);
+  }, []);
 
   // Handle errors (including background errors)
   useEffect(() => {
@@ -210,21 +177,19 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
     });
   }, [selectedCharacter, setSelectedCharacter, addEmotionLog]);
 
-  // Step 5.3: Background pause - Stop scene detection when app goes to background
+  // Background pause - Stop scene detection when app goes to background
   useEffect(() => {
     const subscription = AppState.addEventListener(
       'change',
       (nextAppState: AppStateStatus) => {
         if (nextAppState === 'active') {
-          console.log('[HomeScreen] 📱 App is active - starting scene timer');
+          debugLog('HomeScreen', 'App active - starting scene timer');
           sceneUnderstanding.startTimer();
         } else if (
           nextAppState === 'background' ||
           nextAppState === 'inactive'
         ) {
-          console.log(
-            '[HomeScreen] 📴 App is background/inactive - stopping scene timer'
-          );
+          debugLog('HomeScreen', 'App background - stopping scene timer');
           sceneUnderstanding.stopTimer();
         }
       }
@@ -232,9 +197,7 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
 
     // Start timer if app is currently active
     if (AppState.currentState === 'active') {
-      console.log(
-        '[HomeScreen] 📱 Initial state: App is active - starting scene timer'
-      );
+      debugLog('HomeScreen', 'Initial app state: active - starting scene timer');
       sceneUnderstanding.startTimer();
     }
 
@@ -243,38 +206,19 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
       sceneUnderstanding.stopTimer();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty dependency - only run once on mount
+  }, []);
 
   // Register photo capture callback for scene understanding timer
   useEffect(() => {
-    console.log('[HomeScreen] 🔧 Registering photo capture callback...');
     sceneUnderstanding.setPhotoCaptureCallback(async () => {
-      console.log('[HomeScreen] 📸 Scene timer requesting photo capture');
-      const hasFrame = !!lastCapturedFrameRef.current;
-      const frameSize = lastCapturedFrameRef.current
-        ? Math.round((lastCapturedFrameRef.current.length * 0.75) / 1024)
-        : 0;
-
-      console.log('[HomeScreen] 📊 Frame status:', {
-        hasFrame,
-        frameSizeKB: frameSize,
-      });
-
       if (lastCapturedFrameRef.current) {
-        console.log(
-          '[HomeScreen] ✅ Returning captured frame for scene analysis'
-        );
+        debugLog('HomeScreen', 'Providing captured frame for scene analysis');
         return lastCapturedFrameRef.current;
       } else {
-        console.warn(
-          '[HomeScreen] ⚠️ No captured frame available for scene analysis'
-        );
+        debugWarn('HomeScreen', 'No captured frame available for scene analysis');
         return null;
       }
     });
-    console.log(
-      '[HomeScreen] ✅ Photo capture callback registered for scene understanding'
-    );
   }, [sceneUnderstanding]);
 
   // Monitor scene updates and sync to userStore
@@ -282,22 +226,13 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
     const current = sceneUnderstanding.currentScene;
     if (current) {
       setCurrentScene(current);
-      console.log('[HomeScreen] 📝 Auto-updated scene from timer:', {
-        location: current.location,
-        objects: current.objects.slice(0, 3),
-        confidence: current.confidence,
-        timestamp: new Date(current.timestamp).toLocaleTimeString(),
-      });
+      debugLog('HomeScreen', `Scene updated: ${current.location}`);
     }
   }, [sceneUnderstanding.currentScene, setCurrentScene]);
 
   // Initial scene detection on app startup
   useEffect(() => {
     const performInitialSceneDetection = async () => {
-      console.log(
-        '[HomeScreen] 🚀 App startup - checking for initial scene detection'
-      );
-
       // Check if we have a valid cached scene
       const cached = sceneUnderstanding.currentScene;
       const hasValidScene =
@@ -306,64 +241,42 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
         Date.now() - cached.timestamp < 30 * 60 * 1000; // 30 minutes
 
       if (hasValidScene && cached) {
-        console.log(
-          '[HomeScreen] ✅ Valid scene cache found, skipping initial detection:',
-          {
-            location: cached.location,
-            age:
-              Math.floor((Date.now() - cached.timestamp) / 60000) + ' minutes',
-          }
-        );
+        debugLog('HomeScreen', `Using cached scene: ${cached.location}`);
         return;
       }
 
-      console.log(
-        '[HomeScreen] 🔍 No valid scene cache, waiting for camera frame...'
-      );
+      debugLog('HomeScreen', 'Waiting for camera frame for initial scene detection');
 
       // Poll for camera frame availability (check every 2 seconds, max 30 seconds)
       let attempts = 0;
-      const maxAttempts = 15; // 15 attempts * 2 seconds = 30 seconds max wait
+      const maxAttempts = 15;
 
       const checkFrameInterval = setInterval(async () => {
         attempts++;
 
         if (lastCapturedFrameRef.current) {
-          console.log(
-            '[HomeScreen] 📸 Camera frame available, performing initial scene detection...'
-          );
           clearInterval(checkFrameInterval);
+          debugLog('HomeScreen', 'Starting initial scene detection');
 
           try {
             await sceneUnderstanding.analyzeScene(
               lastCapturedFrameRef.current,
-              undefined // No user question (manual trigger)
+              undefined
             );
-            console.log(
-              '[HomeScreen] ✅ Initial scene detection completed successfully'
-            );
+            debugLog('HomeScreen', 'Initial scene detection completed');
           } catch (error) {
-            console.error(
-              '[HomeScreen] ❌ Initial scene detection failed:',
-              error
-            );
+            debugError('HomeScreen', 'Initial scene detection failed', error);
           }
         } else if (attempts >= maxAttempts) {
-          console.warn(
-            '[HomeScreen] ⚠️ Timeout waiting for camera frame, will wait for next timer cycle'
-          );
+          debugWarn('HomeScreen', 'Timeout waiting for camera frame');
           clearInterval(checkFrameInterval);
-        } else {
-          console.log(
-            `[HomeScreen] ⏳ Waiting for camera frame... (attempt ${attempts}/${maxAttempts})`
-          );
         }
-      }, 2000); // Check every 2 seconds
+      }, 2000);
     };
 
     performInitialSceneDetection();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run once on mount
+  }, []);
 
   const handleGoBack = () => {
     navigation.goBack();
@@ -380,7 +293,6 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
   // Handle object recognition
   const handleRecognizeObject = async () => {
     if (!lastCapturedFrameRef.current) {
-      console.log('[HomeScreen] ⚠️ No captured frame available');
       setToastMessage('请等待摄像头捕获画面');
       setToastType('error');
       setShowToast(true);
@@ -388,12 +300,11 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
     }
 
     if (isRecognizing || objectRecognition.isLoading) {
-      console.log('[HomeScreen] ⚠️ Recognition already in progress');
       return;
     }
 
     setIsRecognizing(true);
-    console.log('[HomeScreen] 📸 Starting object recognition...');
+    debugLog('HomeScreen', 'Starting object recognition');
 
     try {
       const response = await objectRecognition.recognizeObject(
@@ -402,26 +313,18 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
       );
 
       if (response.success) {
-        console.log('[HomeScreen] ✅ Object recognized:', {
-          name: response.object.objectName,
-          category: response.object.category,
-        });
-
-        // Show success message (no navigation, just save and notify)
+        debugLog('HomeScreen', `Object recognized: ${response.object.objectName}`);
         setToastMessage(`识别成功: ${response.object.objectName}`);
         setToastType('success');
         setShowToast(true);
-
-        // Result is automatically saved by useObjectRecognition hook
-        // User can now ask AI about this object in conversation
       } else {
-        console.error('[HomeScreen] ❌ Recognition failed:', response.error);
+        debugError('HomeScreen', 'Recognition failed', response.error);
         setToastMessage(response.error || '识别失败，请重试');
         setToastType('error');
         setShowToast(true);
       }
     } catch (error) {
-      console.error('[HomeScreen] ❌ Recognition error:', error);
+      debugError('HomeScreen', 'Recognition error', error);
       setToastMessage('识别过程中发生错误');
       setToastType('error');
       setShowToast(true);
@@ -432,18 +335,9 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
 
   // Manual scene analysis test
   const handleManualSceneTest = useCallback(async () => {
-    console.log('[HomeScreen] 🧪 Manual scene test triggered');
-    console.log('[HomeScreen] 📊 Current state:', {
-      hasApiKey: !!apiKey,
-      hasFrame: !!lastCapturedFrameRef.current,
-      frameSize: lastCapturedFrameRef.current
-        ? Math.round((lastCapturedFrameRef.current.length * 0.75) / 1024)
-        : 0,
-      isAnalyzing: sceneUnderstanding.isAnalyzing,
-    });
+    debugLog('HomeScreen', 'Manual scene test triggered');
 
     if (!apiKey) {
-      console.error('[HomeScreen] ❌ No API Key configured!');
       setToastMessage('API Key 未配置，请检查 .env 文件');
       setToastType('error');
       setShowToast(true);
@@ -451,7 +345,6 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
     }
 
     if (!lastCapturedFrameRef.current) {
-      console.warn('[HomeScreen] ⚠️ No frame captured yet, waiting...');
       setToastMessage('摄像头还未捕获帧，请稍候再试');
       setToastType('error');
       setShowToast(true);
@@ -459,14 +352,14 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
     }
 
     try {
-      console.log('[HomeScreen] 🚀 Starting manual scene analysis...');
+      debugLog('HomeScreen', 'Starting manual scene analysis');
       await sceneUnderstanding.analyzeScene(
         lastCapturedFrameRef.current,
         '手动测试场景分析'
       );
-      console.log('[HomeScreen] ✅ Manual scene analysis completed');
+      debugLog('HomeScreen', 'Manual scene analysis completed');
     } catch (error) {
-      console.error('[HomeScreen] ❌ Manual scene analysis failed:', error);
+      debugError('HomeScreen', 'Manual scene analysis failed', error);
       setToastMessage(
         `场景分析失败: ${error instanceof Error ? error.message : '未知错误'}`
       );

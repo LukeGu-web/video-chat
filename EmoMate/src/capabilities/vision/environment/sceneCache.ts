@@ -6,6 +6,7 @@
 import { createMMKV } from 'react-native-mmkv';
 import { SceneData, SceneConfig, SceneCacheEntry } from '../../../types/scene';
 import { compareImages, generateThumbnail } from '../imageComparison';
+import { debugError } from '../../../utils/debug';
 
 /**
  * MMKV Storage instance for scene understanding data
@@ -59,31 +60,26 @@ export function loadCachedData(): {
       const removedCount = beforeCount - afterCount;
 
       if (removedCount > 0) {
-        console.log(`[SceneCache] 🗑️ Auto-cleaned ${removedCount} expired scene(s) on load`);
         // Save cleaned cache back to storage
         storage.set(STORAGE_KEYS.SCENE_CACHE, JSON.stringify(cache));
       }
-
-      console.log('[SceneCache] Loaded', cache.length, 'cached scenes (sorted newest first)');
     }
 
     // Load last scene
     const lastSceneJson = storage.getString(STORAGE_KEYS.LAST_SCENE);
     if (lastSceneJson) {
       lastScene = JSON.parse(lastSceneJson);
-      console.log('[SceneCache] Loaded last scene');
     }
 
     // Load config
     const configJson = storage.getString(STORAGE_KEYS.CONFIG);
     if (configJson) {
       config = JSON.parse(configJson);
-      console.log('[SceneCache] Loaded saved config');
     }
 
     return { cache, lastScene, config };
   } catch (error) {
-    console.error('[SceneCache] Failed to load cached data:', error);
+    debugError('SceneCache', 'Failed to load cached data', error);
     return { cache: [], lastScene: null, config: null };
   }
 }
@@ -128,16 +124,14 @@ export function saveToCache(
       finalCache = filteredCache.sort((a, b) => b.cachedAt - a.cachedAt);
       // Keep only the most recent MAX_CACHE_SIZE entries
       finalCache = finalCache.slice(0, MAX_CACHE_SIZE);
-      console.log(`[SceneCache] 🗑️ Cache size limit reached, kept ${MAX_CACHE_SIZE} most recent scenes`);
     }
 
     // Save to MMKV storage
     storage.set(STORAGE_KEYS.SCENE_CACHE, JSON.stringify(finalCache));
 
-    console.log('[SceneCache] ✅ Saved to cache, total entries:', finalCache.length);
     return finalCache;
   } catch (error) {
-    console.error('[SceneCache] ❌ Failed to save cache:', error);
+    debugError('SceneCache', 'Failed to save cache', error);
     return cache;
   }
 }
@@ -150,9 +144,8 @@ export function saveToCache(
 export function saveLastScene(scene: SceneData): void {
   try {
     storage.set(STORAGE_KEYS.LAST_SCENE, JSON.stringify(scene));
-    console.log('[SceneCache] Saved last scene to storage');
   } catch (error) {
-    console.error('[SceneCache] Failed to save last scene:', error);
+    debugError('SceneCache', 'Failed to save last scene', error);
   }
 }
 
@@ -164,9 +157,8 @@ export function saveLastScene(scene: SceneData): void {
 export function saveConfig(config: SceneConfig): void {
   try {
     storage.set(STORAGE_KEYS.CONFIG, JSON.stringify(config));
-    console.log('[SceneCache] Saved config to storage');
   } catch (error) {
-    console.error('[SceneCache] Failed to save config:', error);
+    debugError('SceneCache', 'Failed to save config', error);
   }
 }
 
@@ -196,7 +188,6 @@ export async function checkCache(
 
       // Skip expired scenes - they should not be used for deduplication
       if (entry.expiresAt <= now) {
-        console.log('[SceneCache] ⏭️ Skipping expired scene in cache check');
         continue;
       }
 
@@ -207,15 +198,13 @@ export async function checkCache(
       );
 
       if (comparison.isSameScene) {
-        console.log('[SceneCache] Cache hit! Similarity:', comparison.similarity.toFixed(3));
         return { scene: entry.scene, similarity: comparison.similarity };
       }
     }
 
-    console.log('[SceneCache] Cache miss');
     return { scene: null, similarity: null };
   } catch (error) {
-    console.error('[SceneCache] Cache check failed:', error);
+    debugError('SceneCache', 'Cache check failed', error);
     return { scene: null, similarity: null };
   }
 }
@@ -228,10 +217,9 @@ export async function checkCache(
 export function clearCache(): SceneCacheEntry[] {
   try {
     storage.remove(STORAGE_KEYS.SCENE_CACHE);
-    console.log('[SceneCache] Cache cleared');
     return [];
   } catch (error) {
-    console.error('[SceneCache] Failed to clear cache:', error);
+    debugError('SceneCache', 'Failed to clear cache', error);
     return [];
   }
 }
@@ -263,15 +251,9 @@ export function clearExpiredScenes(cache: SceneCacheEntry[]): {
     // Save updated cache to storage
     storage.set(STORAGE_KEYS.SCENE_CACHE, JSON.stringify(updatedCache));
 
-    if (removedCount > 0) {
-      console.log(`[SceneCache] 🗑️ Cleared ${removedCount} expired scene(s)`);
-    } else {
-      console.log('[SceneCache] ✅ No expired scenes to clear');
-    }
-
     return { updatedCache, removedCount };
   } catch (error) {
-    console.error('[SceneCache] ❌ Failed to clear expired scenes:', error);
+    debugError('SceneCache', 'Failed to clear expired scenes', error);
     return { updatedCache: cache, removedCount: 0 };
   }
 }

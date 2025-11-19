@@ -14,6 +14,7 @@ import {
   ObjectRecognitionResponse,
 } from '../../types/scene';
 import { compressBase64Image, formatByteSize } from './imageCompression';
+import { debugLog, debugWarn, debugError } from '../../utils/debug';
 
 /**
  * Claude API configuration
@@ -56,16 +57,11 @@ export async function compressImage(
       }
     );
 
-    console.log('[ClaudeVision] ✅ Image compression complete:', {
-      originalSize: formatByteSize(stats.originalSize),
-      compressedSize: formatByteSize(stats.compressedSize),
-      savings: `${(stats.compressionRatio * 100).toFixed(1)}%`,
-      underLimit: stats.compressedSize <= maxSizeKB * 1024 ? '✓' : '✗',
-    });
+    debugLog('ClaudeVision', `Image compressed: ${formatByteSize(stats.originalSize)} → ${formatByteSize(stats.compressedSize)} (${(stats.compressionRatio * 100).toFixed(1)}% savings)`);
 
     return compressedBase64;
   } catch (error) {
-    console.error('[ClaudeVision] ⚠️ Image compression failed, using original:', error);
+    debugWarn('ClaudeVision', 'Image compression failed, using original');
     // Fallback to original image if compression fails
     return imageBase64;
   }
@@ -226,14 +222,13 @@ function buildObjectRecognitionPrompt(request: ObjectRecognitionRequest): string
  */
 function parseSceneData(responseText: string): SceneData {
   try {
-    console.log('[ClaudeVision] Parsing response text...');
+    debugLog('ClaudeVision', 'Parsing response text');
 
     // Strategy 1: Try to extract JSON from code block (```json ... ```)
     let jsonText: string | null = null;
     const codeBlockMatch = responseText.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
     if (codeBlockMatch) {
       jsonText = codeBlockMatch[1];
-      console.log('[ClaudeVision] Found JSON in code block');
     }
 
     // Strategy 2: Try to extract first complete JSON object
@@ -241,7 +236,6 @@ function parseSceneData(responseText: string): SceneData {
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         jsonText = jsonMatch[0];
-        console.log('[ClaudeVision] Found JSON object');
       }
     }
 
@@ -250,7 +244,6 @@ function parseSceneData(responseText: string): SceneData {
       const markerMatch = responseText.match(/(?:JSON|json|结果|分析)[:：]\s*(\{[\s\S]*\})/);
       if (markerMatch) {
         jsonText = markerMatch[1];
-        console.log('[ClaudeVision] Found JSON after marker');
       }
     }
 
@@ -263,7 +256,7 @@ function parseSceneData(responseText: string): SceneData {
 
     // Parse JSON
     const sceneData = JSON.parse(jsonText);
-    console.log('[ClaudeVision] JSON parsed successfully');
+    debugLog('ClaudeVision', 'JSON parsed successfully');
 
     // === Strict field validation ===
 
@@ -283,7 +276,7 @@ function parseSceneData(responseText: string): SceneData {
 
     // Validate details object (required object, can be empty)
     if (typeof sceneData.details !== 'object' || sceneData.details === null || Array.isArray(sceneData.details)) {
-      console.warn('[ClaudeVision] Invalid details field, using empty object');
+      debugWarn('ClaudeVision', 'Invalid details field, using empty object');
       sceneData.details = {};
     }
 
@@ -295,7 +288,7 @@ function parseSceneData(responseText: string): SceneData {
 
     // Validate and clean lighting (required string)
     if (typeof sceneData.lighting !== 'string' || !sceneData.lighting.trim()) {
-      console.warn('[ClaudeVision] Missing "lighting" field, using default');
+      debugWarn('ClaudeVision', 'Missing "lighting" field, using default');
       sceneData.lighting = '未知光线';
     } else {
       sceneData.lighting = sceneData.lighting.trim();
@@ -303,11 +296,11 @@ function parseSceneData(responseText: string): SceneData {
 
     // Validate and normalize confidence (required number 0-1)
     if (typeof sceneData.confidence !== 'number') {
-      console.warn('[ClaudeVision] Invalid confidence field, attempting conversion');
+      debugWarn('ClaudeVision', 'Invalid confidence field, attempting conversion');
       sceneData.confidence = parseFloat(sceneData.confidence);
     }
     if (isNaN(sceneData.confidence)) {
-      console.warn('[ClaudeVision] Cannot parse confidence, using default 0.5');
+      debugWarn('ClaudeVision', 'Cannot parse confidence, using default 0.5');
       sceneData.confidence = 0.5;
     }
     // Clamp confidence to [0, 1]
@@ -320,17 +313,11 @@ function parseSceneData(responseText: string): SceneData {
     sceneData.rawResponse = responseText;
 
     // Log parsed data summary
-    console.log('[ClaudeVision] Parsed scene data:', {
-      location: sceneData.location,
-      objectCount: sceneData.objects.length,
-      detailKeys: Object.keys(sceneData.details),
-      confidence: sceneData.confidence,
-    });
+    debugLog('ClaudeVision', `Parsed scene: ${sceneData.location} (${sceneData.objects.length} objects, confidence: ${sceneData.confidence})`);
 
     return sceneData as SceneData;
   } catch (error) {
-    console.error('[ClaudeVision] Failed to parse scene data:', error);
-    console.error('[ClaudeVision] Raw response:', responseText);
+    debugError('ClaudeVision', 'Failed to parse scene data', error);
 
     // Return comprehensive fallback scene data
     return {
@@ -362,11 +349,7 @@ export async function analyzeSceneWithClaude(
   const startTime = Date.now();
 
   try {
-    console.log('[ClaudeVision] Starting scene analysis:', {
-      triggerType: request.triggerType,
-      hasUserQuestion: !!request.userQuestion,
-      hasPreviousScene: !!request.previousScene,
-    });
+    debugLog('ClaudeVision', `Starting scene analysis (trigger: ${request.triggerType})`);
 
     // Compress image if needed
     const compressedImage = await compressImage(request.imageBase64);
@@ -381,12 +364,7 @@ export async function analyzeSceneWithClaude(
       imageData = imageData.split(',')[1] || imageData;
     }
 
-    console.log('[ClaudeVision] Preparing API request...');
-    console.log(
-      '[ClaudeVision] Image size:',
-      Math.round((imageData.length * 0.75) / 1024),
-      'KB'
-    );
+    debugLog('ClaudeVision', `Preparing API request (image: ${Math.round((imageData.length * 0.75) / 1024)}KB)`);
 
     // Make API call to Claude Vision
     const response = await fetch(CLAUDE_API_CONFIG.endpoint, {
@@ -433,11 +411,7 @@ export async function analyzeSceneWithClaude(
 
     // Parse API response
     const apiResponse = await response.json();
-    console.log('[ClaudeVision] API response received:', {
-      id: apiResponse.id,
-      model: apiResponse.model,
-      usage: apiResponse.usage,
-    });
+    debugLog('ClaudeVision', `API response received (id: ${apiResponse.id})`);
 
     // Extract text content from response
     const responseText = apiResponse.content?.[0]?.text || 'No response text';
@@ -452,12 +426,7 @@ export async function analyzeSceneWithClaude(
     );
 
     const duration = Date.now() - startTime;
-    console.log(`[ClaudeVision] Analysis completed in ${duration}ms`);
-    console.log('[ClaudeVision] Detected scene:', {
-      location: scene.location,
-      objectCount: scene.objects.length,
-      confidence: scene.confidence,
-    });
+    debugLog('ClaudeVision', `Analysis completed in ${duration}ms: ${scene.location}`);
 
     return {
       scene,
@@ -467,7 +436,7 @@ export async function analyzeSceneWithClaude(
     };
   } catch (error) {
     const duration = Date.now() - startTime;
-    console.error(`[ClaudeVision] Analysis failed after ${duration}ms:`, error);
+    debugError('ClaudeVision', `Analysis failed after ${duration}ms`, error);
 
     return {
       scene: {
@@ -517,13 +486,7 @@ export function estimateAPICost(
 
   const totalCost = inputCost + outputCost;
 
-  console.log('[ClaudeVision] Cost estimate:', {
-    imageSizeKB: imageSizeKB.toFixed(2),
-    imageTokens,
-    inputTokens,
-    outputTokens,
-    totalCost: `$${totalCost.toFixed(4)}`,
-  });
+  debugLog('ClaudeVision', `Cost: $${totalCost.toFixed(4)} (${imageSizeKB.toFixed(0)}KB, ${inputTokens}+${outputTokens} tokens)`);
 
   return totalCost;
 }
@@ -536,14 +499,13 @@ export function estimateAPICost(
  */
 function parseObjectRecognitionData(responseText: string): ObjectRecognitionData {
   try {
-    console.log('[ClaudeVision] Parsing object recognition response...');
+    debugLog('ClaudeVision', 'Parsing object recognition response');
 
     // Strategy 1: Try to extract JSON from code block
     let jsonText: string | null = null;
     const codeBlockMatch = responseText.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
     if (codeBlockMatch) {
       jsonText = codeBlockMatch[1];
-      console.log('[ClaudeVision] Found JSON in code block');
     }
 
     // Strategy 2: Try to extract first complete JSON object
@@ -551,7 +513,6 @@ function parseObjectRecognitionData(responseText: string): ObjectRecognitionData
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         jsonText = jsonMatch[0];
-        console.log('[ClaudeVision] Found JSON object');
       }
     }
 
@@ -564,7 +525,7 @@ function parseObjectRecognitionData(responseText: string): ObjectRecognitionData
 
     // Parse JSON
     const objectData = JSON.parse(jsonText);
-    console.log('[ClaudeVision] JSON parsed successfully');
+    debugLog('ClaudeVision', 'JSON parsed successfully');
 
     // Validate required fields
     if (typeof objectData.objectName !== 'string' || !objectData.objectName.trim()) {
@@ -596,17 +557,17 @@ function parseObjectRecognitionData(responseText: string): ObjectRecognitionData
       (typeof objectData.additionalInfo !== 'object' ||
         Array.isArray(objectData.additionalInfo))
     ) {
-      console.warn('[ClaudeVision] Invalid additionalInfo field, using empty object');
+      debugWarn('ClaudeVision', 'Invalid additionalInfo field, using empty object');
       objectData.additionalInfo = {};
     }
 
     // Validate and normalize confidence
     if (typeof objectData.confidence !== 'number') {
-      console.warn('[ClaudeVision] Invalid confidence field, attempting conversion');
+      debugWarn('ClaudeVision', 'Invalid confidence field, attempting conversion');
       objectData.confidence = parseFloat(objectData.confidence);
     }
     if (isNaN(objectData.confidence)) {
-      console.warn('[ClaudeVision] Cannot parse confidence, using default 0.5');
+      debugWarn('ClaudeVision', 'Cannot parse confidence, using default 0.5');
       objectData.confidence = 0.5;
     }
     // Clamp confidence to [0, 1]
@@ -618,16 +579,11 @@ function parseObjectRecognitionData(responseText: string): ObjectRecognitionData
     // Store raw response for debugging
     objectData.rawResponse = responseText;
 
-    console.log('[ClaudeVision] Parsed object data:', {
-      objectName: objectData.objectName,
-      category: objectData.category,
-      confidence: objectData.confidence,
-    });
+    debugLog('ClaudeVision', `Parsed object: ${objectData.objectName} (${objectData.category}, confidence: ${objectData.confidence})`);
 
     return objectData as ObjectRecognitionData;
   } catch (error) {
-    console.error('[ClaudeVision] Failed to parse object recognition data:', error);
-    console.error('[ClaudeVision] Raw response:', responseText);
+    debugError('ClaudeVision', 'Failed to parse object recognition data', error);
 
     // Return fallback object data
     return {
@@ -655,10 +611,7 @@ export async function recognizeObjectWithClaude(
   const startTime = Date.now();
 
   try {
-    console.log('[ClaudeVision] Starting object recognition:', {
-      userPrompt: request.userPrompt,
-      mode: request.mode,
-    });
+    debugLog('ClaudeVision', `Starting object recognition: ${request.userPrompt}`);
 
     // Compress image if needed
     const compressedImage = await compressImage(request.imageBase64);
@@ -672,12 +625,7 @@ export async function recognizeObjectWithClaude(
       imageData = imageData.split(',')[1] || imageData;
     }
 
-    console.log('[ClaudeVision] Preparing API request...');
-    console.log(
-      '[ClaudeVision] Image size:',
-      Math.round((imageData.length * 0.75) / 1024),
-      'KB'
-    );
+    debugLog('ClaudeVision', `Preparing API request (image: ${Math.round((imageData.length * 0.75) / 1024)}KB)`);
 
     // Make API call to Claude Vision
     const response = await fetch(CLAUDE_API_CONFIG.endpoint, {
@@ -724,11 +672,7 @@ export async function recognizeObjectWithClaude(
 
     // Parse API response
     const apiResponse = await response.json();
-    console.log('[ClaudeVision] API response received:', {
-      id: apiResponse.id,
-      model: apiResponse.model,
-      usage: apiResponse.usage,
-    });
+    debugLog('ClaudeVision', `API response received (id: ${apiResponse.id})`);
 
     // Extract text content from response
     const responseText = apiResponse.content?.[0]?.text || 'No response text';
@@ -743,12 +687,7 @@ export async function recognizeObjectWithClaude(
     );
 
     const duration = Date.now() - startTime;
-    console.log(`[ClaudeVision] Object recognition completed in ${duration}ms`);
-    console.log('[ClaudeVision] Recognized object:', {
-      name: object.objectName,
-      category: object.category,
-      confidence: object.confidence,
-    });
+    debugLog('ClaudeVision', `Object recognition completed in ${duration}ms: ${object.objectName}`);
 
     return {
       object,
@@ -757,7 +696,7 @@ export async function recognizeObjectWithClaude(
     };
   } catch (error) {
     const duration = Date.now() - startTime;
-    console.error(`[ClaudeVision] Object recognition failed after ${duration}ms:`, error);
+    debugError('ClaudeVision', `Object recognition failed after ${duration}ms`, error);
 
     return {
       object: {

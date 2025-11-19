@@ -22,6 +22,7 @@ import {
 } from '../../../types/scene';
 import { analyzeSceneWithClaude } from '../claudeVision';
 import { generateThumbnail } from '../imageComparison';
+import { debugLog, debugWarn, debugError } from '../../../utils/debug';
 
 // Import modularized functions
 import {
@@ -288,7 +289,7 @@ export function useSceneUnderstanding(
       timerRef.current = setTimeout(async () => {
         // Step 5.3: Skip if conversation is inactive
         if (timerState.isPausedDueToInactivity) {
-          console.log('[SceneUnderstanding] ⏸️ Skipping photo capture - conversation inactive');
+          debugLog('SceneUnderstanding', 'Skipping photo capture - conversation inactive');
           setTimerState(prev => ({
             ...prev,
             nextCaptureIn: 30000, // Reset to 30 seconds
@@ -296,13 +297,11 @@ export function useSceneUnderstanding(
           return;
         }
 
-        console.log('[SceneUnderstanding] Timer: Capturing photo...');
-
         if (photoCaptureCallback.current) {
           try {
             const imageBase64 = await photoCaptureCallback.current();
             if (imageBase64) {
-              console.log('[SceneUnderstanding] Timer: Photo captured');
+              debugLog('SceneUnderstanding', 'Timer: Photo captured');
 
               // Step 3.2: Check for scene change
               const hasSceneChanged = await checkSceneChangeUtil(
@@ -311,13 +310,8 @@ export function useSceneUnderstanding(
                 config.sceneChangeThreshold
               );
 
-              console.log('[SceneUnderstanding] 🔍 Scene change check result:', {
-                hasSceneChanged,
-                timerStateLastChangeTime: timerState.lastSceneChangeTime,
-              });
-
               if (hasSceneChanged) {
-                console.log('[SceneUnderstanding] ✅ Scene change detected!');
+                debugLog('SceneUnderstanding', 'Scene change detected');
 
                 // Check cooldown period (1 minute = 60000ms)
                 const { isInCooldown, remainingCooldown } = checkSceneChangeCooldown(
@@ -325,22 +319,18 @@ export function useSceneUnderstanding(
                 );
 
                 if (isInCooldown) {
-                  console.log(`[SceneUnderstanding] ⏸️ Scene change cooldown active, ${remainingCooldown}s remaining - SKIPPING ANALYSIS`);
+                  debugLog('SceneUnderstanding', `Scene change cooldown: ${remainingCooldown}s remaining`);
                 } else {
-                  console.log('[SceneUnderstanding] 🚀 Triggering scene change analysis...');
+                  debugLog('SceneUnderstanding', 'Triggering scene change analysis');
 
                   // Trigger deep analysis due to scene change
                   analyzeScene(imageBase64, undefined, false, true).catch(error => {
-                    console.error('[SceneUnderstanding] ❌ Scene change analysis failed:', error);
+                    debugError('SceneUnderstanding', 'Scene change analysis failed', error);
                   });
 
                   // Update state: record scene change trigger and reset timer
                   setTimerState(prev => updateAfterSceneChange(prev));
-
-                  console.log('[SceneUnderstanding] ✅ Scene change state updated, timer reset to 5 minutes');
                 }
-              } else {
-                console.log('[SceneUnderstanding] ⏭️ Scene unchanged, skipping analysis');
               }
 
               // Store captured image
@@ -350,17 +340,17 @@ export function useSceneUnderstanding(
               setTimerState(prev => updateAfterPhotoCapture(prev));
             }
           } catch (error) {
-            console.error('[SceneUnderstanding] Timer: Photo capture failed:', error);
+            debugError('SceneUnderstanding', 'Photo capture failed', error);
           }
         } else {
-          console.warn('[SceneUnderstanding] Timer: No photo capture callback registered');
+          debugWarn('SceneUnderstanding', 'No photo capture callback registered');
         }
       }, timerState.nextCaptureIn);
     }
 
     // Set flag for deep analysis (every 5 minutes)
     if (timerState.nextAnalysisIn <= 0 && !shouldTriggerAnalysis.current) {
-      console.log('[SceneUnderstanding] Timer: Marking for deep analysis...');
+      debugLog('SceneUnderstanding', 'Marking for deep analysis');
       shouldTriggerAnalysis.current = true;
     }
 
@@ -396,12 +386,12 @@ export function useSceneUnderstanding(
       isSceneChangeTriggered: boolean = false
     ): Promise<void> => {
       if (!config.enabled) {
-        console.log('[SceneUnderstanding] Feature disabled');
+        debugLog('SceneUnderstanding', 'Feature disabled');
         return;
       }
 
       if (isAnalyzing) {
-        console.log('[SceneUnderstanding] Analysis already in progress');
+        debugLog('SceneUnderstanding', 'Analysis already in progress');
         return;
       }
 
@@ -409,7 +399,7 @@ export function useSceneUnderstanding(
       setError(null);
 
       try {
-        console.log('[SceneUnderstanding] Starting scene analysis');
+        debugLog('SceneUnderstanding', 'Starting scene analysis');
 
         // Update debug info
         setDebugInfo(prev => ({
@@ -430,7 +420,7 @@ export function useSceneUnderstanding(
         );
 
         if (cacheResult.scene && !userQuestion) {
-          console.log('[SceneUnderstanding] ✅ Using cached scene (Step 4.1 cache hit)');
+          debugLog('SceneUnderstanding', 'Using cached scene');
 
           // Update scene with new timestamp
           const updatedScene: SceneData = {
@@ -457,7 +447,7 @@ export function useSceneUnderstanding(
             lastDeduplicationTime: Date.now(),
           }));
 
-          console.log('[SceneUnderstanding] 💰 API call saved via cache! Total saved:', deduplicationStats.savedAPICalls + 1);
+          debugLog('SceneUnderstanding', `API call saved via cache! Total: ${deduplicationStats.savedAPICalls + 1}`);
 
           // Update last image for next comparison
           lastImageBase64.current = imageBase64;
@@ -470,16 +460,7 @@ export function useSceneUnderstanding(
         }
 
         // Step 4.2: Semantic deduplication - Check if scene is still the same
-        // Use image similarity as a proxy for semantic similarity to avoid unnecessary API calls
-        console.log('[SceneUnderstanding] 🔍 Step 4.2: Deduplication check conditions:', {
-          hasCurrentScene: !!currentScene,
-          hasUserQuestion: !!userQuestion,
-          hasLastImage: !!lastImageBase64.current,
-        });
-
         if (currentScene && !userQuestion && lastImageBase64.current) {
-          console.log('[SceneUnderstanding] ✅ All conditions met, checking for semantic deduplication...');
-
           const { shouldDeduplicate, similarity: imageSimilarity } = await checkSemanticDeduplication(
             imageBase64,
             lastImageBase64.current,
@@ -487,9 +468,8 @@ export function useSceneUnderstanding(
           );
 
           // If image similarity is very high (>= deduplicationThreshold), assume semantic similarity
-          // This avoids calling the API for virtually identical scenes
           if (shouldDeduplicate) {
-            console.log('[SceneUnderstanding] ✅ High image similarity detected, skipping API call (semantic deduplication)');
+            debugLog('SceneUnderstanding', 'High similarity - skipping API call (semantic deduplication)');
 
             // Update the scene timestamp to indicate it's still active
             const updatedScene: SceneData = {
@@ -509,15 +489,13 @@ export function useSceneUnderstanding(
               lastDeduplicationTime: Date.now(),
             }));
 
-            console.log('[SceneUnderstanding] 💰 API call saved! Total saved:', deduplicationStats.savedAPICalls + 1);
+            debugLog('SceneUnderstanding', `API call saved! Total: ${deduplicationStats.savedAPICalls + 1}`);
 
             // Update last image for next comparison
             lastImageBase64.current = imageBase64;
 
             setIsAnalyzing(false);
             return;
-          } else {
-            console.log('[SceneUnderstanding] ⏭️ Image similarity below threshold, proceeding with API call');
           }
         }
 
@@ -558,11 +536,7 @@ export function useSceneUnderstanding(
           const newCallCount = totalAPICalls + 1;
           const newAverageResponseTime = newTotalResponseTime / newCallCount;
 
-          console.log('[SceneUnderstanding] ⏱️ Performance stats:', {
-            lastResponseTime: `${responseTime}ms`,
-            averageResponseTime: `${newAverageResponseTime.toFixed(0)}ms`,
-            totalCalls: newCallCount,
-          });
+          debugLog('SceneUnderstanding', `Response time: ${responseTime}ms, Avg: ${newAverageResponseTime.toFixed(0)}ms`);
 
           return {
             lastResponseTime: responseTime,
@@ -578,9 +552,8 @@ export function useSceneUnderstanding(
         }
 
         // Update scene change analysis count if triggered by scene change (Step 3.2)
-        // Note: State update already done in timer callback, this is just for logging
         if (isSceneChangeTriggered) {
-          console.log('[SceneUnderstanding] Scene change analysis completed');
+          debugLog('SceneUnderstanding', 'Scene change analysis completed');
         }
 
         // Save to cache
@@ -600,10 +573,10 @@ export function useSceneUnderstanding(
         // Step 4.2: Update last image for future deduplication comparison
         lastImageBase64.current = imageBase64;
 
-        console.log('[SceneUnderstanding] Analysis completed successfully');
+        debugLog('SceneUnderstanding', 'Analysis completed successfully');
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-        console.error('[SceneUnderstanding] Analysis failed:', errorMessage);
+        debugError('SceneUnderstanding', 'Analysis failed', errorMessage);
         setError(errorMessage);
       } finally {
         setIsAnalyzing(false);
@@ -617,9 +590,9 @@ export function useSceneUnderstanding(
    */
   useEffect(() => {
     if (shouldTriggerAnalysis.current && lastImageBase64.current && !isAnalyzing) {
-      console.log('[SceneUnderstanding] Triggering timer-based analysis...');
+      debugLog('SceneUnderstanding', 'Triggering timer-based analysis');
       analyzeScene(lastImageBase64.current, undefined, true).catch(error => {
-        console.error('[SceneUnderstanding] Timer analysis failed:', error);
+        debugError('SceneUnderstanding', 'Timer analysis failed', error);
         shouldTriggerAnalysis.current = false;
       });
     }
@@ -691,7 +664,7 @@ export function useSceneUnderstanding(
       lastSimilarity: null,
       lastDeduplicationTime: null,
     });
-    console.log('[SceneUnderstanding] Statistics reset');
+    debugLog('SceneUnderstanding', 'Statistics reset');
   }, []);
 
   /**
@@ -713,7 +686,7 @@ export function useSceneUnderstanding(
    */
   const setPhotoCaptureCallback = useCallback(
     (callback: () => Promise<string | null>): void => {
-      console.log('[SceneUnderstanding] Photo capture callback registered');
+      debugLog('SceneUnderstanding', 'Photo capture callback registered');
       photoCaptureCallback.current = callback;
     },
     []
@@ -736,26 +709,25 @@ export function useSceneUnderstanding(
    */
   const triggerByKeyword = useCallback(
     async (keyword: string, userQuestion: string): Promise<void> => {
-      console.log('[SceneUnderstanding] 🎯 Keyword trigger:', keyword);
-      console.log('[SceneUnderstanding] 📝 User question:', userQuestion);
+      debugLog('SceneUnderstanding', `Keyword trigger: ${keyword}`);
 
       // Check if photo capture callback is registered
       if (!photoCaptureCallback.current) {
-        console.warn('[SceneUnderstanding] ⚠️ No photo capture callback registered, cannot trigger keyword analysis');
+        debugWarn('SceneUnderstanding', 'No photo capture callback registered');
         return;
       }
 
       try {
         // Capture photo immediately
-        console.log('[SceneUnderstanding] 📸 Capturing photo for keyword analysis...');
+        debugLog('SceneUnderstanding', 'Capturing photo for keyword analysis');
         const imageBase64 = await photoCaptureCallback.current();
 
         if (!imageBase64) {
-          console.error('[SceneUnderstanding] ❌ Failed to capture photo');
+          debugError('SceneUnderstanding', 'Failed to capture photo', null);
           return;
         }
 
-        console.log('[SceneUnderstanding] ✅ Photo captured, triggering analysis...');
+        debugLog('SceneUnderstanding', 'Photo captured, triggering analysis');
 
         // Trigger analysis with user question
         // Note: This bypasses cooldown and cache (high priority)
@@ -764,9 +736,9 @@ export function useSceneUnderstanding(
         // Update statistics
         setTimerState(prev => updateAfterKeywordAnalysis(prev, keyword));
 
-        console.log('[SceneUnderstanding] ✅ Keyword-triggered analysis completed');
+        debugLog('SceneUnderstanding', 'Keyword-triggered analysis completed');
       } catch (error) {
-        console.error('[SceneUnderstanding] ❌ Keyword-triggered analysis failed:', error);
+        debugError('SceneUnderstanding', 'Keyword-triggered analysis failed', error);
       }
     },
     [analyzeScene]
@@ -780,11 +752,10 @@ export function useSceneUnderstanding(
    */
   const getCachedScenes = useCallback((): SceneCacheEntry[] => {
     try {
-      // Return the state (which is already filtered and sorted)
-      console.log('[SceneUnderstanding] 📚 Retrieved', cachedScenes.length, 'cached scenes');
+      debugLog('SceneUnderstanding', `Retrieved ${cachedScenes.length} cached scenes`);
       return cachedScenes;
     } catch (error) {
-      console.error('[SceneUnderstanding] ❌ Failed to get cached scenes:', error);
+      debugError('SceneUnderstanding', 'Failed to get cached scenes', error);
       return [];
     }
   }, [cachedScenes]);
@@ -808,7 +779,7 @@ export function useSceneUnderstanding(
    */
   const notifyConversationActivity = useCallback((): void => {
     setTimerState(prev => updateConversationActivity(prev));
-    console.log('[SceneUnderstanding] 💬 Conversation activity notified - timer resumed');
+    debugLog('SceneUnderstanding', 'Conversation activity - timer resumed');
   }, []);
 
   return {
