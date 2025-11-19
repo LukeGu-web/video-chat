@@ -12,12 +12,10 @@ import { SafeAreaView as SafeAreaViewRN } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useUserStore, ChatMessage, useAIStatus } from '../store';
 import { useChatAI } from '../hooks/';
+import { useAIConversationFlow } from '../hooks/useAIConversationFlow'; // Step 2.3: AI conversation flow hook
 import { useSpeechToText } from '../capabilities/listen';
 import {
   useSceneUnderstanding,
-  detectVisualKeywords,
-  detectObjectKeywords,
-  formatObjectRecognitionForAI,
   useObjectRecognition,
 } from '../capabilities/vision';
 import { PERSONALITY_PROMPTS, getClaudeApiKey } from '../constants';
@@ -32,10 +30,7 @@ import {
 } from '../components';
 import { EmotionDetector } from '../components/vision';
 import { useBackgroundContext } from '../hooks/useBackgroundContext';
-import {
-  getBackgroundImageSource,
-  formatStoryForAI,
-} from '../utils/backgroundStory';
+import { getBackgroundImageSource } from '../utils/backgroundStory';
 import { isDebugMode } from '../utils/debug';
 
 type RootStackParamList = {
@@ -485,206 +480,29 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
     return `msg_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   };
 
-  // AI 对话流程
-  const runAIFlow = useCallback(
-    async (inputText: string) => {
-      if (!inputText.trim()) return;
-
-      try {
-        // Step 5.3: Notify conversation activity (smart pause)
-        sceneUnderstanding.notifyConversationActivity();
-
-        // 1. 添加用户消息到聊天历史
-        const userMessage: ChatMessage = {
-          id: generateMessageId(),
-          role: 'user',
-          content: inputText.trim(),
-          timestamp: Date.now(),
-          isVoiceMessage: true,
-        };
-        addChatMessage(userMessage);
-
-        // 2. Check for object recognition keywords first (higher priority)
-        let objectContext = '';
-        const objectKeyword = detectObjectKeywords(inputText);
-
-        if (objectKeyword) {
-          console.log(
-            `[HomeScreen] 🎯 Object recognition keyword detected: "${objectKeyword}"`
-          );
-
-          // Check if we have a captured frame
-          if (lastCapturedFrameRef.current) {
-            try {
-              console.log('[HomeScreen] 📸 Starting object recognition...');
-
-              // Trigger object recognition
-              const recognitionResponse =
-                await objectRecognition.recognizeObject(
-                  lastCapturedFrameRef.current,
-                  inputText // Pass user's original question
-                );
-
-              if (recognitionResponse.success) {
-                // Format object recognition result as context
-                objectContext = formatObjectRecognitionForAI(
-                  recognitionResponse.object
-                );
-                console.log('[HomeScreen] ✅ Object recognition complete:', {
-                  name: recognitionResponse.object.objectName,
-                  category: recognitionResponse.object.category,
-                  contextLength: objectContext.length,
-                });
-              } else {
-                console.error(
-                  '[HomeScreen] ❌ Object recognition failed:',
-                  recognitionResponse.error
-                );
-                setToastMessage(recognitionResponse.error || '物品识别失败');
-                setToastType('error');
-                setShowToast(true);
-              }
-            } catch (error) {
-              console.error('[HomeScreen] ❌ Object recognition error:', error);
-              setToastMessage(
-                `物品识别失败: ${
-                  error instanceof Error ? error.message : '未知错误'
-                }`
-              );
-              setToastType('error');
-              setShowToast(true);
-            }
-          } else {
-            console.log(
-              '[HomeScreen] ⚠️ Object keyword detected but no image available'
-            );
-          }
-        }
-
-        // 3. If no object keyword, check for scene keywords and trigger scene analysis
-        const detectedKeyword = !objectKeyword
-          ? detectVisualKeywords(inputText)
-          : null;
-
-        if (detectedKeyword) {
-          console.log(
-            `[HomeScreen] 🎯 Visual keyword detected: "${detectedKeyword}"`
-          );
-
-          // Check if we have a captured frame
-          if (lastCapturedFrameRef.current) {
-            try {
-              console.log(
-                '[HomeScreen] 🔍 Starting scene analysis with caching...'
-              );
-
-              // Use sceneUnderstanding.analyzeScene to ensure caching
-              await sceneUnderstanding.analyzeScene(
-                lastCapturedFrameRef.current,
-                inputText // Pass user question for context
-              );
-
-              // Update userStore with the analyzed scene for AI context
-              const analyzedScene = sceneUnderstanding.currentScene;
-              if (analyzedScene) {
-                setCurrentScene(analyzedScene);
-                console.log('[HomeScreen] 📝 Updated userStore.currentScene:', {
-                  location: analyzedScene.location,
-                  objects: analyzedScene.objects,
-                  timestamp: analyzedScene.timestamp,
-                });
-              } else {
-                console.warn(
-                  '[HomeScreen] ⚠️ No scene data returned from analysis'
-                );
-              }
-
-              console.log('[HomeScreen] ✅ Scene analysis complete and cached');
-            } catch (error) {
-              console.error('[HomeScreen] ❌ Scene analysis error:', error);
-              setToastMessage(
-                `场景分析失败: ${
-                  error instanceof Error ? error.message : '未知错误'
-                }`
-              );
-              setToastType('error');
-              setShowToast(true);
-            }
-          } else {
-            console.log(
-              '[HomeScreen] ⚠️ Visual keyword detected but no image available'
-            );
-          }
-        }
-
-        // 4. 准备背景故事和物品识别上下文（如果可用）
-        let combinedContext = '';
-
-        // Add background story if available
-        if (backgroundContext) {
-          combinedContext += formatStoryForAI(backgroundContext);
-        }
-
-        // Add object recognition context if triggered by keyword
-        if (objectContext) {
-          if (combinedContext) {
-            combinedContext += '\n\n';
-          }
-          combinedContext += objectContext;
-        } else {
-          // Check if there's a recent object recognition record (within 5 minutes)
-          // This allows user to manually recognize an object, then ask AI about it
-          const recentRecords = objectRecognition.records;
-          if (recentRecords.length > 0) {
-            const latestRecord = recentRecords[0]; // Already sorted newest first
-            const recordAge = Date.now() - latestRecord.createdAt;
-            const fiveMinutesInMs = 5 * 60 * 1000;
-
-            if (recordAge < fiveMinutesInMs) {
-              console.log(
-                '[HomeScreen] 📦 Using recent object recognition as context:',
-                {
-                  name: latestRecord.data.objectName,
-                  ageSeconds: Math.round(recordAge / 1000),
-                }
-              );
-
-              if (combinedContext) {
-                combinedContext += '\n\n';
-              }
-              combinedContext += '【最近识别的物品】\n';
-              combinedContext += formatObjectRecognitionForAI(
-                latestRecord.data
-              );
-            }
-          }
-        }
-
-        // 5. 调用 AI 获取回复并播放 TTS
-        await sendMessage(inputText, {
-          modelType: 'haiku',
-          enableTTS: true, // 启用语音播放
-          backgroundStory: combinedContext || undefined, // 传递合并后的上下文（背景故事 + 物品识别）
-          sceneContext: sceneUnderstanding.currentScene, // 直接传递场景数据，避免状态更新延迟
-        });
-
-        // 注意：状态变化由统一的 useEffect 管理
-      } catch (error) {
-        console.error('AI flow error:', error);
-        // 错误处理，状态会自动回到 idle
-      }
+  // Step 2.3: Use AI conversation flow hook
+  const { startConversation } = useAIConversationFlow({
+    sendMessage,
+    sceneUnderstanding,
+    objectRecognition,
+    backgroundContext,
+    addChatMessage,
+    setCurrentScene,
+    setToast: (message: string, type: 'error' | 'success') => {
+      setToastMessage(message);
+      setToastType(type);
+      setShowToast(true);
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [addChatMessage, sendMessage, backgroundContext, setCurrentScene]
-    // Note: sceneUnderstanding excluded to prevent re-render loop
-  );
+    getCapturedFrame: () => lastCapturedFrameRef.current,
+    generateMessageId,
+  });
 
-  // 核心语音对话流程（使用 runAIFlow）
+  // 核心语音对话流程（使用 AI conversation flow hook）
   const handleVoiceConversation = useCallback(
     async (userText: string) => {
-      await runAIFlow(userText);
+      await startConversation(userText);
     },
-    [runAIFlow]
+    [startConversation]
   );
 
   // 监听语音识别完成
