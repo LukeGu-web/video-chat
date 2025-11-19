@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Modal, Pressable } from 'react-native';
-import { isDebugMode } from '../utils/debug';
 
 interface HeaderProps {
   onGoToChatHistory?: () => void;

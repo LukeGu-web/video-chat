@@ -27,11 +27,13 @@ import {
   EmotionProvider,
   useEmotionContext,
   EmotionAwareCharacter,
+  FunctionMonitor,
 } from '../components';
 import { EmotionDetector } from '../components/vision';
 import { useBackgroundContext } from '../hooks/useBackgroundContext';
 import { getBackgroundImageSource } from '../utils/backgroundStory';
-import { isDebugMode, debugLog, debugWarn, debugError } from '../utils/debug';
+import { debugLog, debugWarn, debugError } from '../utils/debug';
+import { MonitorProvider, useMonitorContext } from '../contexts/MonitorContext';
 
 type RootStackParamList = {
   Welcome: undefined;
@@ -68,6 +70,10 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
     isLoading: isBackgroundLoading,
     error: backgroundError,
   } = useBackgroundContext();
+
+  // Monitor context for debug panel
+  const { updateBackgroundScene, updateSceneUnderstanding } =
+    useMonitorContext();
 
   const { setAIStatus } = useAIStatus();
   const {
@@ -124,6 +130,41 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
     },
     []
   );
+
+  // Sync background scene to monitor context
+  useEffect(() => {
+    if (backgroundContext) {
+      updateBackgroundScene({
+        sceneId: backgroundContext.scene.id,
+        dayType: backgroundContext.scene.dayType,
+        timePeriod: backgroundContext.scene.timePeriod,
+        location: backgroundContext.scene.location,
+        weather: backgroundContext.weather,
+        storyPreview: backgroundContext.story.substring(0, 60),
+      });
+    } else {
+      updateBackgroundScene(null);
+    }
+  }, [backgroundContext, updateBackgroundScene]);
+
+  // Sync scene understanding status to monitor context
+  useEffect(() => {
+    updateSceneUnderstanding({
+      isAnalyzing: sceneUnderstanding.isAnalyzing,
+      totalAPICalls: sceneUnderstanding.totalAPICalls,
+      currentLocation: sceneUnderstanding.currentScene?.location || null,
+      timerEnabled: sceneUnderstanding.timerState.enabled,
+      nextCaptureInSeconds: Math.floor(
+        sceneUnderstanding.timerState.nextCaptureIn / 1000
+      ),
+    });
+  }, [
+    sceneUnderstanding.isAnalyzing,
+    sceneUnderstanding.totalAPICalls,
+    sceneUnderstanding.currentScene,
+    sceneUnderstanding.timerState,
+    updateSceneUnderstanding,
+  ]);
 
   // Debug: Log API key once on mount
   useEffect(() => {
@@ -561,74 +602,24 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
           frameCaptureInterval={5000} // 5 seconds - faster initial capture for scene understanding
         />
 
-        {/* Debug Background Info (only in debug mode) */}
-        {isDebugMode() && backgroundContext && (
-          <View className='absolute left-0 w-4/5 p-3 rounded-lg top-14 bg-black/70'>
-            <Text className='mb-1 text-xs font-bold text-white'>
-              背景场景调试信息
-            </Text>
-            <Text className='text-xs text-white'>
-              场景ID: {backgroundContext.scene.id}
-            </Text>
-            <Text className='text-xs text-white'>
-              类型: {backgroundContext.scene.dayType} -{' '}
-              {backgroundContext.scene.timePeriod}
-            </Text>
-            <Text className='text-xs text-white'>
-              地点: {backgroundContext.scene.location}
-            </Text>
-            <Text className='text-xs text-white'>
-              天气: {backgroundContext.weather}
-            </Text>
-            <Text className='text-xs text-white' numberOfLines={2}>
-              故事: {backgroundContext.story.substring(0, 60)}...
-            </Text>
-          </View>
-        )}
-
-        {/* Debug Scene Understanding Test Button (only in debug mode) */}
-        {isDebugMode() && (
-          <View className='absolute right-0 p-3 rounded-lg top-80 bg-black/70'>
-            <Text className='mb-2 text-xs font-bold text-white'>
-              场景理解调试
-            </Text>
-            <TouchableOpacity
-              onPress={handleManualSceneTest}
-              className='px-3 py-2 mb-1 bg-blue-600 rounded'
-              disabled={sceneUnderstanding.isAnalyzing}
-            >
-              <Text className='text-xs font-semibold text-white'>
-                {sceneUnderstanding.isAnalyzing
-                  ? '分析中...'
-                  : '手动测试场景分析'}
-              </Text>
-            </TouchableOpacity>
-            <Text className='mt-1 text-xs text-white'>
-              API调用: {sceneUnderstanding.totalAPICalls}
-            </Text>
-            <Text className='text-xs text-white'>
-              当前场景: {sceneUnderstanding.currentScene?.location || '无'}
-            </Text>
-            <Text className='text-xs text-white'>
-              定时器: {sceneUnderstanding.timerState.enabled ? '开启' : '关闭'}
-            </Text>
-            <Text className='text-xs text-white'>
-              下次拍照:{' '}
-              {Math.floor(sceneUnderstanding.timerState.nextCaptureIn / 1000)}s
-            </Text>
-          </View>
-        )}
+        {/* Function Monitor - Unified Debug Panel */}
+        <FunctionMonitor
+          onTestSceneAnalysis={handleManualSceneTest}
+          isAnalyzing={sceneUnderstanding.isAnalyzing}
+        />
       </SafeAreaViewRN>
     </ImageBackground>
   );
 };
 
-// 带情绪提供器的HomeScreen包装器
+// 带情绪提供器和监控提供器的HomeScreen包装器
 const HomeScreen: React.FC<Props> = ({ navigation }) => {
   return (
-    <EmotionProvider>
-      <HomeScreenContent navigation={navigation} />
-    </EmotionProvider>
+    <MonitorProvider>
+      <EmotionProvider>
+        <HomeScreenContent navigation={navigation} />
+      </EmotionProvider>
+    </MonitorProvider>
   );
 };
 

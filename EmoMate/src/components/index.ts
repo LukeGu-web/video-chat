@@ -14,3 +14,4 @@ export {
   useConversationState,
   ConversationState,
 } from './ConversationStateIndicator';
+export { default as FunctionMonitor } from './FunctionMonitor';

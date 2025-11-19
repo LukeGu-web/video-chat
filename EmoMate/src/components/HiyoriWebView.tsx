@@ -3,12 +3,12 @@ import { View, Text, TouchableOpacity } from 'react-native';
 import { WebView } from 'react-native-webview';
 import Constants from 'expo-constants';
 import {
-  isDebugMode,
   debugLog,
   debugError,
   debugWarn,
   DebugTimer,
 } from '../utils/debug';
+import { useMonitorContext } from '../contexts/MonitorContext';
 
 interface HiyoriWebViewProps {
   style?: any;
@@ -60,6 +60,26 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
       error: null,
       loadAttempts: 0,
     });
+
+    // Monitor context for debug panel
+    const { updateWebViewStatus } = useMonitorContext();
+
+    // Sync state to monitor context
+    useEffect(() => {
+      updateWebViewStatus({
+        isWebViewReady: state.isWebViewReady,
+        isModelReady: state.isModelReady,
+        isLoading: state.isLoading,
+        error: state.error,
+        pendingMessagesCount: pendingMessages.current.length,
+      });
+    }, [
+      state.isWebViewReady,
+      state.isModelReady,
+      state.isLoading,
+      state.error,
+      updateWebViewStatus,
+    ]);
 
     // Clear timeout on unmount
     useEffect(() => {
@@ -600,60 +620,6 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
             </View>
           )}
         />
-
-        {/* Enhanced Status Indicator (debug mode only) */}
-        {isDebugMode() && (
-          <View
-            className='absolute top-0 right-12 flex-row items-center bg-white/95 px-3 py-1.5 rounded-2xl'
-            style={{
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.1,
-              shadowRadius: 4,
-              elevation: 3,
-            }}
-          >
-            <View
-              className='w-2 h-2 mr-2 rounded-full'
-              style={{
-                backgroundColor: state.isModelReady
-                  ? '#10B981'
-                  : state.isWebViewReady
-                  ? '#F59E0B'
-                  : '#EF4444',
-              }}
-            />
-            <Text className='text-xs font-medium text-gray-700'>
-              {state.isModelReady
-                ? 'Hiyori Ready'
-                : state.isWebViewReady
-                ? 'Loading Model...'
-                : state.isLoading
-                ? 'Connecting...'
-                : 'Error'}
-            </Text>
-
-            {/* Pending messages indicator */}
-            {pendingMessages.current.length > 0 && (
-              <View className='items-center justify-center w-5 h-5 ml-2 bg-red-500 rounded-full'>
-                <Text className='text-xs font-bold text-white'>
-                  {pendingMessages.current.length}
-                </Text>
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* Debug info (debug mode only) */}
-        {isDebugMode() && (
-          <View className='absolute px-2 py-1 rounded top-10 right-8 bg-black/80'>
-            <Text className='font-mono text-xs text-white'>
-              WebView: {state.isWebViewReady ? '✓' : '✗'} | Model:{' '}
-              {state.isModelReady ? '✓' : '✗'} | Queue:{' '}
-              {pendingMessages.current.length}
-            </Text>
-          </View>
-        )}
       </View>
     );
   }

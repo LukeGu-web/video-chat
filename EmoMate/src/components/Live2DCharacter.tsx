@@ -2,7 +2,8 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { View, Text } from 'react-native';
 import HiyoriWebView, { HiyoriBridge } from './HiyoriWebView';
 import { useAIStatus, HiyoriMotion } from '../store';
-import { isDebugMode, debugLog, debugError, debugWarn } from '../utils/debug';
+import { debugLog, debugError, debugWarn } from '../utils/debug';
+import { useMonitorContext } from '../contexts/MonitorContext';
 
 interface Live2DCharacterProps {
   status?: HiyoriMotion; // 直接使用HiyoriMotion类型
@@ -69,6 +70,19 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
   const [isModelReady, setIsModelReady] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [shouldLoop, setShouldLoop] = useState(false);
+
+  // Monitor context for debug panel
+  const { updateLive2DStatus } = useMonitorContext();
+
+  // Sync state to monitor context
+  useEffect(() => {
+    updateLive2DStatus({
+      currentMotion,
+      isModelReady,
+      isPlaying,
+      shouldLoop,
+    });
+  }, [currentMotion, isModelReady, isPlaying, shouldLoop, updateLive2DStatus]);
 
   // 判断动作是否应该循环播放(在AI说话/思考期间持续播放)
   const shouldLoopMotion = useCallback((motionName: string): boolean => {
@@ -268,46 +282,6 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
         onModelReady={handleModelReady}
         onMotionResult={handleMotionResult}
       />
-
-      {/* 状态指示器 */}
-      {isDebugMode() && (
-        <View className='absolute top-0 flex-row items-center w-48 p-2 rounded-lg left-8 bg-black/80'>
-          <View
-            className='w-2 h-2 mr-2 rounded-full'
-            style={{
-              backgroundColor: isModelReady ? '#10B981' : '#EF4444',
-            }}
-          />
-          <View className='flex-1'>
-            <View className='gap-0.5'>
-              <View className='flex-row items-center'>
-                <Text className='w-12 font-mono text-xs text-gray-400 min-w-20'>
-                  Motion:
-                </Text>
-                <Text className='font-mono text-xs font-bold text-gray-100'>
-                  {currentMotion}
-                </Text>
-              </View>
-              <View className='flex-row items-center'>
-                <Text className='w-12 font-mono text-xs text-gray-400'>
-                  Ready:
-                </Text>
-                <Text className='font-mono text-xs font-bold text-gray-100'>
-                  {isModelReady ? '✓' : '✗'}
-                </Text>
-              </View>
-              <View className='flex-row items-center'>
-                <Text className='w-12 font-mono text-xs text-gray-400 min-w-20'>
-                  Playing:
-                </Text>
-                <Text className='font-mono text-xs font-bold text-gray-100'>
-                  {isPlaying ? '▶' : '⏸'}
-                </Text>
-              </View>
-            </View>
-          </View>
-        </View>
-      )}
     </View>
   );
 };

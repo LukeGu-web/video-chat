@@ -4,7 +4,8 @@ import Live2DCharacter, { HIYORI_MOTIONS } from './Live2DCharacter';
 import { useEmotionContext } from './EmotionProvider';
 import { EmotionType } from '../types/emotion';
 import { useAIStatus, HiyoriMotion } from '../store';
-import { isDebugMode, debugLog } from '../utils/debug';
+import { debugLog } from '../utils/debug';
+import { useMonitorContext } from '../contexts/MonitorContext';
 import {
   selectMotion,
   analyzeConversationContext,
@@ -37,6 +38,9 @@ export const EmotionAwareCharacter: React.FC<EmotionAwareCharacterProps> = ({
   const [motionSelection, setMotionSelection] =
     useState<MotionSelection | null>(null);
   const returnToIdleTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Monitor context for debug panel
+  const { updateEmotionStatus } = useMonitorContext();
 
   // Determine the motion to play based on emotion, AI status, and context
   const currentMotion = React.useMemo((): HiyoriMotion => {
@@ -140,6 +144,29 @@ export const EmotionAwareCharacter: React.FC<EmotionAwareCharacterProps> = ({
     motionSelection,
   ]);
 
+  // Sync emotion status to monitor context
+  useEffect(() => {
+    updateEmotionStatus({
+      facialEmotion,
+      textEmotion,
+      combinedEmotion,
+      aiStatus,
+      selectedMotion: currentMotion,
+      motionPriority: motionSelection?.priority || 0,
+      motionReason: motionSelection?.reason || '',
+      mappingEnabled: enableEmotionMapping,
+    });
+  }, [
+    facialEmotion,
+    textEmotion,
+    combinedEmotion,
+    aiStatus,
+    currentMotion,
+    motionSelection,
+    enableEmotionMapping,
+    updateEmotionStatus,
+  ]);
+
   const handleMotionComplete = useCallback(
     (motion: string, success: boolean) => {
       debugLog(
@@ -159,82 +186,6 @@ export const EmotionAwareCharacter: React.FC<EmotionAwareCharacterProps> = ({
         loop={loop}
         onMotionComplete={handleMotionComplete}
       />
-
-      {isDebugMode() && (
-        <View className='absolute bottom-24 left-8 bg-black/80 rounded-lg p-2 max-w-[280px]'>
-          <Text className='mb-1 text-xs font-bold text-white'>
-            Motion Selection
-          </Text>
-          <View className='gap-0.5'>
-            <View className='flex-row items-center'>
-              <Text className='w-12 font-mono text-xs text-gray-400 min-w-20'>
-                Facial:
-              </Text>
-              <Text className='font-mono text-xs text-gray-100'>
-                {facialEmotion || 'none'}
-              </Text>
-            </View>
-            <View className='flex-row items-center'>
-              <Text className='w-12 font-mono text-xs text-gray-400 min-w-20'>
-                Text:
-              </Text>
-              <Text className='font-mono text-xs text-gray-100'>
-                {textEmotion || 'none'}
-              </Text>
-            </View>
-            <View className='flex-row items-center'>
-              <Text className='w-12 font-mono text-xs text-gray-400 min-w-24'>
-                Combined:
-              </Text>
-              <Text className='font-mono text-xs font-bold text-green-300'>
-                {combinedEmotion}
-              </Text>
-            </View>
-            <View className='flex-row items-center'>
-              <Text className='w-12 font-mono text-xs text-gray-400 min-w-28'>
-                AI Status:
-              </Text>
-              <Text className='font-mono text-xs text-blue-300'>
-                {aiStatus || 'none'}
-              </Text>
-            </View>
-            <View className='flex-row items-center'>
-              <Text className='w-12 font-mono text-xs text-gray-400 min-w-16'>
-                Motion:
-              </Text>
-              <Text className='font-mono text-xs font-bold text-yellow-300'>
-                {currentMotion}
-              </Text>
-            </View>
-            <View className='flex-row items-center'>
-              <Text className='w-12 font-mono text-xs text-gray-400 min-w-24'>
-                Priority:
-              </Text>
-              <Text className='font-mono text-xs text-purple-300'>
-                {motionSelection?.priority ?? '-'}
-              </Text>
-            </View>
-            {motionSelection?.reason && (
-              <View className='mt-1'>
-                <Text className='font-mono text-xs text-gray-400 min-w-16'>
-                  Reason:
-                </Text>
-                <Text className='font-mono text-xs text-gray-100'>
-                  {motionSelection.reason}
-                </Text>
-              </View>
-            )}
-            <View className='flex-row items-center'>
-              <Text className='w-12 font-mono text-xs text-gray-400 min-w-16'>
-                Mapping:
-              </Text>
-              <Text className='font-mono text-xs text-gray-100'>
-                {enableEmotionMapping ? 'ON' : 'OFF'}
-              </Text>
-            </View>
-          </View>
-        </View>
-      )}
     </View>
   );
 };
