@@ -1,11 +1,6 @@
 import React, { useEffect, useCallback, useState, useRef } from 'react';
-import {
-  View,
-  Text,
-  ImageBackground,
-  ActivityIndicator,
-} from 'react-native';
-import { SafeAreaView as SafeAreaViewRN } from 'react-native-safe-area-context';
+import { View, Text, ImageBackground, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useUserStore, ChatMessage, useAIStatus } from '../store';
 import {
@@ -31,8 +26,8 @@ import {
   ObjectRecognitionButton,
 } from '../components';
 import { EmotionDetector } from '../components/vision';
-import { useBackgroundContext } from '../hooks/useBackgroundContext';
-import { getBackgroundImageSource } from '../utils/backgroundStory';
+import { useBackgroundStore } from '../store/backgroundStore';
+import { getBackgroundImageSource, shouldRefreshBackground } from '../utils/backgroundStory';
 import { debugLog, debugWarn, debugError } from '../utils/debug';
 import { useMonitorStore, useEmotionStore } from '../store';
 
@@ -54,24 +49,26 @@ interface Props {
 }
 
 // HomeScreen内容组件
-const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
+const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const setFacialEmotion = useEmotionStore((state) => state.setFacialEmotion);
-  const {
-    chatHistory,
-    addChatMessage,
-    setCurrentScene,
-  } = useUserStore();
+  const { chatHistory, addChatMessage, setCurrentScene } = useUserStore();
 
-  // Background context hook
+  // Background context store
   const {
     context: backgroundContext,
     isLoading: isBackgroundLoading,
     error: backgroundError,
-  } = useBackgroundContext();
+    initialize: initializeBackground,
+    refresh: refreshBackground,
+  } = useBackgroundStore();
 
   // Monitor store for debug panel
-  const updateBackgroundScene = useMonitorStore((state) => state.updateBackgroundScene);
-  const updateSceneUnderstanding = useMonitorStore((state) => state.updateSceneUnderstanding);
+  const updateBackgroundScene = useMonitorStore(
+    (state) => state.updateBackgroundScene
+  );
+  const updateSceneUnderstanding = useMonitorStore(
+    (state) => state.updateSceneUnderstanding
+  );
 
   const { setAIStatus } = useAIStatus();
   const {
@@ -115,19 +112,43 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
   const [isRecognizing, setIsRecognizing] = useState(false);
 
   // Stable callback for frame capture (prevents useEffect re-triggering)
-  const handleFrameCaptured = useCallback(
-    (frameBase64: string) => {
-      // Store last captured frame for visual QA and scene understanding
-      lastCapturedFrameRef.current = frameBase64;
-      debugLog('HomeScreen', `Frame captured: ${Math.round((frameBase64.length * 0.75) / 1024)}KB`);
-    },
-    []
-  );
+  const handleFrameCaptured = useCallback((frameBase64: string) => {
+    // Store last captured frame for visual QA and scene understanding
+    lastCapturedFrameRef.current = frameBase64;
+    debugLog(
+      'HomeScreen',
+      `Frame captured: ${Math.round((frameBase64.length * 0.75) / 1024)}KB`
+    );
+  }, []);
 
   // Stable callback to get captured frame
   const getCapturedFrame = useCallback(() => {
     return lastCapturedFrameRef.current;
   }, []);
+
+  // Initialize background context on mount
+  useEffect(() => {
+    initializeBackground();
+  }, [initializeBackground]);
+
+  // Auto-refresh background context every 5 minutes if needed (30-minute threshold)
+  useEffect(() => {
+    const checkInterval = setInterval(async () => {
+      // Get current context from store to avoid recreating interval on every context update
+      const currentContext = useBackgroundStore.getState().context;
+      if (currentContext && shouldRefreshBackground(currentContext.timestamp)) {
+        debugLog('HomeScreen', 'Auto-refresh background triggered (30 minutes elapsed)');
+        try {
+          await refreshBackground();
+        } catch (err) {
+          debugError('HomeScreen', 'Auto-refresh background failed:', err);
+          // Don't throw error on auto-refresh failure to avoid disrupting user
+        }
+      }
+    }, 5 * 60 * 1000); // Check every 5 minutes
+
+    return () => clearInterval(checkInterval);
+  }, [refreshBackground]); // Only depend on stable refreshBackground reference
 
   // Sync background scene to monitor context
   useEffect(() => {
@@ -210,12 +231,13 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
         debugLog('HomeScreen', 'Providing captured frame for scene analysis');
         return lastCapturedFrameRef.current;
       } else {
-        debugWarn('HomeScreen', 'No captured frame available for scene analysis');
+        debugWarn(
+          'HomeScreen',
+          'No captured frame available for scene analysis'
+        );
         return null;
       }
     });
-    // Only register once on mount, sceneUnderstanding should be stable
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Monitor scene updates and sync to userStore
@@ -263,7 +285,10 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
       );
 
       if (response.success) {
-        debugLog('HomeScreen', `Object recognized: ${response.object.objectName}`);
+        debugLog(
+          'HomeScreen',
+          `Object recognized: ${response.object.objectName}`
+        );
         showSuccess(`识别成功: ${response.object.objectName}`);
       } else {
         debugError('HomeScreen', 'Recognition failed', response.error);
@@ -393,7 +418,7 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
       className='flex-1'
       resizeMode='cover'
     >
-      <SafeAreaViewRN className='flex-1'>
+      <SafeAreaView className='flex-1'>
         {/* Toast (Error/Success) */}
         <Toast
           message={toastState.message}
@@ -464,12 +489,9 @@ const HomeScreenContent: React.FC<Props> = ({ navigation }) => {
           onTestSceneAnalysis={handleManualSceneTest}
           isAnalyzing={sceneUnderstanding.isAnalyzing}
         />
-      </SafeAreaViewRN>
+      </SafeAreaView>
     </ImageBackground>
   );
 };
-
-// 直接导出 HomeScreenContent 作为 HomeScreen (不再需要 Provider)
-const HomeScreen: React.FC<Props> = HomeScreenContent;
 
 export default HomeScreen;
