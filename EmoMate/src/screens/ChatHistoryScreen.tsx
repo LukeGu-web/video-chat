@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -34,29 +34,19 @@ const ChatHistoryScreen: React.FC = () => {
       {/* Header with Back Button */}
       <View className='bg-white border-b border-gray-200'>
         <View className='flex-row items-center justify-between p-4'>
-          <TouchableOpacity
-            onPress={handleGoBack}
-            className='flex-row items-center'
-          >
+          <Pressable onPress={handleGoBack} className='flex-row items-center'>
             <Text className='font-medium text-blue-500 text-16'>← 返回</Text>
-          </TouchableOpacity>
+          </Pressable>
 
           <Text className='text-lg font-bold text-gray-800'>聊天记录</Text>
 
-          <TouchableOpacity
+          <Pressable
             onPress={handleClearHistory}
             className='px-3 py-1 bg-red-500 rounded-lg'
           >
             <Text className='text-sm font-medium text-white'>清空</Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
-
-        {/* Character Info */}
-        {/* <View className="px-4 pb-3">
-          <Text className="text-sm text-gray-600">
-            与 {selectedCharacter || 'AI伴侣'} 的对话
-          </Text>
-        </View> */}
       </View>
 
       {/* Chat History Content */}
