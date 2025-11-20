@@ -2,20 +2,9 @@ import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useUserStore } from '../store';
 import { ChatList } from '../components';
-
-type RootStackParamList = {
-  Welcome: undefined;
-  Home: undefined;
-  ChatHistory: undefined;
-};
-
-type ChatHistoryScreenNavigationProp = NativeStackNavigationProp<
-  RootStackParamList,
-  'ChatHistory'
->;
+import { ChatHistoryScreenNavigationProp } from '../types/navigation';
 
 const ChatHistoryScreen: React.FC = () => {
   const navigation = useNavigation<ChatHistoryScreenNavigationProp>();
@@ -30,7 +19,7 @@ const ChatHistoryScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView className='flex-1 bg-background'>
+    <SafeAreaView className='flex-1 bg-white'>
       {/* Header with Back Button */}
       <View className='bg-white border-b border-gray-200'>
         <View className='flex-row items-center justify-between p-4'>

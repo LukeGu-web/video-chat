@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   useSceneUnderstanding,
   useObjectRecognition,
@@ -13,19 +12,7 @@ import EmptyState from '../components/EmptyState';
 import ActionButton from '../components/ActionButton';
 import SceneHistoryCard from '../components/scene-history/SceneHistoryCard';
 import ObjectRecognitionCard from '../components/object-recognition/ObjectRecognitionCard';
-
-type RootStackParamList = {
-  Welcome: undefined;
-  Home: undefined;
-  ChatHistory: undefined;
-  Hiyori: undefined;
-  SceneHistory: undefined;
-};
-
-type SceneHistoryScreenNavigationProp = NativeStackNavigationProp<
-  RootStackParamList,
-  'SceneHistory'
->;
+import { SceneHistoryScreenNavigationProp } from '../types/navigation';
 
 interface Props {
   navigation: SceneHistoryScreenNavigationProp;
@@ -113,7 +100,7 @@ const SceneHistoryScreen: React.FC<Props> = ({ navigation }) => {
   }, [objectStats.latestRecord]);
 
   return (
-    <SafeAreaView className='flex-1 bg-gray-50'>
+    <SafeAreaView className='flex-1 bg-white'>
       {/* Header */}
       <View className='flex-row items-center justify-between px-4 py-3 bg-white border-b border-gray-200'>
         <TouchableOpacity onPress={handleGoBack} className='px-1 py-2'>

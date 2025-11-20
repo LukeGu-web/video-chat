@@ -1,22 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   requestCameraAndMicrophonePermissions,
   checkCameraAndMicrophonePermissions,
   PermissionStatus,
 } from '../utils';
-
-type RootStackParamList = {
-  Welcome: undefined;
-  Home: undefined;
-};
-
-type WelcomeScreenNavigationProp = NativeStackNavigationProp<
-  RootStackParamList,
-  'Welcome'
->;
+import { WelcomeScreenNavigationProp } from '../types/navigation';
 
 interface Props {
   navigation: WelcomeScreenNavigationProp;

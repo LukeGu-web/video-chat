@@ -2,12 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Modal, Pressable } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-
-type RootStackParamList = {
-  Home: undefined;
-  ChatHistory: undefined;
-  SceneHistory: undefined;
-};
+import { RootStackParamList } from '../types/navigation';
 
 interface MenuOption {
   id: string;
