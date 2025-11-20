@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Pressable } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 
 interface VoiceControlProps {
   isListening?: boolean;
@@ -12,6 +12,15 @@ interface VoiceControlProps {
   onStopListening?: () => void;
   onStopSpeaking?: () => void;
 }
+
+// Shared shadow style for consistency with ObjectRecognitionButton
+const BUTTON_SHADOW_STYLE = {
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.3,
+  shadowRadius: 8,
+  elevation: 8,
+};
 
 const VoiceControl: React.FC<VoiceControlProps> = ({
   isListening = false,
@@ -41,7 +50,7 @@ const VoiceControl: React.FC<VoiceControlProps> = ({
         </View>
       ) : (
         <Pressable
-          className={`w-20 h-20 rounded-full items-center justify-center mx-auto ${
+          className={`w-20 h-20 rounded-full items-center justify-center ${
             isListening
               ? 'bg-red-500'
               : isSpeaking
@@ -50,12 +59,13 @@ const VoiceControl: React.FC<VoiceControlProps> = ({
               ? 'bg-gray-400'
               : 'bg-primary'
           }`}
+          style={BUTTON_SHADOW_STYLE}
           onPressIn={isSpeaking ? undefined : onStartListening}
           onPressOut={isSpeaking ? undefined : onStopListening}
           onPress={isSpeaking ? onStopSpeaking : undefined}
           disabled={isDisabled}
         >
-          <Text className='mb-1 text-2xl text-white'>
+          <Text className='text-3xl text-white'>
             {isListening ? '🎤' : isSpeaking ? '⏹️' : '🎙️'}
           </Text>
           <Text className='text-xs font-medium text-center text-white'>

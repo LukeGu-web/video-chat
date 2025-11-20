@@ -327,8 +327,16 @@ const HomeScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Voice Control - Floating over character's lower body */}
-        <View className='absolute px-4 right-8 bottom-8'>
+        {/* Control Buttons Container - Unified layout for Voice and Object Recognition */}
+        <View className='absolute bottom-8 left-0 right-0 flex-row justify-between px-8'>
+          {/* Object Recognition Button - Left side */}
+          <ObjectRecognitionButton
+            onRecognize={handleRecognizeObject}
+            isRecognizing={isRecognizing}
+            disabled={objectRecognition.isLoading}
+          />
+
+          {/* Voice Control - Right side */}
           <VoiceControl
             isListening={isListening}
             isSupported={isSupported}
@@ -341,13 +349,6 @@ const HomeScreen: React.FC = () => {
             onStopSpeaking={stopSpeaking}
           />
         </View>
-
-        {/* Object Recognition Button - Floating on left side */}
-        <ObjectRecognitionButton
-          onRecognize={handleRecognizeObject}
-          isRecognizing={isRecognizing}
-          disabled={objectRecognition.isLoading}
-        />
 
         {/* Facial Emotion Detection */}
         <EmotionDetector
