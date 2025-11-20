@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useCallback, useState, useRef } from 'react';
 import { View, Text, ImageBackground, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useUserStore, useAIStatus } from '../store';
@@ -109,19 +109,12 @@ const HomeScreen: React.FC = () => {
   // Scene understanding monitoring (consolidates 2 useEffects)
   useSceneUnderstandingMonitor(sceneUnderstanding);
 
-  // Debug: Log API key once on mount
-  useEffect(() => {
-    debugLog('HomeScreen', `API Key: ${apiKey ? 'configured' : 'missing'}`);
-  }, [apiKey]);
-
   // Handle errors (including background errors)
   useEffect(() => {
     if (error || aiError || backgroundError) {
       const message = error || aiError || backgroundError?.message || '';
       showError(message);
     }
-    // showError is stable (empty deps), no need to include in deps
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [error, aiError, backgroundError]);
 
   // 统一的 AI 状态管理 - 直接使用Hiyori动作
@@ -328,7 +321,7 @@ const HomeScreen: React.FC = () => {
         </View>
 
         {/* Control Buttons Container - Unified layout for Voice and Object Recognition */}
-        <View className='absolute bottom-8 left-0 right-0 flex-row justify-between px-8'>
+        <View className='absolute left-0 right-0 flex-row justify-between px-8 bottom-8'>
           {/* Object Recognition Button - Left side */}
           <ObjectRecognitionButton
             onRecognize={handleRecognizeObject}

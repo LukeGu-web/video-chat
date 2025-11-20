@@ -3,6 +3,7 @@ import { useMonitorStore } from '../store/monitorStore';
 import { useUserStore } from '../store';
 import { useDebounce } from './useDebounce';
 import { debugLog } from '../utils/debug';
+import { SceneData } from '../types/scene';
 
 /**
  * Scene understanding object type (simplified from UseSceneUnderstandingReturn)
@@ -10,10 +11,7 @@ import { debugLog } from '../utils/debug';
 interface SceneUnderstanding {
   isAnalyzing: boolean;
   totalAPICalls: number;
-  currentScene: {
-    location: string;
-    [key: string]: any;
-  } | null;
+  currentScene: SceneData | null;
   timerState: {
     enabled: boolean;
     nextCaptureIn: number;
