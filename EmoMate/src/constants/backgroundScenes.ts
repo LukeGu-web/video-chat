@@ -444,6 +444,123 @@ export const STORY_TEMPLATES: Record<string, StoryTemplate> = {
     ],
     contexts: ['vacation', 'beach', 'summer', 'excited'],
   },
+
+  noon_classroom: {
+    id: 'noon_classroom',
+    templates: [
+      '现在{time}，正在教室里上课。{activity_desc}，{scene_detail}。{mood_desc}',
+      '上午的课程～{time}坐在教室里{activity_desc}。窗外{weather_desc}，{mood_desc}',
+    ],
+    contexts: ['school', 'class', 'study', 'focused'],
+  },
+
+  noon_rooftop: {
+    id: 'noon_rooftop',
+    templates: [
+      '午休时间来天台了～{time}的天台{scene_detail}，{weather_desc}。{activity_desc}，{mood_desc}',
+      '在学校天台度过午休时光。{time}的阳光{scene_detail}，{mood_desc}{thought}',
+    ],
+    contexts: ['school', 'outdoor', 'peaceful', 'lunch'],
+  },
+
+  afternoon_classroom: {
+    id: 'afternoon_classroom',
+    templates: [
+      '下午{time}的课堂，{activity_desc}。教室里{scene_detail}，{mood_desc}',
+      '下午上课中～现在{time}，{activity_desc}。{scene_detail}，{mood_desc}想着{plan}',
+    ],
+    contexts: ['school', 'class', 'study', 'afternoon'],
+  },
+
+  afternoon_artroom: {
+    id: 'afternoon_artroom',
+    templates: [
+      '放学后来美术室了～{time}在社团活动中{activity_desc}。{scene_detail}，{mood_desc}',
+      '社团活动时间！{time}的美术室{scene_detail}。{activity_desc}，{mood_desc}',
+    ],
+    contexts: ['school', 'club', 'creative', 'art'],
+  },
+
+  afternoon_playground: {
+    id: 'afternoon_playground',
+    templates: [
+      '放学后的操场～{time}左右，{activity_desc}。{weather_desc}，{mood_desc}',
+      '在操场上{activity_desc}，{time}的{weather_desc}。{scene_detail}，{mood_desc}',
+    ],
+    contexts: ['school', 'outdoor', 'sports', 'energetic'],
+  },
+
+  evening_livingroom: {
+    id: 'evening_livingroom',
+    templates: [
+      '回到家了～{time}在客厅{activity_desc}。灯光{scene_detail}，{mood_desc}',
+      '傍晚{time}的客厅，{activity_desc}。{scene_detail}，{mood_desc}{thought}',
+    ],
+    contexts: ['home', 'cozy', 'family', 'evening'],
+  },
+
+  evening_bedroom: {
+    id: 'evening_bedroom',
+    templates: [
+      '晚上回到房间～{time}了，{activity_desc}。{scene_detail}，{mood_desc}',
+      '傍晚{time}在房间里{activity_desc}。窗外{scene_detail}，{mood_desc}想着{plan}',
+    ],
+    contexts: ['home', 'private', 'study', 'evening'],
+  },
+
+  night_balcony: {
+    id: 'night_balcony',
+    templates: [
+      '夜晚{time}来阳台透透气。{scene_detail}，城市的灯光很美。{mood_desc}',
+      '在阳台上{activity_desc}，{time}的夜景{scene_detail}。{mood_desc}{thought}',
+    ],
+    contexts: ['home', 'outdoor', 'peaceful', 'night'],
+  },
+
+  weekend_park: {
+    id: 'weekend_park',
+    templates: [
+      '周末去公园散步～{time}的公园{scene_detail}，{weather_desc}。{activity_desc}，{mood_desc}',
+      '今天来公园放松一下。{time}的{weather_desc}，{activity_desc}。{mood_desc}{plan}',
+    ],
+    contexts: ['weekend', 'outdoor', 'nature', 'relaxed'],
+  },
+
+  weekend_street_day: {
+    id: 'weekend_street_day',
+    templates: [
+      '周末出门逛街～{time}的街道{scene_detail}，{weather_desc}。{mood_desc}{plan}',
+      '在街上{activity_desc}，现在{time}。{weather_desc}，{mood_desc}',
+    ],
+    contexts: ['weekend', 'outdoor', 'urban', 'shopping'],
+  },
+
+  weekend_street_night: {
+    id: 'weekend_street_night',
+    templates: [
+      '周末晚上出来走走～{time}的街道灯火通明，{scene_detail}。{mood_desc}',
+      '夜晚的街道很热闹，现在{time}。{activity_desc}，{mood_desc}{thought}',
+    ],
+    contexts: ['weekend', 'outdoor', 'urban', 'nightlife'],
+  },
+
+  weekend_nightmarket: {
+    id: 'weekend_nightmarket',
+    templates: [
+      '来夜市啦！{time}的夜市{scene_detail}，到处都是{food_mention}的香味。{mood_desc}',
+      '周末逛夜市～{time}的夜市很热闹，{activity_desc}。{mood_desc}{plan}',
+    ],
+    contexts: ['weekend', 'outdoor', 'food', 'vibrant'],
+  },
+
+  holiday_street: {
+    id: 'holiday_street',
+    templates: [
+      '假期出来探索新地方～{time}在陌生的街道{activity_desc}。{weather_desc}，{mood_desc}',
+      '假期旅行中！{time}的街道{scene_detail}。{activity_desc}，{mood_desc}{plan}',
+    ],
+    contexts: ['vacation', 'outdoor', 'urban', 'exploration'],
+  },
 };
 
 // ==================== Weather Descriptors ====================
