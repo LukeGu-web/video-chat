@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   useSceneUnderstanding,
@@ -161,21 +161,24 @@ const SceneHistoryScreen: React.FC<Props> = ({ navigation }) => {
                 历史记录
               </Text>
 
-              {sceneUnderstanding.cachedScenes.length === 0 ? (
-                <EmptyState
-                  icon='📭'
-                  title='暂无缓存场景'
-                  description='使用视觉问答功能后,场景分析结果会自动保存在这里'
-                />
-              ) : (
-                sceneUnderstanding.cachedScenes.map((entry, index) => (
+              <FlatList
+                data={sceneUnderstanding.cachedScenes}
+                renderItem={({ item: entry, index }) => (
                   <SceneHistoryCard
-                    key={`${entry.cachedAt}-${index}`}
                     entry={entry}
                     index={index}
                   />
-                ))
-              )}
+                )}
+                keyExtractor={(item, index) => `${item.cachedAt}-${index}`}
+                ListEmptyComponent={
+                  <EmptyState
+                    icon='📭'
+                    title='暂无缓存场景'
+                    description='使用视觉问答功能后,场景分析结果会自动保存在这里'
+                  />
+                }
+                scrollEnabled={false}
+              />
             </View>
           </>
         ) : (
@@ -216,23 +219,26 @@ const SceneHistoryScreen: React.FC<Props> = ({ navigation }) => {
                 识别记录
               </Text>
 
-              {objectRecognition.records.length === 0 ? (
-                <EmptyState
-                  icon='📦'
-                  title='暂无识别记录'
-                  description='在主界面使用物品识别功能后，记录会显示在这里'
-                />
-              ) : (
-                objectRecognition.records.map((record) => (
+              <FlatList
+                data={objectRecognition.records}
+                renderItem={({ item: record }) => (
                   <ObjectRecognitionCard
-                    key={record.id}
                     record={record}
                     onDelete={objectRecognition.deleteRecord}
                     isExpanded={expandedDescriptions.has(record.id)}
                     onToggleExpand={toggleDescription}
                   />
-                ))
-              )}
+                )}
+                keyExtractor={(item) => item.id}
+                ListEmptyComponent={
+                  <EmptyState
+                    icon='📦'
+                    title='暂无识别记录'
+                    description='在主界面使用物品识别功能后，记录会显示在这里'
+                  />
+                }
+                scrollEnabled={false}
+              />
             </View>
           </>
         )}
