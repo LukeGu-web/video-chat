@@ -4,3 +4,6 @@ export * from './useToast';
 export * from './useInitialSceneDetection';
 export * from './useAppStateSceneTimer';
 export * from './useDebounce';
+export * from './useBackgroundSceneManager';
+export * from './useSceneUnderstandingMonitor';
+export * from './useVoiceConversationManager';

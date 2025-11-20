@@ -1,13 +1,15 @@
-import React, { useEffect, useCallback, useState, useRef } from 'react';
+import React, { useEffect, useCallback, useState, useRef, useMemo } from 'react';
 import { View, Text, ImageBackground, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useUserStore, ChatMessage, useAIStatus } from '../store';
+import { useUserStore, useAIStatus } from '../store';
 import {
   useChatAI,
   useToast,
   useInitialSceneDetection,
   useAppStateSceneTimer,
-  useDebounce,
+  useBackgroundSceneManager,
+  useSceneUnderstandingMonitor,
+  useVoiceConversationManager,
 } from '../hooks/';
 import { useAIConversationFlow } from '../hooks/useAIConversationFlow'; // Step 2.3: AI conversation flow hook
 import { useSpeechToText } from '../capabilities/listen';
@@ -26,32 +28,28 @@ import {
   ObjectRecognitionButton,
 } from '../components';
 import { EmotionDetector } from '../components/vision';
-import { useBackgroundStore } from '../store/backgroundStore';
-import { getBackgroundImageSource, shouldRefreshBackground } from '../utils/backgroundStory';
 import { debugLog, debugWarn, debugError } from '../utils/debug';
-import { useMonitorStore, useEmotionStore } from '../store';
+import { useEmotionStore } from '../store';
+
+// Emotion detector configuration constants (avoid re-creating on each render)
+const EMOTION_DETECTOR_CONFIG = {
+  isActive: true,
+  detectionInterval: 3000,
+  frameCaptureInterval: 5000, // 5 seconds - faster initial capture for scene understanding
+} as const;
 
 // HomeScreen内容组件
 const HomeScreen: React.FC = () => {
   const setFacialEmotion = useEmotionStore((state) => state.setFacialEmotion);
-  const { chatHistory, addChatMessage, setCurrentScene } = useUserStore();
+  const { addChatMessage, setCurrentScene } = useUserStore();
 
-  // Background context store
+  // Background scene management (consolidates 3 useEffects)
   const {
-    context: backgroundContext,
-    isLoading: isBackgroundLoading,
-    error: backgroundError,
-    initialize: initializeBackground,
-    refresh: refreshBackground,
-  } = useBackgroundStore();
-
-  // Monitor store for debug panel
-  const updateBackgroundScene = useMonitorStore(
-    (state) => state.updateBackgroundScene
-  );
-  const updateSceneUnderstanding = useMonitorStore(
-    (state) => state.updateSceneUnderstanding
-  );
+    backgroundContext,
+    isBackgroundLoading,
+    backgroundError,
+    backgroundSource,
+  } = useBackgroundSceneManager();
 
   const { setAIStatus } = useAIStatus();
   const {
@@ -78,16 +76,9 @@ const HomeScreen: React.FC = () => {
   // Toast management
   const { toastState, showError, showSuccess, dismissToast } = useToast();
 
-  // Step 5.2: Visual QA - store last captured frame
+  // Step 5.2: Visual QA - store last captured frame for scene understanding
   const lastCapturedFrameRef = useRef<string | null>(null);
 
-  // Track previous transcript to prevent unnecessary conversation starts
-  const prevTranscriptRef = useRef<string>('');
-
-  // Track processed AI messages to avoid duplicates
-  const processedMessageIdsRef = useRef<Set<string>>(new Set());
-
-  // Step 5.2: Scene Understanding hook with caching
   const apiKey = getClaudeApiKey();
 
   const sceneUnderstanding = useSceneUnderstanding(apiKey || '', {
@@ -115,85 +106,8 @@ const HomeScreen: React.FC = () => {
     return lastCapturedFrameRef.current;
   }, []);
 
-  // Initialize background context on mount
-  useEffect(() => {
-    initializeBackground();
-  }, [initializeBackground]);
-
-  // Store latest refreshBackground function in ref to avoid recreating interval
-  const refreshBackgroundRef = useRef(refreshBackground);
-  useEffect(() => {
-    refreshBackgroundRef.current = refreshBackground;
-  }, [refreshBackground]);
-
-  // Auto-refresh background context every 5 minutes if needed (30-minute threshold)
-  useEffect(() => {
-    const checkInterval = setInterval(async () => {
-      // Get current context from store to avoid recreating interval on every context update
-      const currentContext = useBackgroundStore.getState().context;
-      if (currentContext && shouldRefreshBackground(currentContext.timestamp)) {
-        debugLog('HomeScreen', 'Auto-refresh background triggered (30 minutes elapsed)');
-        try {
-          await refreshBackgroundRef.current();
-        } catch (err) {
-          debugError('HomeScreen', 'Auto-refresh background failed:', err);
-          // Don't throw error on auto-refresh failure to avoid disrupting user
-        }
-      }
-    }, 5 * 60 * 1000); // Check every 5 minutes
-
-    return () => clearInterval(checkInterval);
-  }, []); // Empty deps - interval only created once on mount
-
-  // Sync background scene to monitor context
-  useEffect(() => {
-    if (backgroundContext) {
-      updateBackgroundScene({
-        sceneId: backgroundContext.scene.id,
-        dayType: backgroundContext.scene.dayType,
-        timePeriod: backgroundContext.scene.timePeriod,
-        location: backgroundContext.scene.location,
-        weather: backgroundContext.weather,
-        storyPreview: backgroundContext.story.substring(0, 60),
-      });
-    } else {
-      updateBackgroundScene(null);
-    }
-  }, [backgroundContext, updateBackgroundScene]);
-
-  // Debounced update to avoid excessive re-renders from frequent timer updates
-  const debouncedUpdateSceneUnderstanding = useDebounce(
-    (data: {
-      isAnalyzing: boolean;
-      totalAPICalls: number;
-      currentLocation: string | null;
-      timerEnabled: boolean;
-      nextCaptureInSeconds: number;
-    }) => {
-      updateSceneUnderstanding(data);
-    },
-    500 // 500ms debounce delay
-  );
-
-  // Sync scene understanding status to monitor context
-  useEffect(() => {
-    debouncedUpdateSceneUnderstanding({
-      isAnalyzing: sceneUnderstanding.isAnalyzing,
-      totalAPICalls: sceneUnderstanding.totalAPICalls,
-      currentLocation: sceneUnderstanding.currentScene?.location || null,
-      timerEnabled: sceneUnderstanding.timerState.enabled,
-      nextCaptureInSeconds: Math.floor(
-        sceneUnderstanding.timerState.nextCaptureIn / 1000
-      ),
-    });
-  }, [
-    sceneUnderstanding.isAnalyzing,
-    sceneUnderstanding.totalAPICalls,
-    sceneUnderstanding.currentScene?.location,
-    sceneUnderstanding.timerState.enabled,
-    sceneUnderstanding.timerState.nextCaptureIn,
-    debouncedUpdateSceneUnderstanding,
-  ]);
+  // Scene understanding monitoring (consolidates 2 useEffects)
+  useSceneUnderstandingMonitor(sceneUnderstanding);
 
   // Debug: Log API key once on mount
   useEffect(() => {
@@ -248,15 +162,6 @@ const HomeScreen: React.FC = () => {
       }
     });
   }, []);
-
-  // Monitor scene updates and sync to userStore
-  useEffect(() => {
-    const current = sceneUnderstanding.currentScene;
-    if (current) {
-      setCurrentScene(current);
-      debugLog('HomeScreen', `Scene updated: ${current.location}`);
-    }
-  }, [sceneUnderstanding.currentScene, setCurrentScene]);
 
   // Initial scene detection on app startup
   useInitialSceneDetection({
@@ -363,46 +268,16 @@ const HomeScreen: React.FC = () => {
     generateMessageId,
   });
 
-  // 监听语音识别完成并开始对话
-  useEffect(() => {
-    // 只在真正的状态转换时触发（避免因startConversation/clearTranscript引用变化导致的重复执行）
-    if (!isListening && transcript && transcript !== prevTranscriptRef.current) {
-      prevTranscriptRef.current = transcript;
-      startConversation(transcript);
-      clearTranscript();
-    }
-  }, [isListening, transcript]);
-
-  // 监听AI消息并添加到聊天历史
-  useEffect(() => {
-    if (messages.length > 0) {
-      const lastMessage = messages[messages.length - 1];
-
-      // 使用唯一ID而不是内容和时间戳比较，避免遍历整个历史记录
-      const messageId = `${lastMessage.content}_${lastMessage.timestamp}`;
-
-      if (
-        lastMessage.role === 'assistant' &&
-        !processedMessageIdsRef.current.has(messageId)
-      ) {
-        processedMessageIdsRef.current.add(messageId);
-
-        const aiMessage: ChatMessage = {
-          id: generateMessageId(),
-          role: 'assistant',
-          content: lastMessage.content,
-          timestamp: lastMessage.timestamp,
-          isVoiceMessage: true,
-        };
-        addChatMessage(aiMessage);
-      }
-    }
-  }, [messages]); // 只依赖messages，避免不必要的重新执行
-
-  // Get background image source
-  const backgroundSource = backgroundContext
-    ? getBackgroundImageSource(backgroundContext.imagePath)
-    : require('../../assets/background/afternoon.jpeg'); // Fallback
+  // Voice conversation management (consolidates 2 useEffects)
+  useVoiceConversationManager({
+    isListening,
+    transcript,
+    messages,
+    startConversation,
+    clearTranscript,
+    addChatMessage,
+    generateMessageId,
+  });
 
   // Show loading indicator while background is loading
   if (isBackgroundLoading) {
@@ -477,10 +352,8 @@ const HomeScreen: React.FC = () => {
         {/* Facial Emotion Detection */}
         <EmotionDetector
           onEmotionDetected={setFacialEmotion}
-          isActive={true}
-          detectionInterval={3000}
           onFrameCaptured={handleFrameCaptured}
-          frameCaptureInterval={5000} // 5 seconds - faster initial capture for scene understanding
+          {...EMOTION_DETECTOR_CONFIG}
         />
 
         {/* Function Monitor - Unified Debug Panel */}
