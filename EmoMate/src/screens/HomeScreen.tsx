@@ -1,7 +1,6 @@
 import React, { useEffect, useCallback, useState, useRef } from 'react';
 import { View, Text, ImageBackground, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useUserStore, ChatMessage, useAIStatus } from '../store';
 import {
   useChatAI,
@@ -31,25 +30,8 @@ import { getBackgroundImageSource, shouldRefreshBackground } from '../utils/back
 import { debugLog, debugWarn, debugError } from '../utils/debug';
 import { useMonitorStore, useEmotionStore } from '../store';
 
-type RootStackParamList = {
-  Welcome: undefined;
-  Home: undefined;
-  ChatHistory: undefined;
-  Hiyori: undefined;
-  SceneHistory: undefined;
-};
-
-type HomeScreenNavigationProp = NativeStackNavigationProp<
-  RootStackParamList,
-  'Home'
->;
-
-interface Props {
-  navigation: HomeScreenNavigationProp;
-}
-
 // HomeScreen内容组件
-const HomeScreen: React.FC<Props> = ({ navigation }) => {
+const HomeScreen: React.FC = () => {
   const setFacialEmotion = useEmotionStore((state) => state.setFacialEmotion);
   const { chatHistory, addChatMessage, setCurrentScene } = useUserStore();
 
@@ -256,14 +238,6 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     enabled: true,
   });
 
-  const handleGoToChatHistory = () => {
-    navigation.navigate('ChatHistory');
-  };
-
-  const handleGoToSceneHistory = () => {
-    navigation.navigate('SceneHistory');
-  };
-
   // Handle object recognition
   const handleRecognizeObject = async () => {
     if (!lastCapturedFrameRef.current) {
@@ -428,10 +402,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           type={toastState.type}
         />
 
-        <Header
-          onGoToChatHistory={handleGoToChatHistory}
-          onGoToSceneHistory={handleGoToSceneHistory}
-        />
+        <Header />
 
         {/* Main Content Area - Full screen with character at bottom */}
         <View className='justify-end flex-1'>

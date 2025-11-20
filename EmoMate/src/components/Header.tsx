@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Modal, Pressable } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-interface HeaderProps {
-  onGoToChatHistory?: () => void;
-  onGoToSceneHistory?: () => void;
-}
+type RootStackParamList = {
+  Home: undefined;
+  ChatHistory: undefined;
+  SceneHistory: undefined;
+};
 
 interface MenuOption {
   id: string;
@@ -13,10 +16,8 @@ interface MenuOption {
   icon: string;
 }
 
-const Header: React.FC<HeaderProps> = ({
-  onGoToChatHistory,
-  onGoToSceneHistory,
-}) => {
+const Header: React.FC = () => {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [isModalVisible, setIsModalVisible] = useState(false);
 
   const menuOptions: MenuOption[] = [
@@ -26,7 +27,7 @@ const Header: React.FC<HeaderProps> = ({
       icon: '💬',
       onPress: () => {
         setIsModalVisible(false);
-        onGoToChatHistory?.();
+        navigation.navigate('ChatHistory');
       },
     },
     {
@@ -35,7 +36,7 @@ const Header: React.FC<HeaderProps> = ({
       icon: '📸',
       onPress: () => {
         setIsModalVisible(false);
-        onGoToSceneHistory?.();
+        navigation.navigate('SceneHistory');
       },
     },
   ];
