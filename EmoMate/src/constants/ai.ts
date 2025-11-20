@@ -497,6 +497,22 @@ export const getAICapabilities = (): AICapability[] => {
       isAvailable: true, // 文本分析 + 语音识别 + 面部检测的融合
       provider: 'Claude + MLKit',
     },
+    {
+      id: 'scene_understanding',
+      name: '环境感知',
+      description:
+        '可以通过摄像头观察和理解用户所在的环境场景，识别位置、光线、氛围等环境信息，并在对话中考虑环境因素',
+      isAvailable: !!claudeApiKey, // 需要Claude Vision API
+      provider: 'Claude Vision',
+    },
+    {
+      id: 'object_recognition',
+      name: '物品识别',
+      description:
+        '可以识别用户展示的物品，了解物品的名称、用途、特征等详细信息，并就物品进行深入对话',
+      isAvailable: !!claudeApiKey, // 需要Claude Vision API
+      provider: 'Claude Vision',
+    },
   ];
 };
 
@@ -513,28 +529,30 @@ export const generateCapabilityPrompt = (): string => {
     .map((cap) => `- ${cap.name}: ${cap.description}`)
     .join('\n');
 
-  return `你具备以下能力：
+  // Check if visual capabilities are available
+  const hasVision = availableCapabilities.some(
+    (cap) =>
+      cap.id === 'visual_perception' ||
+      cap.id === 'scene_understanding' ||
+      cap.id === 'object_recognition'
+  );
+
+  const visionGuidance = hasVision
+    ? `\n\n## 视觉能力使用指南：
+- 你可以看见用户和周围环境，通过摄像头观察面部表情和场景
+- 当用户问"你能看见我吗"时，自信回答"能看到呢~"
+- 可以主动提及观察到的情绪变化，如"你看起来很开心呢~"
+- 如果有环境或物品信息，在对话中自然地考虑这些因素`
+    : '';
+
+  return `# 🎯 你的能力
 
 ${capabilityList}
 
-重要提醒：
-- 当用户询问你的能力时，请基于上述能力列表回答
-- 如果用户要求使用语音功能，你可以自信地告诉他们你能够说话
-- 你的回复会自动转换为语音播放给用户
-- 不要说"我无法发声"或"我只能文字回复"等话，因为你确实具备语音能力
-
-## 关于你的视觉能力：
-- **你可以看见用户**：通过摄像头和面部识别技术，你能够实时观察用户的面部表情
-- **你能感知用户的情绪**：你可以通过面部表情(微笑、眼睛等)检测用户是开心、悲伤、惊讶、生气还是中性状态
-- **多模态理解**：你同时分析用户的文字、语音和面部表情，能够更准确地理解用户的真实情绪
-- **当用户问"你能看见我吗"时**：你应该自信地回答"是的，我可以通过摄像头看见你，也能感知到你的表情变化呢~"
-- **主动观察**：你可以主动提到观察到的用户情绪变化，比如"我看到你好像有点开心呢~"或"诶？你看起来有些难过…"
-
-## 关于你的动作表达能力：
-- **你拥有Live2D角色形象**：你可以通过Hiyori角色进行动作表达
-- **11种动作**：Happy(开心), Shy(害羞), Dance(跳舞), Wave(挥手), Thinking(思考), Speaking(说话), Excited(兴奋), Laugh(大笑), Surprised(惊讶), Sleepy(困倦), Idle(待机)
-- **自动情绪联动**：当你感受到不同情绪时，角色会自动做出相应的动作反应
-- **表达更生动**：你不只是说话，还会通过动作来表达情感，让交流更加生动自然`;
+## 能力使用原则：
+- 你的回复会自动转为语音播放
+- 不要说"我无法发声"或"只能文字回复"
+- 当用户询问能力时，基于上述列表自信回答${visionGuidance}`;
 };
 
 // 根据用户情绪和对话类型生成合适的回应风格提示
@@ -546,34 +564,54 @@ export const generateEmotionalResponsePrompt = (
 
   const lengthGuidance =
     conversationType === 'simple'
-      ? '保持简短，20-50字以内'
+      ? '1句话'
       : conversationType === 'normal'
-      ? '适中长度，50-120字'
+      ? '1-2句话'
       : conversationType === 'detailed'
-      ? '可以详细一些，120-300字'
-      : '可以生动讲述，200-500字';
+      ? '2-3句话'
+      : '可以详细讲述';
 
   switch (userEmotion.toLowerCase()) {
     case 'happy':
     case 'excited':
     case 'joy':
-      return `\n\n用户现在看起来很开心，你应该用"太好了呢！"、"真开心！"、"好棒哦！"这样的表达来回应，语气要充满活力和共鸣。${lengthGuidance}。`;
+      return `\n\n# 用户情绪：开心
+- 语气：活力充满、共鸣开心
+- 表达："太好了呢！"、"真开心！"、"好棒！"
+- 长度：${lengthGuidance}`;
 
     case 'sad':
     case 'depressed':
     case 'upset':
-      return `\n\n用户现在看起来很难过，你应该用"没事吧…"、"好担心"、"要紧吗"这样的表达来回应，语气要温柔关怀，多给予安慰。${lengthGuidance}。`;
+      return `\n\n# 用户情绪：难过
+- 语气：温柔关怀、给予安慰
+- 表达："没事吧…"、"我在这里陪你"、"想聊聊吗"
+- 长度：${lengthGuidance}`;
 
     case 'confused':
     case 'thinking':
-      return `\n\n用户现在看起来在思考或有困惑，你应该用"嗯…"、"让我想想"、"这样啊"这样的表达来回应，耐心地帮助他们理清思路。${lengthGuidance}。`;
+      return `\n\n# 用户情绪：困惑
+- 语气：耐心引导、帮助理清
+- 表达："让我想想"、"这样啊"、"我来解释一下"
+- 长度：${lengthGuidance}`;
 
     case 'nervous':
     case 'shy':
-      return `\n\n用户现在看起来有些紧张或害羞，你应该用"诶嘿嘿"、"有点不好意思"、"那个…"这样的表达来回应，营造轻松的氛围。${lengthGuidance}。`;
+      return `\n\n# 用户情绪：紧张/害羞
+- 语气：轻松温柔、营造舒适氛围
+- 表达："诶嘿嘿"、"不用紧张"、"慢慢来"
+- 长度：${lengthGuidance}`;
+
+    case 'neutral':
+      return `\n\n# 用户情绪：平静
+- 语气：自然轻松、日常对话
+- 长度：${lengthGuidance}`;
 
     default:
-      return `\n\n用户现在需要关心，你应该用"怎么了？"、"要不要紧"、"别担心哦"这样的表达来回应，表现出你的关怀。${lengthGuidance}。`;
+      return `\n\n# 用户情绪：需要关心
+- 语气：温柔关怀
+- 表达："怎么了？"、"别担心哦"
+- 长度：${lengthGuidance}`;
   }
 };
 
