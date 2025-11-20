@@ -7,6 +7,7 @@ import {
   useToast,
   useInitialSceneDetection,
   useAppStateSceneTimer,
+  useDebounce,
 } from '../hooks/';
 import { useAIConversationFlow } from '../hooks/useAIConversationFlow'; // Step 2.3: AI conversation flow hook
 import { useSpeechToText } from '../capabilities/listen';
@@ -80,6 +81,12 @@ const HomeScreen: React.FC = () => {
   // Step 5.2: Visual QA - store last captured frame
   const lastCapturedFrameRef = useRef<string | null>(null);
 
+  // Track previous transcript to prevent unnecessary conversation starts
+  const prevTranscriptRef = useRef<string>('');
+
+  // Track processed AI messages to avoid duplicates
+  const processedMessageIdsRef = useRef<Set<string>>(new Set());
+
   // Step 5.2: Scene Understanding hook with caching
   const apiKey = getClaudeApiKey();
 
@@ -113,6 +120,12 @@ const HomeScreen: React.FC = () => {
     initializeBackground();
   }, [initializeBackground]);
 
+  // Store latest refreshBackground function in ref to avoid recreating interval
+  const refreshBackgroundRef = useRef(refreshBackground);
+  useEffect(() => {
+    refreshBackgroundRef.current = refreshBackground;
+  }, [refreshBackground]);
+
   // Auto-refresh background context every 5 minutes if needed (30-minute threshold)
   useEffect(() => {
     const checkInterval = setInterval(async () => {
@@ -121,7 +134,7 @@ const HomeScreen: React.FC = () => {
       if (currentContext && shouldRefreshBackground(currentContext.timestamp)) {
         debugLog('HomeScreen', 'Auto-refresh background triggered (30 minutes elapsed)');
         try {
-          await refreshBackground();
+          await refreshBackgroundRef.current();
         } catch (err) {
           debugError('HomeScreen', 'Auto-refresh background failed:', err);
           // Don't throw error on auto-refresh failure to avoid disrupting user
@@ -130,7 +143,7 @@ const HomeScreen: React.FC = () => {
     }, 5 * 60 * 1000); // Check every 5 minutes
 
     return () => clearInterval(checkInterval);
-  }, [refreshBackground]); // Only depend on stable refreshBackground reference
+  }, []); // Empty deps - interval only created once on mount
 
   // Sync background scene to monitor context
   useEffect(() => {
@@ -148,9 +161,23 @@ const HomeScreen: React.FC = () => {
     }
   }, [backgroundContext, updateBackgroundScene]);
 
+  // Debounced update to avoid excessive re-renders from frequent timer updates
+  const debouncedUpdateSceneUnderstanding = useDebounce(
+    (data: {
+      isAnalyzing: boolean;
+      totalAPICalls: number;
+      currentLocation: string | null;
+      timerEnabled: boolean;
+      nextCaptureInSeconds: number;
+    }) => {
+      updateSceneUnderstanding(data);
+    },
+    500 // 500ms debounce delay
+  );
+
   // Sync scene understanding status to monitor context
   useEffect(() => {
-    updateSceneUnderstanding({
+    debouncedUpdateSceneUnderstanding({
       isAnalyzing: sceneUnderstanding.isAnalyzing,
       totalAPICalls: sceneUnderstanding.totalAPICalls,
       currentLocation: sceneUnderstanding.currentScene?.location || null,
@@ -165,7 +192,7 @@ const HomeScreen: React.FC = () => {
     sceneUnderstanding.currentScene?.location,
     sceneUnderstanding.timerState.enabled,
     sceneUnderstanding.timerState.nextCaptureIn,
-    updateSceneUnderstanding,
+    debouncedUpdateSceneUnderstanding,
   ]);
 
   // Debug: Log API key once on mount
@@ -338,38 +365,39 @@ const HomeScreen: React.FC = () => {
 
   // 监听语音识别完成并开始对话
   useEffect(() => {
-    if (!isListening && transcript) {
-      // 语音识别完成且有文本时，清空transcript并发送给AI
+    // 只在真正的状态转换时触发（避免因startConversation/clearTranscript引用变化导致的重复执行）
+    if (!isListening && transcript && transcript !== prevTranscriptRef.current) {
+      prevTranscriptRef.current = transcript;
       startConversation(transcript);
       clearTranscript();
     }
-  }, [isListening, transcript, startConversation, clearTranscript]);
+  }, [isListening, transcript]);
 
   // 监听AI消息并添加到聊天历史
   useEffect(() => {
     if (messages.length > 0) {
       const lastMessage = messages[messages.length - 1];
-      if (lastMessage.role === 'assistant') {
-        // 检查是否已经在chatHistory中
-        const existsInHistory = chatHistory.some(
-          (msg) =>
-            msg.content === lastMessage.content &&
-            Math.abs(msg.timestamp - lastMessage.timestamp) < 1000
-        );
 
-        if (!existsInHistory) {
-          const aiMessage: ChatMessage = {
-            id: generateMessageId(),
-            role: 'assistant',
-            content: lastMessage.content,
-            timestamp: lastMessage.timestamp,
-            isVoiceMessage: true,
-          };
-          addChatMessage(aiMessage);
-        }
+      // 使用唯一ID而不是内容和时间戳比较，避免遍历整个历史记录
+      const messageId = `${lastMessage.content}_${lastMessage.timestamp}`;
+
+      if (
+        lastMessage.role === 'assistant' &&
+        !processedMessageIdsRef.current.has(messageId)
+      ) {
+        processedMessageIdsRef.current.add(messageId);
+
+        const aiMessage: ChatMessage = {
+          id: generateMessageId(),
+          role: 'assistant',
+          content: lastMessage.content,
+          timestamp: lastMessage.timestamp,
+          isVoiceMessage: true,
+        };
+        addChatMessage(aiMessage);
       }
     }
-  }, [messages, chatHistory, addChatMessage]);
+  }, [messages]); // 只依赖messages，避免不必要的重新执行
 
   // Get background image source
   const backgroundSource = backgroundContext
