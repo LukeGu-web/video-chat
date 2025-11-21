@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useMonitorStore } from '../store/monitorStore';
-import { useUserStore } from '../store';
+import { useSceneStore } from '../store';
 import { useDebounce } from './useDebounce';
 import { debugLog } from '../utils/debug';
 import { SceneData } from '../types/scene';
@@ -29,7 +29,7 @@ export const useSceneUnderstandingMonitor = (
   const updateSceneUnderstanding = useMonitorStore(
     (state) => state.updateSceneUnderstanding
   );
-  const setCurrentScene = useUserStore((state) => state.setCurrentScene);
+  const setCurrentScene = useSceneStore((state) => state.setCurrentScene);
 
   // 1. Sync scene understanding status to monitor context (with debounce)
   // Debounced update to avoid excessive re-renders from frequent timer updates

@@ -2,13 +2,14 @@ import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { useUserStore } from '../store';
+import { useChatStore } from '../store';
 import { ChatList } from '../components';
 import { ChatHistoryScreenNavigationProp } from '../types/navigation';
 
 const ChatHistoryScreen: React.FC = () => {
   const navigation = useNavigation<ChatHistoryScreenNavigationProp>();
-  const { chatHistory, clearChatHistory } = useUserStore();
+  const chatHistory = useChatStore((state) => state.chatHistory);
+  const clearChatHistory = useChatStore((state) => state.clearChatHistory);
 
   const handleGoBack = () => {
     navigation.goBack();

@@ -36,6 +36,7 @@ interface SceneStoreState {
   cache: SceneCacheEntry[];
   lastScene: SceneData | null;
   config: Partial<SceneConfig> | null;
+  currentScene: SceneData | null; // Current active scene
 }
 
 interface SceneStoreActions {
@@ -50,6 +51,9 @@ interface SceneStoreActions {
   ) => void;
   saveLastScene: (scene: SceneData) => void;
   saveConfig: (config: SceneConfig) => void;
+
+  // Current scene management
+  setCurrentScene: (scene: SceneData | null) => void;
 
   // Cache management
   clearCache: () => void;
@@ -69,6 +73,7 @@ const initialState: SceneStoreState = {
   cache: [],
   lastScene: null,
   config: null,
+  currentScene: null,
 };
 
 // ============================================
@@ -130,7 +135,7 @@ function loadCachedData(): SceneStoreState {
       hasConfig: !!config,
     });
 
-    return { cache, lastScene, config };
+    return { cache, lastScene, config, currentScene: null };
   } catch (error) {
     debugError('SceneStore', 'Failed to load cached data', error);
     return initialState;
@@ -223,6 +228,15 @@ export const useSceneStore = create<SceneStore>()(
       }
     },
 
+    setCurrentScene: (scene: SceneData | null) => {
+      set((state) => {
+        state.currentScene = scene;
+      });
+      debugLog('SceneStore', 'Set current scene', {
+        sceneLocation: scene?.location || 'null'
+      });
+    },
+
     clearCache: () => {
       try {
         set((state) => {
@@ -268,6 +282,7 @@ export const useSceneStore = create<SceneStore>()(
           state.cache = initialState.cache;
           state.lastScene = initialState.lastScene;
           state.config = initialState.config;
+          state.currentScene = initialState.currentScene;
         });
         storage.remove(STORAGE_KEYS.SCENE_CACHE);
         storage.remove(STORAGE_KEYS.LAST_SCENE);

@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { View, Text, FlatList } from 'react-native';
-import { ChatMessage } from '../store/userStore';
+import { ChatMessage } from '../store/chatStore';
 import { ChatBubble } from './ChatBubble';
 
 interface ChatListProps {

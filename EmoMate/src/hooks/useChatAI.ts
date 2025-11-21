@@ -9,7 +9,7 @@ import {
 import { parseSSEChunk } from '../capabilities/speak/sentenceDetector'; // Phase 2: 句子检测
 import { TTSQueue } from '../capabilities/speak'; // Phase 2: TTS队列管理 - NEW ARCHITECTURE
 import { SmartSentenceBuffer } from '../capabilities/speak/smartSentenceBuffer'; // Phase 3: 智能句子过滤
-import { useUserStore } from '../store/userStore'; // Scene context
+import { useSceneStore } from '../store/sceneStore'; // Scene context
 import { SceneData } from '../types/scene'; // Scene data type
 import { buildCacheableAPIRequestConfig } from './ai/buildAIContext'; // Unified API config builder with caching support (Step 1.1: Refactoring)
 import { useProactiveConversation } from './ai/useProactiveConversation'; // Proactive conversation system (Step 1.2: Refactoring)
@@ -79,7 +79,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
   const [isProactiveModeEnabled, setIsProactiveModeEnabled] = useState(true);
 
   // Get current scene context from store (Step 5.1)
-  const { currentScene } = useUserStore();
+  const currentScene = useSceneStore((state) => state.currentScene);
 
   // Phase 3: Global TTS queue reference for user interruption
   const currentTTSQueue = useRef<TTSQueue | null>(null);

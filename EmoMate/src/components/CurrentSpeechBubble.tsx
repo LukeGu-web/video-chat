@@ -14,7 +14,7 @@ const CurrentSpeechBubble: React.FC<CurrentSpeechBubbleProps> = ({
       {currentMessage && currentMessage.trim() !== '' && (
         <View className='relative max-w-[80%] self-center'>
           {/* 气泡主体 */}
-          <View className='justify-center px-4 py-3 bg-blue-100 border-2 border-blue-300 shadow-sm rounded-2xl'>
+          <View className='justify-center px-4 py-3 bg-blue-100 border-2 border-blue-300 shadow-sm rounded-2xl opacity-90'>
             <Text className='text-base font-medium leading-relaxed text-center text-blue-800'>
               {currentMessage}
             </Text>

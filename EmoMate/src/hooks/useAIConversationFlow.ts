@@ -15,7 +15,7 @@
  */
 
 import { useCallback } from 'react';
-import type { ChatMessage } from '../store';
+import type { ChatMessage } from '../store/chatStore';
 import type { BackgroundContext } from '../utils/backgroundStory';
 import type { ObjectRecognitionRecord } from '../types/scene';
 import {

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { ChatMessage } from '../store';
+import { ChatMessage } from '../store/chatStore';
 
 /**
  * AI message type (simplified)

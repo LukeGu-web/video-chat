@@ -2,7 +2,7 @@ import React, { useEffect, useCallback, useState, useRef } from 'react';
 import { View, Text, ImageBackground, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useIsFocused } from '@react-navigation/native';
-import { useUserStore, useAIStatus } from '../store';
+import { useAIStatus, useChatStore, useSceneStore } from '../store';
 import {
   useChatAI,
   useToast,
@@ -42,7 +42,8 @@ const EMOTION_DETECTOR_CONFIG = {
 const HomeScreen: React.FC = () => {
   const isFocused = useIsFocused(); // Monitor screen focus state
   const setFacialEmotion = useEmotionStore((state) => state.setFacialEmotion);
-  const { addChatMessage, setCurrentScene } = useUserStore();
+  const setCurrentScene = useSceneStore((state) => state.setCurrentScene);
+  const addChatMessage = useChatStore((state) => state.addChatMessage);
 
   // Background scene management (consolidates 3 useEffects)
   const {
