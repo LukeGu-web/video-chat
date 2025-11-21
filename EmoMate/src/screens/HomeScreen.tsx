@@ -1,6 +1,7 @@
 import React, { useEffect, useCallback, useState, useRef } from 'react';
 import { View, Text, ImageBackground, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useIsFocused } from '@react-navigation/native';
 import { useUserStore, useAIStatus } from '../store';
 import {
   useChatAI,
@@ -33,13 +34,13 @@ import { useEmotionStore } from '../store';
 
 // Emotion detector configuration constants (avoid re-creating on each render)
 const EMOTION_DETECTOR_CONFIG = {
-  isActive: true,
   detectionInterval: 3000,
   frameCaptureInterval: 5000, // 5 seconds - faster initial capture for scene understanding
 } as const;
 
 // HomeScreen内容组件
 const HomeScreen: React.FC = () => {
+  const isFocused = useIsFocused(); // Monitor screen focus state
   const setFacialEmotion = useEmotionStore((state) => state.setFacialEmotion);
   const { addChatMessage, setCurrentScene } = useUserStore();
 
@@ -343,10 +344,11 @@ const HomeScreen: React.FC = () => {
           />
         </View>
 
-        {/* Facial Emotion Detection */}
+        {/* Facial Emotion Detection - Only active when screen is focused */}
         <EmotionDetector
           onEmotionDetected={setFacialEmotion}
           onFrameCaptured={handleFrameCaptured}
+          isActive={isFocused} // Stop detection when screen loses focus
           {...EMOTION_DETECTOR_CONFIG}
         />
 
