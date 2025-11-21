@@ -11,9 +11,15 @@ import { TTSQueue } from '../capabilities/speak'; // Phase 2: TTS队列管理 - 
 import { SmartSentenceBuffer } from '../capabilities/speak/smartSentenceBuffer'; // Phase 3: 智能句子过滤
 import { useUserStore } from '../store/userStore'; // Scene context
 import { SceneData } from '../types/scene'; // Scene data type
-import { buildAPIRequestConfig } from './ai/buildAIContext'; // Unified API config builder (Step 1.1: Refactoring)
+import { buildCacheableAPIRequestConfig } from './ai/buildAIContext'; // Unified API config builder with caching support (Step 1.1: Refactoring)
 import { useProactiveConversation } from './ai/useProactiveConversation'; // Proactive conversation system (Step 1.2: Refactoring)
 import { detectUserEmotionFromText } from '../utils/emotionDetection'; // Emotion detection (Step 1.3: Refactoring)
+import {
+  trackCacheUsage,
+  parseCacheUsageFromSSE,
+  getCacheStatsReport,
+} from '../utils/cacheMetrics'; // Phase 2: Cache metrics tracking
+import { debugLog } from '../utils/debug'; // Debug logging utilities
 
 export interface ChatMessage {
   id: string;
@@ -47,6 +53,7 @@ export interface UseChatAIReturn {
   currentSegment: string; // 当前正在播放的语音片段
   enableProactiveMode: (enabled: boolean) => void; // 启用/禁用主动对话
   isProactiveModeEnabled: boolean; // 主动对话模式状态
+  getCacheStats: () => string; // Phase 2: 获取缓存统计报告
 }
 
 // 预设人格模板和API配置现在从 constants/ai.ts 导入
@@ -121,19 +128,20 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       | 'storytelling' = 'normal',
     onSentence: (sentence: string) => void
   ): Promise<string> => {
-    // Step 1.1: Use unified API config builder (eliminates 60+ lines of duplicate code)
-    const apiConfig = buildAPIRequestConfig(
+    // Step 1.1: Use cacheable API config builder with prompt caching support
+    const apiConfig = buildCacheableAPIRequestConfig(
       messages,
       config,
       conversationType,
       currentPersonality,
-      currentScene
+      currentScene,
+      true // Enable cache in production (will auto-detect NODE_ENV)
     );
 
     const requestBody = {
       model: apiConfig.model,
       max_tokens: apiConfig.lengthConfig.maxTokens,
-      system: apiConfig.systemMessage,
+      system: apiConfig.systemMessage, // Can be string or array of CacheableSystemBlock
       messages: apiConfig.contextMessages,
       stop_sequences: ['用户:', 'User:', '---'],
       stream: true, // Enable streaming
@@ -148,6 +156,12 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       xhr.setRequestHeader('Content-Type', 'application/json');
       xhr.setRequestHeader('x-api-key', apiConfig.apiKey);
       xhr.setRequestHeader('anthropic-version', CLAUDE_API_CONFIG.version);
+
+      // Phase 1: Enable Prompt Caching (if cache is enabled)
+      if (apiConfig.enableCache) {
+        xhr.setRequestHeader('anthropic-beta', 'prompt-caching-2024-07-31');
+        console.log('[ChatAI] ✅ Prompt Caching enabled');
+      }
 
       let fullText = '';
       let processedLength = 0;
@@ -185,9 +199,9 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
 
               // Only call onSentence for sentences that passed filtering
               for (const sentence of sentencesToPlay) {
-                console.log(
-                  `[ChatAI] Phase 3: Playing filtered sentence: "${sentence}"`
-                );
+                debugLog('ChatAI', 'Phase 3: Playing filtered sentence', {
+                  sentence,
+                });
                 onSentence(sentence);
                 fullText += sentence;
               }
@@ -203,30 +217,34 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
             // Phase 3: Flush remaining content from SmartBuffer
             const finalSentence = smartBuffer.flush();
             if (finalSentence) {
-              console.log(
-                `[ChatAI] Phase 3: Playing final sentence: "${finalSentence}"`
-              );
+              debugLog('ChatAI', 'Phase 3: Playing final sentence', {
+                finalSentence,
+              });
               onSentence(finalSentence);
               fullText += finalSentence;
             }
 
             // Phase 3: Log statistics
             const stats = smartBuffer.getStats();
-            console.log(`[ChatAI] Phase 3 Statistics:`, stats);
-            console.log(
-              `[ChatAI] Phase 3: Played ${stats.playedSentences}/${stats.totalSentences} sentences`
-            );
-            console.log(
-              `[ChatAI] Phase 3: Skipped ${stats.skippedSentences} sentences`
-            );
-            console.log(
-              `[ChatAI] Phase 3: Total length: ${stats.totalLength} chars`
-            );
-            console.log(
-              `[ChatAI] Phase 3: Average importance: ${stats.averageImportance.toFixed(
-                2
-              )}`
-            );
+            debugLog('ChatAI', 'Phase 3 Statistics', stats);
+            debugLog('ChatAI', 'Phase 3: Sentence stats', {
+              played: `${stats.playedSentences}/${stats.totalSentences}`,
+              skipped: stats.skippedSentences,
+              totalLength: `${stats.totalLength} chars`,
+              avgImportance: stats.averageImportance.toFixed(2),
+            });
+
+            // Phase 2: Track cache usage from API response
+            if (apiConfig.enableCache) {
+              const cacheUsage = parseCacheUsageFromSSE(xhr.responseText);
+              if (cacheUsage) {
+                trackCacheUsage(cacheUsage);
+              } else {
+                console.warn(
+                  '[ChatAI] ⚠️ Could not parse cache usage from response'
+                );
+              }
+            }
 
             // Validate and optimize final response (Layer 3 safety check)
             const optimizedResponse = validateAndOptimizeResponse(
@@ -281,9 +299,10 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
 
       // Detect conversation type
       const conversationType = detectConversationType(content, updatedMessages);
-      console.log(
-        `[ChatAI] Phase 2: 对话类型检测: "${content}" -> ${conversationType}`
-      );
+      debugLog('ChatAI', 'Phase 2: 对话类型检测', {
+        content,
+        conversationType,
+      });
 
       // Enhanced config with emotion
       const enhancedConfig = {
@@ -330,8 +349,11 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
           async (sentence) => {
             // Enqueue sentence for TTS
             if (enhancedConfig?.enableTTS !== false) {
-              console.log(`[ChatAI] 🎵 Phase 2: 加入TTS队列: "${sentence}"`);
-              await ttsQueue.enqueue(sentence, { voiceId, emotion: userEmotion });
+              debugLog('ChatAI', 'Phase 2: 加入TTS队列', { sentence });
+              await ttsQueue.enqueue(sentence, {
+                voiceId,
+                emotion: userEmotion,
+              });
             }
           }
         );
@@ -352,11 +374,11 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
 
         // Wait for TTS queue to finish
         if (enhancedConfig?.enableTTS !== false) {
-          console.log('[ChatAI] ⏳ Phase 2: 等待TTS队列完成');
+          debugLog('ChatAI', 'Phase 2: 等待TTS队列完成');
           setIsStreamSpeaking(true); // Phase 3: Set speaking state
           await ttsQueue.waitForCompletion();
           setIsStreamSpeaking(false); // Phase 3: Clear speaking state
-          console.log('[ChatAI] ✅ Phase 2: TTS队列播放完成');
+          debugLog('ChatAI', 'Phase 2: TTS队列播放完成');
         }
 
         // Start proactive conversation detection
@@ -388,11 +410,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
         setIsLoading(false);
       }
     },
-    [
-      messages,
-      currentPersonality,
-      proactiveConversation,
-    ]
+    [messages, currentPersonality, proactiveConversation]
   );
 
   const clearMessages = useCallback(() => {
@@ -425,9 +443,12 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     if (currentTTSQueue.current) {
       try {
         await currentTTSQueue.current.cancel();
-        console.log('[ChatAI] ✅ Conversation TTS queue cancelled');
+        debugLog('ChatAI', 'Conversation TTS queue cancelled');
       } catch (error) {
-        console.error('[ChatAI] Error cancelling conversation TTS queue:', error);
+        console.error(
+          '[ChatAI] Error cancelling conversation TTS queue:',
+          error
+        );
       }
       currentTTSQueue.current = null;
     }
@@ -478,6 +499,11 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     proactiveConversation,
   ]);
 
+  // Phase 2: Get cache statistics report
+  const getCacheStats = useCallback(() => {
+    return getCacheStatsReport();
+  }, []);
+
   return {
     messages,
     isLoading,
@@ -492,5 +518,6 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     currentSegment: currentStreamSegment,
     enableProactiveMode,
     isProactiveModeEnabled,
+    getCacheStats, // Phase 2: Cache statistics
   };
 };
