@@ -14,7 +14,7 @@
  * @module useAIConversationFlow
  */
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useEffect } from 'react';
 import type { ChatMessage } from '../store/chatStore';
 import type { BackgroundContext } from '../utils/backgroundStory';
 import type { ObjectRecognitionRecord } from '../types/scene';
@@ -127,6 +127,18 @@ export const useAIConversationFlow = (
   // Small talk manager reference
   const smallTalkManagerRef = useRef<SmallTalkManager | null>(null);
 
+  // Cleanup: Stop small talk manager when component unmounts
+  // This prevents memory leaks and ensures TTS is stopped properly
+  useEffect(() => {
+    return () => {
+      if (smallTalkManagerRef.current) {
+        console.log('[AIConversationFlow] Component unmounting, stopping small talk');
+        smallTalkManagerRef.current.stop();
+        smallTalkManagerRef.current = null;
+      }
+    };
+  }, []);
+
   /**
    * Start a new conversation with the AI
    *
@@ -190,24 +202,29 @@ export const useAIConversationFlow = (
           manager.start();
         }
 
-        // Call object recognition handler
-        const objectResult = await handleObjectRecognition(
-          inputText,
-          capturedFrame,
-          objectRecognition
-        );
+        // Call object recognition handler with proper error handling
+        // Use try-finally to ensure small talk is always stopped, even if recognition fails
+        let objectResult;
+        try {
+          objectResult = await handleObjectRecognition(
+            inputText,
+            capturedFrame,
+            objectRecognition
+          );
+        } finally {
+          // CRITICAL: Always stop small talk and clear status, even if recognition throws
+          // This prevents memory leaks and audio conflicts
+          if (smallTalkManagerRef.current) {
+            console.log('[AIConversationFlow] Recognition complete (or failed), stopping small talk');
+            smallTalkManagerRef.current.stop();
+            smallTalkManagerRef.current = null;
+          }
 
-        // Stop small talk immediately after recognition completes
-        if (smallTalkManagerRef.current) {
-          console.log('[AIConversationFlow] Recognition complete, stopping small talk');
-          smallTalkManagerRef.current.stop();
-          smallTalkManagerRef.current = null;
-        }
-
-        // Clear AI status
-        if (hasObjectKeyword && setLooking && setThinking) {
-          setLooking(false);
-          setThinking(false);
+          // Clear AI status
+          if (hasObjectKeyword && setLooking && setThinking) {
+            setLooking(false);
+            setThinking(false);
+          }
         }
 
         // Show error toast if object recognition failed
@@ -242,6 +259,8 @@ export const useAIConversationFlow = (
         );
 
         // Step 6: Send message to AI with context
+        // Note: Small talk TTS has been stopped in the finally block above
+        // This ensures no audio conflict between small talk and main AI response
         await sendMessage(inputText, {
           modelType: 'haiku',
           enableTTS: true,

@@ -59,7 +59,7 @@ const HomeScreen: React.FC = () => {
   } = useBackgroundSceneManager();
 
   // AI Status management (new multi-dimensional state)
-  const { setListening, setLooking, setThinking, setSpeaking } = useAIStatus();
+  const { setLooking, setThinking, setBatchStates } = useAIStatus();
 
   const {
     isListening,
@@ -134,17 +134,14 @@ const HomeScreen: React.FC = () => {
   }, [error, aiError, backgroundError]);
 
   // Sync useChatAI states to useAIStatus (multi-dimensional state model)
+  // Use batch update to prevent race conditions and unnecessary re-renders
   useEffect(() => {
-    setListening(isListening);
-  }, [isListening, setListening]);
-
-  useEffect(() => {
-    setThinking(isGenerating);
-  }, [isGenerating, setThinking]);
-
-  useEffect(() => {
-    setSpeaking(isSpeaking);
-  }, [isSpeaking, setSpeaking]);
+    setBatchStates({
+      isListening,
+      isThinking: isGenerating,
+      isSpeaking,
+    });
+  }, [isListening, isGenerating, isSpeaking, setBatchStates]);
 
   // Background pause - Stop scene detection when app goes to background
   useAppStateSceneTimer({

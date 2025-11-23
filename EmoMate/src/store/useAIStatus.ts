@@ -45,6 +45,9 @@ interface AIStatusStore extends AIActivityState, AIDerivedState {
   setThinking: (value: boolean) => void;
   setSpeaking: (value: boolean) => void;
 
+  // Batch state setter (recommended for updating multiple states at once)
+  setBatchStates: (states: Partial<AIActivityState>) => void;
+
   // Legacy API (for backward compatibility)
   aiStatus: HiyoriMotion; // Alias for currentMotion
   setAIStatus: (status: HiyoriMotion) => void; // Manual override
@@ -177,6 +180,31 @@ export const useAIStatus = create<AIStatusStore>((set) => ({
       const derivedState = calculateDerivedState(newActivityState);
       return {
         isSpeaking: value,
+        ...derivedState,
+        aiStatus: derivedState.currentMotion,
+      };
+    });
+  },
+
+  // Batch state setter - Update multiple activity states in a single render
+  // This prevents race conditions and unnecessary re-renders when syncing
+  // multiple states from external sources (e.g., useChatAI hook)
+  setBatchStates: (states: Partial<AIActivityState>) => {
+    set((currentState) => {
+      // Merge new states with current state
+      const newActivityState = {
+        isListening: currentState.isListening,
+        isLooking: currentState.isLooking,
+        isThinking: currentState.isThinking,
+        isSpeaking: currentState.isSpeaking,
+        ...states, // Override with new values
+      };
+
+      // Calculate derived state once for all updates
+      const derivedState = calculateDerivedState(newActivityState);
+
+      return {
+        ...states, // Update only the provided activity states
         ...derivedState,
         aiStatus: derivedState.currentMotion,
       };
