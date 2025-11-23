@@ -53,6 +53,7 @@ export class TTSQueue implements ITTSQueue {
       id: `tts_${Date.now()}_${Math.random().toString(36).substring(7)}`,
       text: text.trim(),
       status: 'pending',
+      options, // Store options with the item for later use
     };
 
     this.queue.push(item);
@@ -60,7 +61,10 @@ export class TTSQueue implements ITTSQueue {
 
     // Start synthesis if capacity allows
     if (this.activeSynthesisTasks < (this.config.maxConcurrentSynthesis || 2)) {
+      console.log(`[TTSQueue] 🚀 Starting synthesis for ${item.id} (active tasks: ${this.activeSynthesisTasks})`);
       this.synthesize(item, options);
+    } else {
+      console.log(`[TTSQueue] ⏳ Queued ${item.id} - waiting for available slot (active tasks: ${this.activeSynthesisTasks})`);
     }
 
     // Start playback if not already playing
@@ -89,7 +93,7 @@ export class TTSQueue implements ITTSQueue {
         item.status = 'ready';
         this.activeSynthesisTasks--;
 
-        console.log(`[TTSQueue] ⚡ Using cached audio for ${item.id}`);
+        console.log(`[TTSQueue] ⚡ Using cached audio for ${item.id} (active tasks: ${this.activeSynthesisTasks})`);
 
         // If this is the first item and playback hasn't started, start now
         if (this.queue[0] === item && !this.isPlaying) {
@@ -97,6 +101,7 @@ export class TTSQueue implements ITTSQueue {
         }
 
         // Start synthesis for next pending item
+        console.log(`[TTSQueue] 🔄 Checking for next pending item after cache hit...`);
         this.synthesizeNextPending(options);
         return;
       }
@@ -109,7 +114,7 @@ export class TTSQueue implements ITTSQueue {
       item.audioUri = result.audioUri;
       item.status = 'ready';
 
-      console.log(`[TTSQueue] ✅ Synthesis complete for ${item.id}`);
+      console.log(`[TTSQueue] ✅ Synthesis complete for ${item.id} (active tasks: ${this.activeSynthesisTasks - 1})`);
 
       // Cache the result for future use (only cache short phrases)
       if (item.text.length <= 30) {
@@ -125,7 +130,11 @@ export class TTSQueue implements ITTSQueue {
         this.playNext();
       }
 
+      // Decrement active tasks BEFORE checking for next pending
+      this.activeSynthesisTasks--;
+
       // Start synthesis for next pending item
+      console.log(`[TTSQueue] 🔄 Checking for next pending item after synthesis...`);
       this.synthesizeNextPending(options);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -176,13 +185,25 @@ export class TTSQueue implements ITTSQueue {
 
   /**
    * Start synthesis for next pending item
+   * FIX: Use options stored in the item, not passed parameter
    */
   private synthesizeNextPending(options?: TTSSynthesisOptions): void {
     const nextPendingIndex = this.queue.findIndex(
       (q) => q.status === 'pending'
     );
-    if (nextPendingIndex !== -1 && this.activeSynthesisTasks < (this.config.maxConcurrentSynthesis || 2)) {
-      this.synthesize(this.queue[nextPendingIndex], options);
+
+    if (nextPendingIndex !== -1) {
+      const nextItem = this.queue[nextPendingIndex];
+      const itemOptions = nextItem.options || options; // Prefer item's stored options
+
+      if (this.activeSynthesisTasks < (this.config.maxConcurrentSynthesis || 2)) {
+        console.log(`[TTSQueue] 🚀 Starting next pending synthesis: ${nextItem.id} (active tasks: ${this.activeSynthesisTasks})`);
+        this.synthesize(nextItem, itemOptions);
+      } else {
+        console.log(`[TTSQueue] ⏸️ Cannot start ${nextItem.id} - max concurrent reached (active: ${this.activeSynthesisTasks})`);
+      }
+    } else {
+      console.log(`[TTSQueue] ℹ️ No pending items to synthesize (active tasks: ${this.activeSynthesisTasks})`);
     }
   }
 

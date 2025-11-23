@@ -31,6 +31,7 @@ export interface TTSQueueItem {
   audioUri?: string;
   error?: string;
   retryCount?: number;
+  options?: TTSSynthesisOptions; // Store synthesis options with the item
 }
 
 /**
