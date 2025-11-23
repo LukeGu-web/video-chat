@@ -14,7 +14,7 @@
  * @module useAIConversationFlow
  */
 
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import type { ChatMessage } from '../store/chatStore';
 import type { BackgroundContext } from '../utils/backgroundStory';
 import type { ObjectRecognitionRecord } from '../types/scene';
@@ -23,6 +23,9 @@ import {
   handleObjectRecognition,
   handleSceneAnalysis,
 } from '../utils/ai/buildConversationContext';
+import { detectObjectKeywords } from '../capabilities/vision';
+import { createRecognitionSmallTalkManager } from '../utils/objectRecognitionHelper';
+import type { SmallTalkManager } from '../utils/smallTalk';
 
 /**
  * AI conversation flow configuration
@@ -72,6 +75,16 @@ export interface AIConversationFlowConfig {
 
   // Message ID generator
   generateMessageId: () => string;
+
+  // Small talk support (for voice-triggered recognition)
+  smallTalkTTS?: {
+    speak: (text: string, options?: any) => Promise<void>;
+    stop: () => void;
+  };
+
+  // AI Status setters (for voice-triggered recognition)
+  setLooking?: (value: boolean) => void;
+  setThinking?: (value: boolean) => void;
 }
 
 /**
@@ -106,7 +119,13 @@ export const useAIConversationFlow = (
     setToast,
     getCapturedFrame,
     generateMessageId,
+    smallTalkTTS,
+    setLooking,
+    setThinking,
   } = config;
+
+  // Small talk manager reference
+  const smallTalkManagerRef = useRef<SmallTalkManager | null>(null);
 
   /**
    * Start a new conversation with the AI
@@ -141,11 +160,55 @@ export const useAIConversationFlow = (
 
         // Step 3: Handle object recognition (if keyword detected)
         const capturedFrame = getCapturedFrame();
+
+        // Check if object keyword is detected for small talk
+        const objectKeyword = detectObjectKeywords(inputText);
+        const hasObjectKeyword = !!objectKeyword;
+
+        // Start small talk if object keyword detected and small talk is enabled
+        if (hasObjectKeyword && smallTalkTTS && setLooking && setThinking) {
+          console.log('[AIConversationFlow] 🗣️ Starting small talk for voice-triggered recognition');
+
+          // Set AI status
+          setLooking(true);
+          setThinking(true);
+
+          // Initialize and start small talk manager
+          const manager = createRecognitionSmallTalkManager(
+            async (text: string) => {
+              console.log(`[AIConversationFlow] Playing small talk: ${text}`);
+              await smallTalkTTS.speak(text, {
+                voiceId: 'hkfHEbBvdQFNX4uWHqRF',
+              });
+            },
+            () => {
+              console.log('[AIConversationFlow] Stopping small talk');
+              smallTalkTTS.stop();
+            }
+          );
+          smallTalkManagerRef.current = manager;
+          manager.start();
+        }
+
+        // Call object recognition handler
         const objectResult = await handleObjectRecognition(
           inputText,
           capturedFrame,
           objectRecognition
         );
+
+        // Stop small talk immediately after recognition completes
+        if (smallTalkManagerRef.current) {
+          console.log('[AIConversationFlow] Recognition complete, stopping small talk');
+          smallTalkManagerRef.current.stop();
+          smallTalkManagerRef.current = null;
+        }
+
+        // Clear AI status
+        if (hasObjectKeyword && setLooking && setThinking) {
+          setLooking(false);
+          setThinking(false);
+        }
 
         // Show error toast if object recognition failed
         if (objectResult.error) {

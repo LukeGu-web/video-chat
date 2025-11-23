@@ -14,6 +14,7 @@ import {
 } from '../hooks/';
 import { useAIConversationFlow } from '../hooks/useAIConversationFlow'; // Step 2.3: AI conversation flow hook
 import { useSpeechToText } from '../capabilities/listen';
+import { useTTS } from '../capabilities/speak';
 import {
   useSceneUnderstanding,
   useObjectRecognition,
@@ -31,6 +32,10 @@ import {
 import { EmotionDetector } from '../components/vision';
 import { debugLog, debugWarn, debugError } from '../utils/debug';
 import { useEmotionStore } from '../store';
+import {
+  createRecognitionPrompt,
+  isConfidenceAcceptable,
+} from '../utils/objectRecognitionHelper';
 
 // Emotion detector configuration constants (avoid re-creating on each render)
 const EMOTION_DETECTOR_CONFIG = {
@@ -53,7 +58,9 @@ const HomeScreen: React.FC = () => {
     backgroundSource,
   } = useBackgroundSceneManager();
 
-  const { setAIStatus } = useAIStatus();
+  // AI Status management (new multi-dimensional state)
+  const { setListening, setLooking, setThinking, setSpeaking } = useAIStatus();
+
   const {
     isListening,
     transcript,
@@ -74,6 +81,13 @@ const HomeScreen: React.FC = () => {
     stopSpeaking,
     currentSegment,
   } = useChatAI({ personality: PERSONALITY_PROMPTS.gentle, enableTTS: true });
+
+  // TTS for small talk (voice-triggered object recognition only)
+  const smallTalkTTS = useTTS({
+    provider: 'elevenlabs',
+    mode: 'simple',
+    fallbackToExpo: true,
+  });
 
   // Toast management
   const { toastState, showError, showSuccess, dismissToast } = useToast();
@@ -119,22 +133,18 @@ const HomeScreen: React.FC = () => {
     }
   }, [error, aiError, backgroundError]);
 
-  // 统一的 AI 状态管理 - 直接使用Hiyori动作
+  // Sync useChatAI states to useAIStatus (multi-dimensional state model)
   useEffect(() => {
-    if (isListening) {
-      // 1. 开始语音识别时：使用Thinking动作（倾听思考状态）
-      setAIStatus('Thinking');
-    } else if (isGenerating) {
-      // 2. 正在生成回复：Thinking 动作
-      setAIStatus('Thinking');
-    } else if (isSpeaking) {
-      // 3. 正在播放 TTS：Speaking 动作
-      setAIStatus('Speaking');
-    } else {
-      // 4. 其他情况：Idle 动作
-      setAIStatus('Idle');
-    }
-  }, [isListening, isGenerating, isSpeaking, setAIStatus]);
+    setListening(isListening);
+  }, [isListening, setListening]);
+
+  useEffect(() => {
+    setThinking(isGenerating);
+  }, [isGenerating, setThinking]);
+
+  useEffect(() => {
+    setSpeaking(isSpeaking);
+  }, [isSpeaking, setSpeaking]);
 
   // Background pause - Stop scene detection when app goes to background
   useAppStateSceneTimer({
@@ -165,7 +175,7 @@ const HomeScreen: React.FC = () => {
     enabled: true,
   });
 
-  // Handle object recognition
+  // Handle object recognition (button triggered - no small talk needed)
   const handleRecognizeObject = async () => {
     if (!lastCapturedFrameRef.current) {
       showError('请等待摄像头捕获画面');
@@ -177,29 +187,66 @@ const HomeScreen: React.FC = () => {
     }
 
     setIsRecognizing(true);
-    debugLog('HomeScreen', 'Starting object recognition');
+    setLooking(true);
+    debugLog('HomeScreen', 'Starting button-triggered object recognition');
 
     try {
+      // Call Vision API directly (no small talk for button trigger)
+      setThinking(true);
       const response = await objectRecognition.recognizeObject(
         lastCapturedFrameRef.current,
         '识别这个物品'
       );
+      setThinking(false);
 
+      // Handle result and use AI to announce
       if (response.success) {
-        debugLog(
-          'HomeScreen',
-          `Object recognized: ${response.object.objectName}`
-        );
-        showSuccess(`识别成功: ${response.object.objectName}`);
+        const object = response.object;
+        debugLog('HomeScreen', `Object recognized: ${object.objectName}`, {
+          confidence: object.confidence,
+          category: object.category,
+        });
+
+        // Check confidence level
+        if (!isConfidenceAcceptable(object.confidence)) {
+          // Low confidence - use AI to explain retry
+          const errorPrompt = createRecognitionPrompt(
+            object,
+            false,
+            '识别置信度较低'
+          );
+          await sendMessage(errorPrompt);
+        } else {
+          // Success - use AI to announce result naturally
+          const announcement = createRecognitionPrompt(object, true);
+          await sendMessage(announcement);
+        }
       } else {
+        // Recognition failed - use AI to handle error
         debugError('HomeScreen', 'Recognition failed', response.error);
-        showError(response.error || '识别失败，请重试');
+        const errorPrompt = createRecognitionPrompt(
+          {
+            objectName: '未知',
+            category: '未知',
+            description: '',
+            confidence: 0,
+            timestamp: Date.now(),
+          },
+          false,
+          response.error
+        );
+        await sendMessage(errorPrompt);
       }
     } catch (error) {
       debugError('HomeScreen', 'Recognition error', error);
-      showError('识别过程中发生错误');
+
+      // Use AI to handle unexpected error
+      const errorMsg = error instanceof Error ? error.message : '未知错误';
+      await sendMessage(`识别过程中发生了错误：${errorMsg}。要不要再试一次？`);
     } finally {
       setIsRecognizing(false);
+      setLooking(false);
+      setThinking(false);
     }
   };
 
@@ -261,6 +308,10 @@ const HomeScreen: React.FC = () => {
     setToast,
     getCapturedFrame,
     generateMessageId,
+    // Small talk support for voice-triggered recognition
+    smallTalkTTS,
+    setLooking,
+    setThinking,
   });
 
   // Voice conversation management (consolidates 2 useEffects)
