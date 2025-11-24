@@ -57,62 +57,78 @@ interface AIStatusStore extends AIActivityState, AIDerivedState {
 }
 
 /**
- * Calculate derived state (motion and activity) from activity states
+ * Priority Rule for state calculation
+ * Defines a condition and its corresponding derived state
+ */
+interface PriorityRule {
+  condition: (state: AIActivityState) => boolean;
+  motion: HiyoriMotion;
+  activity: string;
+}
+
+/**
+ * Priority rules for calculating derived state
+ * Ordered from highest to lowest priority
+ *
  * Priority rules (highest to lowest):
- * 1. Speaking - Always show Speaking motion when TTS is playing
- * 2. Listening - Show Thinking motion when user is speaking
- * 3. Looking - Show Thinking motion when recognizing objects
- * 4. Thinking - Show Thinking motion when waiting for API
- * 5. Idle - Default state
+ * 1. Speaking + Looking + Thinking - Small talk during object recognition
+ * 2. Speaking - Always show Speaking motion when TTS is playing
+ * 3. Listening - Show Thinking motion when user is speaking
+ * 4. Looking - Show Thinking motion when recognizing objects
+ * 5. Thinking - Show Thinking motion when waiting for API
+ * 6. Idle - Default state
+ */
+const PRIORITY_RULES: PriorityRule[] = [
+  // Priority 1: Speaking while looking at object (small talk during recognition)
+  {
+    condition: (s) => s.isSpeaking && s.isLooking && s.isThinking,
+    motion: 'Speaking',
+    activity: 'looking_and_speaking',
+  },
+  // Priority 2: Regular speaking
+  {
+    condition: (s) => s.isSpeaking,
+    motion: 'Speaking',
+    activity: 'speaking',
+  },
+  // Priority 3: Listening to user
+  {
+    condition: (s) => s.isListening,
+    motion: 'Thinking',
+    activity: 'listening',
+  },
+  // Priority 4: Looking at object (object recognition)
+  {
+    condition: (s) => s.isLooking,
+    motion: 'Thinking',
+    activity: 'looking',
+  },
+  // Priority 5: Thinking (waiting for API response)
+  {
+    condition: (s) => s.isThinking,
+    motion: 'Thinking',
+    activity: 'thinking',
+  },
+  // Priority 6: Idle (default state)
+  {
+    condition: () => true, // Always true as fallback
+    motion: 'Idle',
+    activity: 'idle',
+  },
+];
+
+/**
+ * Calculate derived state (motion and activity) from activity states
+ * Uses priority rule array for clean, maintainable state calculation
  */
 function calculateDerivedState(state: AIActivityState): AIDerivedState {
-  const { isListening, isLooking, isThinking, isSpeaking } = state;
+  // Find first matching rule (highest priority)
+  const rule = PRIORITY_RULES.find((r) => r.condition(state));
 
-  // Priority 1: Speaking (highest priority - always visible)
-  if (isSpeaking) {
-    if (isLooking && isThinking) {
-      // Speaking while looking at object (small talk during recognition)
-      return {
-        currentMotion: 'Speaking',
-        currentActivity: 'looking_and_speaking',
-      };
-    }
-    // Regular speaking
-    return {
-      currentMotion: 'Speaking',
-      currentActivity: 'speaking',
-    };
-  }
-
-  // Priority 2: Listening to user
-  if (isListening) {
-    return {
-      currentMotion: 'Thinking',
-      currentActivity: 'listening',
-    };
-  }
-
-  // Priority 3: Looking at object (object recognition)
-  if (isLooking) {
-    return {
-      currentMotion: 'Thinking',
-      currentActivity: 'looking',
-    };
-  }
-
-  // Priority 4: Thinking (waiting for API response)
-  if (isThinking) {
-    return {
-      currentMotion: 'Thinking',
-      currentActivity: 'thinking',
-    };
-  }
-
-  // Priority 5: Idle
-  return {
-    currentMotion: 'Idle',
-    currentActivity: 'idle',
-  };
+  // Rule should always be found (fallback to Idle), but add safety check
+  return rule
+    ? { currentMotion: rule.motion, currentActivity: rule.activity }
+    : { currentMotion: 'Idle', currentActivity: 'idle' };
 }
 
 /**

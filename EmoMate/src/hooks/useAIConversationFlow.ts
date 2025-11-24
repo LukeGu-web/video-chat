@@ -202,15 +202,42 @@ export const useAIConversationFlow = (
           manager.start();
         }
 
-        // Call object recognition handler with proper error handling
+        // Call object recognition handler with proper error handling and timeout protection
         // Use try-finally to ensure small talk is always stopped, even if recognition fails
-        let objectResult;
+        let objectResult: {
+          triggered: boolean;
+          context: string | null;
+          error: string | null;
+        };
+
         try {
-          objectResult = await handleObjectRecognition(
+          // Add timeout protection for object recognition (15 seconds)
+          const RECOGNITION_TIMEOUT = 15000; // 15 seconds
+
+          const recognitionPromise = handleObjectRecognition(
             inputText,
             capturedFrame,
             objectRecognition
           );
+
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error('识别超时，请重试')), RECOGNITION_TIMEOUT);
+          });
+
+          objectResult = await Promise.race([recognitionPromise, timeoutPromise]);
+        } catch (error) {
+          console.error('[AIConversationFlow] Recognition error or timeout:', error);
+
+          // Handle timeout or other errors gracefully
+          const errorMsg = error instanceof Error ? error.message : '识别失败';
+          setToast(errorMsg, 'error');
+
+          // Return empty result to allow conversation to continue
+          objectResult = {
+            triggered: false,
+            context: null,
+            error: errorMsg,
+          };
         } finally {
           // CRITICAL: Always stop small talk and clear status, even if recognition throws
           // This prevents memory leaks and audio conflicts

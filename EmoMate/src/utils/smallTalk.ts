@@ -88,6 +88,8 @@ export class SmallTalkManager {
   private onStopCallback?: () => void;
   private tierTimers: NodeJS.Timeout[] = [];
   private aborted: boolean = false;
+  private consecutiveFailures: number = 0;
+  private readonly MAX_CONSECUTIVE_FAILURES = 2;
 
   constructor(
     onSpeak: (text: string) => Promise<void>,
@@ -136,8 +138,29 @@ export class SmallTalkManager {
     if (this.onSpeakCallback) {
       try {
         await this.onSpeakCallback(phrase.text);
+
+        // Reset failure counter on success
+        this.consecutiveFailures = 0;
       } catch (error) {
         debugLog('SmallTalkManager', 'Error playing phrase', error);
+
+        // Track consecutive failures
+        this.consecutiveFailures++;
+
+        // Stop manager if too many consecutive failures
+        if (this.consecutiveFailures >= this.MAX_CONSECUTIVE_FAILURES) {
+          debugLog(
+            'SmallTalkManager',
+            `Stopping after ${this.consecutiveFailures} consecutive failures`
+          );
+          this.stop();
+          return;
+        }
+
+        debugLog(
+          'SmallTalkManager',
+          `Failure ${this.consecutiveFailures}/${this.MAX_CONSECUTIVE_FAILURES}, continuing...`
+        );
       }
     }
 
@@ -210,6 +233,7 @@ export class SmallTalkManager {
   reset(): void {
     this.stop();
     this.currentTier = SmallTalkTier.SHORT;
+    this.consecutiveFailures = 0;
   }
 }
 
