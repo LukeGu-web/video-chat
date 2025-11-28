@@ -20,7 +20,12 @@ import {
   getCacheStatsReport,
 } from '../utils/cacheMetrics'; // Phase 2: Cache metrics tracking
 import { debugLog } from '../utils/debug'; // Debug logging utilities
-import { executeRAG } from '../capabilities/retrieval'; // RAG system (Phase 1: Retrieval-Augmented Generation)
+import { executeRAG, type RAGResult } from '../capabilities/retrieval'; // RAG system (Phase 1: Retrieval-Augmented Generation)
+import {
+  shouldRequestFeedback,
+  submitFeedback,
+  type RetrievalFeedback,
+} from '../capabilities/retrieval'; // Phase 3: User feedback system
 import { useChatStore, ChatMessage } from '../store/chatStore'; // Chat history persistence
 
 // Re-export ChatMessage for convenience
@@ -51,6 +56,13 @@ export interface UseChatAIReturn {
   enableProactiveMode: (enabled: boolean) => void; // 启用/禁用主动对话
   isProactiveModeEnabled: boolean; // 主动对话模式状态
   getCacheStats: () => string; // Phase 2: 获取缓存统计报告
+  // Phase 3: User feedback system
+  shouldShowFeedback: boolean; // 是否应该显示反馈提示
+  submitUserFeedback: (
+    rating: 'helpful' | 'not_helpful' | 'neutral',
+    comment?: string
+  ) => void; // 提交用户反馈
+  dismissFeedback: () => void; // 关闭反馈提示
 }
 
 // 预设人格模板和API配置现在从 constants/ai.ts 导入
@@ -90,6 +102,10 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
   const [isStreamGenerating, setIsStreamGenerating] = useState(false); // Claude streaming
   const [isStreamSpeaking, setIsStreamSpeaking] = useState(false); // TTS queue playing
   const [currentStreamSegment, setCurrentStreamSegment] = useState(''); // Current sentence being spoken
+
+  // Phase 3: User feedback system
+  const [lastRAGResult, setLastRAGResult] = useState<RAGResult | null>(null);
+  const [shouldShowFeedback, setShouldShowFeedback] = useState(false);
 
   // Sync messages with chatHistory from store
   useEffect(() => {
@@ -321,6 +337,9 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
         minRelevanceThreshold: 0.3,
       });
 
+      // Phase 3: Store RAG result for potential feedback
+      setLastRAGResult(ragResult);
+
       debugLog('ChatAI', 'RAG检索完成', {
         isTriggered: ragResult.isRetrievalTriggered,
         totalFound: ragResult.retrieval.metadata.totalFound,
@@ -408,6 +427,12 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
           await ttsQueue.waitForCompletion();
           setIsStreamSpeaking(false); // Phase 3: Clear speaking state
           debugLog('ChatAI', 'Phase 2: TTS队列播放完成');
+        }
+
+        // Phase 3: Check if we should request user feedback
+        if (shouldRequestFeedback(ragResult.isRetrievalTriggered)) {
+          setShouldShowFeedback(true);
+          debugLog('ChatAI', 'Phase 3: Requesting user feedback');
         }
 
         // Start proactive conversation detection
@@ -538,6 +563,45 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     return getCacheStatsReport();
   }, []);
 
+  // Phase 3: Submit user feedback
+  const submitUserFeedback = useCallback(
+    (rating: 'helpful' | 'not_helpful' | 'neutral', comment?: string) => {
+      if (!lastRAGResult) {
+        debugLog('ChatAI', 'Phase 3: No RAG result to submit feedback for');
+        return;
+      }
+
+      const feedbackData = {
+        queryText: messages[messages.length - 2]?.content || '', // User's last message
+        rating,
+        retrievalMetadata: {
+          totalFound: lastRAGResult.retrieval.metadata.totalFound,
+          averageRelevance: lastRAGResult.retrieval.metadata.averageRelevance || 0,
+          sourcesUsed: lastRAGResult.retrieval.metadata.sources,
+          contextLength: lastRAGResult.context.length,
+        },
+        userComment: comment,
+      };
+
+      const feedback = submitFeedback(feedbackData);
+
+      debugLog('ChatAI', 'Phase 3: User feedback submitted', {
+        feedbackId: feedback.id,
+        rating,
+      });
+
+      // Hide feedback prompt
+      setShouldShowFeedback(false);
+    },
+    [lastRAGResult, messages]
+  );
+
+  // Phase 3: Dismiss feedback prompt
+  const dismissFeedback = useCallback(() => {
+    setShouldShowFeedback(false);
+    debugLog('ChatAI', 'Phase 3: Feedback dismissed');
+  }, []);
+
   return {
     messages,
     isLoading,
@@ -553,5 +617,9 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     enableProactiveMode,
     isProactiveModeEnabled,
     getCacheStats, // Phase 2: Cache statistics
+    // Phase 3: User feedback
+    shouldShowFeedback,
+    submitUserFeedback,
+    dismissFeedback,
   };
 };

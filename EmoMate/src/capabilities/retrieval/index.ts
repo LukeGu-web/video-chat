@@ -1,7 +1,7 @@
 /**
  * RAG (Retrieval-Augmented Generation) System
  * Export all retrieval capabilities
- * Phase 2: Enhanced with advanced scoring, intelligent truncation, and performance monitoring
+ * Phase 3: Enhanced with conversation summarization and user feedback
  */
 
 // Main pipeline
@@ -38,3 +38,26 @@ export {
   type RAGPerformanceMetrics,
   type PerformanceReport,
 } from './performanceMonitor';
+
+// Phase 3: Advanced features
+export {
+  generateConversationSummary,
+  shouldSummarizeConversation,
+  createSlidingWindowSummaries,
+  formatSummaryForContext,
+  type ConversationSummary,
+  type SummaryOptions,
+} from './conversationSummarizer';
+
+export {
+  submitFeedback,
+  getFeedbackHistory,
+  getFeedbackStats,
+  clearFeedbackData,
+  suggestOptimalThreshold,
+  getFeedbackInsights,
+  shouldRequestFeedback,
+  getFeedbackPrompt,
+  type RetrievalFeedback,
+  type FeedbackStats,
+} from './userFeedback';

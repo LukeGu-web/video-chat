@@ -1,7 +1,7 @@
 /**
  * RAG Pipeline - Complete Retrieval-Augmented Generation Flow
  * Integrates all RAG modules into a unified pipeline
- * Phase 2: Enhanced with performance monitoring
+ * Phase 3: Enhanced with conversation summarization support
  */
 
 import { analyzeQuery, QueryAnalysis } from './queryAnalyzer';
@@ -17,6 +17,14 @@ import {
   logPerformanceReport,
   type RAGPerformanceMetrics,
 } from './performanceMonitor';
+import {
+  shouldSummarizeConversation,
+  generateConversationSummary,
+  formatSummaryForContext,
+  type ConversationSummary,
+  type SummaryOptions,
+} from './conversationSummarizer';
+import { useChatStore } from '../../store/chatStore';
 
 // ============================================
 // Types
@@ -37,6 +45,9 @@ export interface RAGResult {
 
   // Phase 2: Performance metrics
   performance?: RAGPerformanceMetrics;
+
+  // Phase 3: Conversation summaries
+  summaries?: ConversationSummary[];
 }
 
 export interface RAGOptions {
@@ -55,6 +66,10 @@ export interface RAGOptions {
   // Phase 2: Performance monitoring
   enablePerformanceMonitoring?: boolean;
   logPerformanceReport?: boolean;
+
+  // Phase 3: Conversation summarization
+  enableConversationSummaries?: boolean;
+  summaryOptions?: SummaryOptions;
 }
 
 // ============================================
@@ -63,7 +78,7 @@ export interface RAGOptions {
 
 /**
  * Execute complete RAG pipeline
- * Phase 2: Enhanced with performance monitoring
+ * Phase 3: Enhanced with conversation summarization support
  *
  * @param userQuery - User's query text
  * @param options - RAG configuration options
@@ -82,6 +97,8 @@ export async function executeRAG(
     contextOptions,
     enablePerformanceMonitoring = true,
     logPerformanceReport: shouldLogReport = false,
+    enableConversationSummaries = false,
+    summaryOptions,
   } = options || {};
 
   // 1. Query Analysis
@@ -155,12 +172,40 @@ export async function executeRAG(
     threshold: minRelevanceThreshold,
   });
 
+  // 4.5. Generate conversation summaries (Phase 3)
+  let summaries: ConversationSummary[] | undefined;
+  let summaryContext = '';
+
+  if (enableConversationSummaries) {
+    const chatHistory = useChatStore.getState().chatHistory;
+
+    if (shouldSummarizeConversation(chatHistory.length, summaryOptions)) {
+      try {
+        const summary = generateConversationSummary(chatHistory, summaryOptions);
+        summaries = [summary];
+        summaryContext = formatSummaryForContext(summary) + '\n\n';
+
+        debugLog('RAG', 'Conversation summary generated', {
+          messageCount: summary.messageCount,
+          topics: summary.topics.length,
+          summaryLength: summary.summary.length,
+          tokens: summary.tokens,
+        });
+      } catch (error) {
+        debugLog('RAG', 'Failed to generate summary', error);
+      }
+    }
+  }
+
   // 5. Build context
   const contextBuildStart = Date.now();
-  const context = buildRetrievalContext(filteredRetrieval, {
+  const retrievalContext = buildRetrievalContext(filteredRetrieval, {
     maxTokens: maxContextTokens,
     ...contextOptions,
   });
+
+  // Combine summary context with retrieval context
+  const context = summaryContext + retrievalContext;
   const contextBuildTimeMs = Date.now() - contextBuildStart;
 
   debugLog('RAG', 'Context built', {
@@ -175,6 +220,7 @@ export async function executeRAG(
     analysis,
     retrieval: filteredRetrieval,
     isRetrievalTriggered: true,
+    summaries,
   };
 
   // 6. Performance monitoring
