@@ -1,6 +1,7 @@
 /**
  * Multi-Source Retriever - RAG多源检索器
  * 并行搜索多个数据源（聊天记录、物体识别、场景理解）
+ * Phase 2: Enhanced with optimized relevance scoring and time decay
  */
 
 import { useChatStore, ChatMessage } from '../../store/chatStore';
@@ -8,6 +9,11 @@ import { useObjectRecognitionStore } from '../../store/objectRecognitionStore';
 import { useSceneStore } from '../../store/sceneStore';
 import { QueryAnalysis } from './queryAnalyzer';
 import { ObjectRecognitionRecord, SceneCacheEntry } from '../../types/scene';
+import {
+  calculateRelevanceScore,
+  DEFAULT_WEIGHTS,
+  type RelevanceScoreBreakdown,
+} from './relevanceScoring';
 
 // ============================================
 // Types
@@ -18,18 +24,21 @@ export interface RetrievalResult {
   objects: Array<{
     record: ObjectRecognitionRecord;
     relevance: number; // Relevance score 0-1
+    scoreBreakdown?: RelevanceScoreBreakdown; // Phase 2: Detailed score breakdown
   }>;
 
   // Chat history messages
   conversations: Array<{
     message: ChatMessage;
     relevance: number;
+    scoreBreakdown?: RelevanceScoreBreakdown; // Phase 2: Detailed score breakdown
   }>;
 
   // Scene understanding records
   scenes: Array<{
     scene: SceneCacheEntry;
     relevance: number;
+    scoreBreakdown?: RelevanceScoreBreakdown; // Phase 2: Detailed score breakdown
   }>;
 
   // Retrieval metadata
@@ -37,6 +46,7 @@ export interface RetrievalResult {
     totalFound: number;
     searchTimeMs: number;
     sources: string[];
+    averageRelevance?: number; // Phase 2: Average relevance score
   };
 }
 
@@ -46,6 +56,7 @@ export interface RetrievalResult {
 
 /**
  * Retrieve relevant information from multiple data sources
+ * Phase 2: Enhanced with average relevance calculation
  */
 export async function retrieveFromMultipleSources(
   analysis: QueryAnalysis
@@ -61,6 +72,19 @@ export async function retrieveFromMultipleSources(
 
   const searchTimeMs = Date.now() - startTime;
 
+  // Calculate average relevance
+  const allRelevanceScores = [
+    ...objects.map((o) => o.relevance),
+    ...conversations.map((c) => c.relevance),
+    ...scenes.map((s) => s.relevance),
+  ];
+
+  const averageRelevance =
+    allRelevanceScores.length > 0
+      ? allRelevanceScores.reduce((sum, score) => sum + score, 0) /
+        allRelevanceScores.length
+      : 0;
+
   return {
     objects,
     conversations,
@@ -69,6 +93,7 @@ export async function retrieveFromMultipleSources(
       totalFound: objects.length + conversations.length + scenes.length,
       searchTimeMs,
       sources: ['objects', 'conversations', 'scenes'],
+      averageRelevance, // Phase 2: Include average relevance
     },
   };
 }
@@ -79,6 +104,7 @@ export async function retrieveFromMultipleSources(
 
 /**
  * Search object recognition records
+ * Phase 2: Using optimized relevance scoring with time decay
  */
 async function searchObjects(
   analysis: QueryAnalysis
@@ -89,46 +115,25 @@ async function searchObjects(
   const results: RetrievalResult['objects'] = [];
 
   for (const record of records) {
-    let relevance = 0;
+    // Construct searchable text
+    const objectText = `${record.data.objectName} ${record.data.description} ${record.data.category}`;
 
-    // 1. Time matching (40% weight)
-    if (analysis.timeReference?.range) {
-      const recordTime = record.createdAt;
-      const { start, end } = analysis.timeReference.range;
-      if (recordTime >= start.getTime() && recordTime <= end.getTime()) {
-        relevance += 0.4;
-      }
-    }
+    // Use optimized scoring algorithm
+    const scoreBreakdown = calculateRelevanceScore({
+      itemTimestamp: record.createdAt,
+      itemText: objectText,
+      itemEntityType: record.data.category,
+      queryAnalysis: analysis,
+      weights: DEFAULT_WEIGHTS.objects,
+    });
 
-    // 2. Keyword matching (40% weight)
-    const objectText = `${record.data.objectName} ${record.data.description} ${record.data.category}`.toLowerCase();
-    const matchedKeywords = analysis.keywords.filter((keyword) =>
-      objectText.includes(keyword.toLowerCase())
-    );
-    if (matchedKeywords.length > 0) {
-      relevance += 0.4 * (matchedKeywords.length / analysis.keywords.length);
-    }
-
-    // 3. Entity type matching (20% weight)
-    if (analysis.entities) {
-      for (const entity of analysis.entities) {
-        if (
-          entity.type === 'book' &&
-          record.data.category.toLowerCase().includes('书')
-        ) {
-          relevance += 0.2;
-        } else if (
-          entity.type === 'object' &&
-          record.data.category.toLowerCase() === 'object'
-        ) {
-          relevance += 0.2;
-        }
-      }
-    }
-
-    // Only return results with relevance > 0.2
-    if (relevance > 0.2) {
-      results.push({ record, relevance });
+    // Only return results with relevance > threshold
+    if (scoreBreakdown.totalScore > 0.2) {
+      results.push({
+        record,
+        relevance: scoreBreakdown.totalScore,
+        scoreBreakdown, // Include breakdown for debugging
+      });
     }
   }
 
@@ -141,6 +146,7 @@ async function searchObjects(
 
 /**
  * Search chat history
+ * Phase 2: Using optimized relevance scoring with time decay
  */
 async function searchConversations(
   analysis: QueryAnalysis
@@ -151,33 +157,32 @@ async function searchConversations(
   const results: RetrievalResult['conversations'] = [];
 
   for (const message of messages) {
-    let relevance = 0;
+    // Use optimized scoring algorithm
+    const scoreBreakdown = calculateRelevanceScore({
+      itemTimestamp: message.timestamp,
+      itemText: message.content,
+      itemEntityType: undefined, // Conversations don't have entity types
+      queryAnalysis: analysis,
+      weights: DEFAULT_WEIGHTS.conversations,
+    });
 
-    // 1. Time matching (30% weight)
-    if (analysis.timeReference?.range) {
-      const messageTime = message.timestamp;
-      const { start, end } = analysis.timeReference.range;
-      if (messageTime >= start.getTime() && messageTime <= end.getTime()) {
-        relevance += 0.3;
-      }
-    }
-
-    // 2. Keyword matching (50% weight)
-    const messageText = message.content.toLowerCase();
-    const matchedKeywords = analysis.keywords.filter((keyword) =>
-      messageText.includes(keyword.toLowerCase())
-    );
-    if (matchedKeywords.length > 0) {
-      relevance += 0.5 * (matchedKeywords.length / analysis.keywords.length);
-    }
-
-    // 3. Role weight (user messages have higher weight)
+    // Apply role weight boost (user messages are more important)
+    let finalScore = scoreBreakdown.totalScore;
     if (message.role === 'user') {
-      relevance *= 1.2;
+      finalScore *= 1.2; // 20% boost for user messages
+      finalScore = Math.min(finalScore, 1.0); // Clamp to 1.0
     }
 
-    if (relevance > 0.2) {
-      results.push({ message, relevance });
+    // Only return results with relevance > threshold
+    if (finalScore > 0.2) {
+      results.push({
+        message,
+        relevance: finalScore,
+        scoreBreakdown: {
+          ...scoreBreakdown,
+          totalScore: finalScore,
+        },
+      });
     }
   }
 
@@ -187,6 +192,7 @@ async function searchConversations(
 
 /**
  * Search scene understanding records
+ * Phase 2: Using optimized relevance scoring with time decay
  */
 async function searchScenes(
   analysis: QueryAnalysis
@@ -197,28 +203,25 @@ async function searchScenes(
   const results: RetrievalResult['scenes'] = [];
 
   for (const scene of scenes) {
-    let relevance = 0;
+    // Construct searchable text
+    const sceneText = `${scene.scene.location} ${scene.scene.objects.join(' ')}`;
 
-    // 1. Time matching (50% weight)
-    if (analysis.timeReference?.range) {
-      const sceneTime = scene.cachedAt;
-      const { start, end } = analysis.timeReference.range;
-      if (sceneTime >= start.getTime() && sceneTime <= end.getTime()) {
-        relevance += 0.5;
-      }
-    }
+    // Use optimized scoring algorithm
+    const scoreBreakdown = calculateRelevanceScore({
+      itemTimestamp: scene.cachedAt,
+      itemText: sceneText,
+      itemEntityType: scene.scene.location, // Use location as entity type
+      queryAnalysis: analysis,
+      weights: DEFAULT_WEIGHTS.scenes,
+    });
 
-    // 2. Keyword matching (scene location and objects - 50% weight)
-    const sceneText = `${scene.scene.location} ${scene.scene.objects.join(' ')}`.toLowerCase();
-    const matchedKeywords = analysis.keywords.filter((keyword) =>
-      sceneText.includes(keyword.toLowerCase())
-    );
-    if (matchedKeywords.length > 0) {
-      relevance += 0.5 * (matchedKeywords.length / analysis.keywords.length);
-    }
-
-    if (relevance > 0.2) {
-      results.push({ scene, relevance });
+    // Only return results with relevance > threshold
+    if (scoreBreakdown.totalScore > 0.2) {
+      results.push({
+        scene,
+        relevance: scoreBreakdown.totalScore,
+        scoreBreakdown,
+      });
     }
   }
 
