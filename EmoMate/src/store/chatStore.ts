@@ -30,10 +30,11 @@ const STORAGE_KEYS = {
 
 export interface ChatMessage {
   id: string;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: number;
   isVoiceMessage?: boolean; // Mark if this is a voice message
+  conversationType?: 'simple' | 'normal' | 'detailed' | 'storytelling'; // Conversation type (optional, for debugging)
 }
 
 interface ChatState {

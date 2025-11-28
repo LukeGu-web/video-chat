@@ -20,14 +20,11 @@ import {
   getCacheStatsReport,
 } from '../utils/cacheMetrics'; // Phase 2: Cache metrics tracking
 import { debugLog } from '../utils/debug'; // Debug logging utilities
+import { executeRAG } from '../capabilities/retrieval'; // RAG system (Phase 1: Retrieval-Augmented Generation)
+import { useChatStore, ChatMessage } from '../store/chatStore'; // Chat history persistence
 
-export interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  timestamp: number;
-  conversationType?: 'simple' | 'normal' | 'detailed' | 'storytelling'; // 对话类型（可选，用于调试）
-}
+// Re-export ChatMessage for convenience
+export type { ChatMessage };
 
 export interface ChatAIConfig {
   personality?: string;
@@ -70,7 +67,12 @@ export const useChatAIWithLanLan = (
 };
 
 export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  // Load chat history from persistent storage on initialization
+  const chatHistory = useChatStore((state) => state.chatHistory);
+  const addChatMessage = useChatStore((state) => state.addChatMessage);
+  const clearChatHistory = useChatStore((state) => state.clearChatHistory);
+
+  const [messages, setMessages] = useState<ChatMessage[]>(chatHistory);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentPersonality, setCurrentPersonality] = useState(
@@ -88,6 +90,11 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
   const [isStreamGenerating, setIsStreamGenerating] = useState(false); // Claude streaming
   const [isStreamSpeaking, setIsStreamSpeaking] = useState(false); // TTS queue playing
   const [currentStreamSegment, setCurrentStreamSegment] = useState(''); // Current sentence being spoken
+
+  // Sync messages with chatHistory from store
+  useEffect(() => {
+    setMessages(chatHistory);
+  }, [chatHistory]);
 
   const generateMessageId = () => {
     return `msg_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
@@ -288,6 +295,9 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
         timestamp: Date.now(),
       };
 
+      // Save to persistent storage
+      addChatMessage(userMessage);
+
       const updatedMessages = [...messages, userMessage];
       setMessages(updatedMessages);
 
@@ -304,10 +314,26 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
         conversationType,
       });
 
-      // Enhanced config with emotion
+      // === RAG Phase 1: Retrieval-Augmented Generation ===
+      const ragResult = await executeRAG(content, {
+        enableRetrieval: true,
+        maxContextTokens: 500,
+        minRelevanceThreshold: 0.3,
+      });
+
+      debugLog('ChatAI', 'RAG检索完成', {
+        isTriggered: ragResult.isRetrievalTriggered,
+        totalFound: ragResult.retrieval.metadata.totalFound,
+        contextLength: ragResult.context.length,
+        intent: ragResult.analysis.intent,
+      });
+
+      // Enhanced config with emotion and RAG context
       const enhancedConfig = {
         ...config,
         userEmotion: config?.userEmotion || detectedEmotion,
+        // Add RAG context to background story (priority over manual background story)
+        backgroundStory: ragResult.context || config?.backgroundStory,
       };
 
       // Initialize TTS queue (Phase 3: Store in ref for interruption)
@@ -370,6 +396,9 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
           conversationType: conversationType,
         };
 
+        // Save to persistent storage
+        addChatMessage(aiMessage);
+
         setMessages([...updatedMessages, aiMessage]);
 
         // Wait for TTS queue to finish
@@ -405,6 +434,9 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
           timestamp: Date.now(),
         };
 
+        // Save to persistent storage
+        addChatMessage(errorMessage);
+
         setMessages([...updatedMessages, errorMessage]);
       } finally {
         setIsLoading(false);
@@ -416,8 +448,10 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
   const clearMessages = useCallback(() => {
     setMessages([]);
     setError(null);
+    // Clear persistent storage
+    clearChatHistory();
     proactiveConversation.resetTimer();
-  }, [proactiveConversation]);
+  }, [proactiveConversation, clearChatHistory]);
 
   const setPersonality = useCallback((personality: string) => {
     setCurrentPersonality(personality);
