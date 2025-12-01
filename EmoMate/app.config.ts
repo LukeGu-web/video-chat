@@ -20,6 +20,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     supportsTablet: false,
     bundleIdentifier: 'com.lukeguexpo.emomate',
     infoPlist: {
+      CFBundleDisplayName: 'Yume',
       ITSAppUsesNonExemptEncryption: false,
       NSCameraUsageDescription:
         'Yume needs access to your camera to enable video conversations with your AI companion and analyze your emotional expressions for a personalized experience.',
@@ -27,6 +28,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         'Yume needs access to your microphone to record your voice for speech recognition and enable audio conversations with your AI companion.',
       NSSpeechRecognitionUsageDescription:
         'Yume uses speech recognition to convert your spoken words into text for better communication with your AI companion.',
+      NSPhotoLibraryUsageDescription:
+        'Yume may need access to your photo library to save or share conversation memories with your AI companion.',
+      NSLocationWhenInUseUsageDescription:
+        'Yume may use your location to provide contextual and personalized experiences with your AI companion.',
     },
   },
   android: {
