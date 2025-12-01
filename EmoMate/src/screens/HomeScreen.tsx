@@ -2,7 +2,7 @@ import React, { useEffect, useCallback, useState, useRef } from 'react';
 import { View, Text, ImageBackground, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useIsFocused } from '@react-navigation/native';
-import { useAIStatus, useChatStore, useSceneStore } from '../store';
+import { useAIStatus, useSceneStore } from '../store';
 import {
   useChatAI,
   useToast,
@@ -48,7 +48,6 @@ const HomeScreen: React.FC = () => {
   const isFocused = useIsFocused(); // Monitor screen focus state
   const setFacialEmotion = useEmotionStore((state) => state.setFacialEmotion);
   const setCurrentScene = useSceneStore((state) => state.setCurrentScene);
-  const addChatMessage = useChatStore((state) => state.addChatMessage);
 
   // Background scene management (consolidates 3 useEffects)
   const {
@@ -278,11 +277,6 @@ const HomeScreen: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiKey, sceneUnderstanding]);
 
-  // 生成唯一消息ID
-  const generateMessageId = useCallback(() => {
-    return `msg_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-  }, []);
-
   // Stable callback for toast notifications in AI conversation flow
   const setToast = useCallback((message: string, type: 'error' | 'success') => {
     if (type === 'error') {
@@ -300,11 +294,9 @@ const HomeScreen: React.FC = () => {
     sceneUnderstanding,
     objectRecognition,
     backgroundContext,
-    addChatMessage,
     setCurrentScene,
     setToast,
     getCapturedFrame,
-    generateMessageId,
     // Small talk support for voice-triggered recognition
     smallTalkTTS,
     setLooking,
@@ -315,11 +307,8 @@ const HomeScreen: React.FC = () => {
   useVoiceConversationManager({
     isListening,
     transcript,
-    messages,
     startConversation,
     clearTranscript,
-    addChatMessage,
-    generateMessageId,
   });
 
   // Show loading indicator while background is loading

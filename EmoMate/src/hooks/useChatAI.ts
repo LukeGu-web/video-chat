@@ -8,7 +8,7 @@ import {
 } from '../constants/ai';
 import { parseSSEChunk } from '../capabilities/speak/sentenceDetector'; // Phase 2: 句子检测
 import { TTSQueue } from '../capabilities/speak'; // Phase 2: TTS队列管理 - NEW ARCHITECTURE
-import { SmartSentenceBuffer } from '../capabilities/speak/smartSentenceBuffer'; // Phase 3: 智能句子过滤
+// import { SmartSentenceBuffer } from '../capabilities/speak/smartSentenceBuffer'; // Phase 3: 智能句子过滤 - DISABLED (causes incomplete sentences)
 import { useSceneStore } from '../store/sceneStore'; // Scene context
 import { SceneData } from '../types/scene'; // Scene data type
 import { buildCacheableAPIRequestConfig } from './ai/buildAIContext'; // Unified API config builder with caching support (Step 1.1: Refactoring)
@@ -40,6 +40,7 @@ export interface ChatAIConfig {
   userEmotion?: string; // 用户当前情绪状态
   backgroundStory?: string; // 背景故事上下文
   sceneContext?: SceneData | null; // 场景上下文（Step 5.2: 直接传递，避免状态更新延迟）
+  isVoiceMessage?: boolean; // 是否为语音消息
 }
 
 export interface UseChatAIReturn {
@@ -79,12 +80,11 @@ export const useChatAIWithLanLan = (
 };
 
 export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
-  // Load chat history from persistent storage on initialization
-  const chatHistory = useChatStore((state) => state.chatHistory);
+  // Use chatHistory directly from store as single source of truth
+  const messages = useChatStore((state) => state.chatHistory);
   const addChatMessage = useChatStore((state) => state.addChatMessage);
   const clearChatHistory = useChatStore((state) => state.clearChatHistory);
 
-  const [messages, setMessages] = useState<ChatMessage[]>(chatHistory);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentPersonality, setCurrentPersonality] = useState(
@@ -107,11 +107,6 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
   const [lastRAGResult, setLastRAGResult] = useState<RAGResult | null>(null);
   const [shouldShowFeedback, setShouldShowFeedback] = useState(false);
 
-  // Sync messages with chatHistory from store
-  useEffect(() => {
-    setMessages(chatHistory);
-  }, [chatHistory]);
-
   const generateMessageId = () => {
     return `msg_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   };
@@ -130,7 +125,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
         content: content.trim(),
         timestamp: Date.now(),
       };
-      setMessages((prev) => [...prev, proactiveMessage]);
+      addChatMessage(proactiveMessage);
     },
     onSpeakingStateChange: (isSpeaking, segment) => {
       setIsStreamSpeaking(isSpeaking);
@@ -189,11 +184,17 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       let fullText = '';
       let processedLength = 0;
 
-      // Phase 3: Create SMART sentence buffer with intelligent filtering
-      const smartBuffer = new SmartSentenceBuffer({
-        conversationType,
-        debug: true, // Enable debug logging to see filtering decisions
-      });
+      // Phase 3: DISABLED - SmartSentenceBuffer temporary disabled
+      // Reason: Causes incomplete sentences that change original meaning
+      // Solution: Using improved AI prompts to reduce verbosity instead
+      // const smartBuffer = new SmartSentenceBuffer({
+      //   conversationType,
+      //   debug: true,
+      // });
+
+      // Simple sentence buffer for direct streaming (no filtering)
+      let partialSentence = '';
+      const sentenceEndings = ['。', '！', '？', '~', '…', '呢', '哦', '啊', '呀'];
 
       // Track processed lines to avoid duplicates
       const processedLines = new Set<string>();
@@ -217,17 +218,32 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
             // Parse SSE chunk
             const text = parseSSEChunk(line);
             if (text) {
-              // Phase 3: Use SmartSentenceBuffer to filter sentences
-              const sentencesToPlay = smartBuffer.addChunk(text);
+              // DISABLED: SmartSentenceBuffer filtering
+              // Now playing ALL sentences directly without filtering
+              partialSentence += text;
 
-              // Only call onSentence for sentences that passed filtering
-              for (const sentence of sentencesToPlay) {
-                debugLog('ChatAI', 'Phase 3: Playing filtered sentence', {
-                  sentence,
-                });
-                onSentence(sentence);
-                fullText += sentence;
+              // Extract complete sentences
+              let currentSentence = '';
+              for (let i = 0; i < partialSentence.length; i++) {
+                const char = partialSentence[i];
+                currentSentence += char;
+
+                // Check if this is a sentence ending
+                if (sentenceEndings.includes(char)) {
+                  const sentence = currentSentence.trim();
+                  if (sentence) {
+                    debugLog('ChatAI', 'Playing complete sentence (unfiltered)', {
+                      sentence,
+                    });
+                    onSentence(sentence);
+                    fullText += sentence;
+                  }
+                  currentSentence = '';
+                }
               }
+
+              // Update partial sentence with remaining incomplete text
+              partialSentence = currentSentence;
             }
           }
         }
@@ -237,25 +253,16 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       xhr.onload = () => {
         if (xhr.status === 200) {
           try {
-            // Phase 3: Flush remaining content from SmartBuffer
-            const finalSentence = smartBuffer.flush();
-            if (finalSentence) {
-              debugLog('ChatAI', 'Phase 3: Playing final sentence', {
+            // DISABLED: SmartBuffer flush
+            // Now flush remaining partial sentence directly without filtering
+            if (partialSentence.trim()) {
+              const finalSentence = partialSentence.trim();
+              debugLog('ChatAI', 'Playing final sentence (unfiltered)', {
                 finalSentence,
               });
               onSentence(finalSentence);
               fullText += finalSentence;
             }
-
-            // Phase 3: Log statistics
-            const stats = smartBuffer.getStats();
-            debugLog('ChatAI', 'Phase 3 Statistics', stats);
-            debugLog('ChatAI', 'Phase 3: Sentence stats', {
-              played: `${stats.playedSentences}/${stats.totalSentences}`,
-              skipped: stats.skippedSentences,
-              totalLength: `${stats.totalLength} chars`,
-              avgImportance: stats.averageImportance.toFixed(2),
-            });
 
             // Phase 2: Track cache usage from API response
             if (apiConfig.enableCache) {
@@ -309,13 +316,13 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
         role: 'user',
         content: content.trim(),
         timestamp: Date.now(),
+        isVoiceMessage: config?.isVoiceMessage,
       };
 
       // Save to persistent storage
       addChatMessage(userMessage);
 
       const updatedMessages = [...messages, userMessage];
-      setMessages(updatedMessages);
 
       // Update proactive conversation timer
       proactiveConversation.resetTimer();
@@ -413,12 +420,11 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
           content: aiResponse,
           timestamp: Date.now(),
           conversationType: conversationType,
+          isVoiceMessage: config?.isVoiceMessage,
         };
 
         // Save to persistent storage
         addChatMessage(aiMessage);
-
-        setMessages([...updatedMessages, aiMessage]);
 
         // Wait for TTS queue to finish
         if (enhancedConfig?.enableTTS !== false) {
@@ -461,8 +467,6 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
 
         // Save to persistent storage
         addChatMessage(errorMessage);
-
-        setMessages([...updatedMessages, errorMessage]);
       } finally {
         setIsLoading(false);
       }
@@ -471,9 +475,8 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
   );
 
   const clearMessages = useCallback(() => {
-    setMessages([]);
     setError(null);
-    // Clear persistent storage
+    // Clear persistent storage (this will also clear messages from store)
     clearChatHistory();
     proactiveConversation.resetTimer();
   }, [proactiveConversation, clearChatHistory]);

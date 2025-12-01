@@ -61,9 +61,6 @@ export interface AIConversationFlowConfig {
   // Background context
   backgroundContext: BackgroundContext | null;
 
-  // Chat message management
-  addChatMessage: (message: ChatMessage) => void;
-
   // Scene update
   setCurrentScene: (scene: any) => void;
 
@@ -72,9 +69,6 @@ export interface AIConversationFlowConfig {
 
   // Captured frame provider
   getCapturedFrame: () => string | null;
-
-  // Message ID generator
-  generateMessageId: () => string;
 
   // Small talk support (for voice-triggered recognition)
   smallTalkTTS?: {
@@ -114,11 +108,9 @@ export const useAIConversationFlow = (
     sceneUnderstanding,
     objectRecognition,
     backgroundContext,
-    addChatMessage,
     setCurrentScene,
     setToast,
     getCapturedFrame,
-    generateMessageId,
     smallTalkTTS,
     setLooking,
     setThinking,
@@ -160,17 +152,8 @@ export const useAIConversationFlow = (
         // Step 1: Notify scene understanding of conversation activity (smart pause)
         sceneUnderstanding.notifyConversationActivity();
 
-        // Step 2: Add user message to chat history
-        const userMessage: ChatMessage = {
-          id: generateMessageId(),
-          role: 'user',
-          content: inputText.trim(),
-          timestamp: Date.now(),
-          isVoiceMessage: true,
-        };
-        addChatMessage(userMessage);
-
-        // Step 3: Handle object recognition (if keyword detected)
+        // Step 2: Handle object recognition (if keyword detected)
+        // Note: User message will be added by sendMessage with isVoiceMessage flag
         const capturedFrame = getCapturedFrame();
 
         // Check if object keyword is detected for small talk
@@ -293,6 +276,7 @@ export const useAIConversationFlow = (
           enableTTS: true,
           backgroundStory: combinedContext || undefined,
           sceneContext: sceneUnderstanding.currentScene,
+          isVoiceMessage: true, // Mark as voice message
         });
 
         // Note: AI status changes are managed by parent component's useEffect
@@ -309,11 +293,12 @@ export const useAIConversationFlow = (
       sceneUnderstanding,
       objectRecognition,
       backgroundContext,
-      addChatMessage,
       setCurrentScene,
       setToast,
       getCapturedFrame,
-      generateMessageId,
+      smallTalkTTS,
+      setLooking,
+      setThinking,
     ]
   );
 
