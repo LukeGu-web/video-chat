@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, FlatList } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   useSceneUnderstanding,
@@ -127,122 +127,115 @@ const SceneHistoryScreen: React.FC<Props> = ({ navigation }) => {
       </View>
 
       {/* Content */}
-      <ScrollView className='flex-1' contentContainerClassName='p-4'>
-        {activeTab === 'scene' ? (
-          <>
-            {/* Scene History Stats */}
-            <View className='flex-row justify-between mb-4'>
-              <StatsCard value={sceneStats.total} label='总场景数' />
-              <StatsCard value={sceneStats.active} label='活跃场景' />
-              <StatsCard value={sceneStats.expired} label='已过期' />
-            </View>
+      {activeTab === 'scene' ? (
+        <FlatList
+          data={sceneUnderstanding.cachedScenes}
+          renderItem={({ item: entry, index }) => (
+            <SceneHistoryCard entry={entry} index={index} />
+          )}
+          keyExtractor={(item, index) => `${item.cachedAt}-${index}`}
+          ListHeaderComponent={
+            <>
+              {/* Scene History Stats */}
+              <View className='flex-row justify-between mb-4'>
+                <StatsCard value={sceneStats.total} label='总场景数' />
+                <StatsCard value={sceneStats.active} label='活跃场景' />
+                <StatsCard value={sceneStats.expired} label='已过期' />
+              </View>
 
-            {/* Action buttons */}
-            <View className='flex-row justify-between mb-5'>
-              <ActionButton
-                label='清理过期场景'
-                icon='🗑️'
-                variant='warning'
-                onPress={handleClearExpired}
-                disabled={sceneStats.expired === 0}
-              />
-              <ActionButton
-                label='清空所有场景'
-                icon='🚮'
-                variant='danger'
-                onPress={handleClearAll}
-                disabled={sceneStats.total === 0}
-              />
-            </View>
+              {/* Action buttons */}
+              <View className='flex-row justify-between mb-5'>
+                <ActionButton
+                  label='清理过期场景'
+                  icon='🗑️'
+                  variant='warning'
+                  onPress={handleClearExpired}
+                  disabled={sceneStats.expired === 0}
+                />
+                <ActionButton
+                  label='清空所有场景'
+                  icon='🚮'
+                  variant='danger'
+                  onPress={handleClearAll}
+                  disabled={sceneStats.total === 0}
+                />
+              </View>
 
-            {/* Scene history list */}
-            <View className='mt-2'>
+              {/* List title */}
               <Text className='mb-3 text-lg font-bold text-gray-800'>
                 历史记录
               </Text>
+            </>
+          }
+          ListEmptyComponent={
+            <EmptyState
+              icon='📭'
+              title='暂无缓存场景'
+              description='使用视觉问答功能后,场景分析结果会自动保存在这里'
+            />
+          }
+          contentContainerStyle={{ padding: 16 }}
+        />
+      ) : (
+        <FlatList
+          data={objectRecognition.records}
+          renderItem={({ item: record }) => (
+            <ObjectRecognitionCard
+              record={record}
+              onDelete={objectRecognition.deleteRecord}
+              isExpanded={expandedDescriptions.has(record.id)}
+              onToggleExpand={toggleDescription}
+            />
+          )}
+          keyExtractor={(item) => item.id}
+          ListHeaderComponent={
+            <>
+              {/* Object Recognition Stats */}
+              <View className='flex-row justify-between mb-4'>
+                <StatsCard
+                  value={objectRecognition.records.length}
+                  label='识别记录'
+                  color='green'
+                />
+                <StatsCard
+                  value={objectStats.categories.length}
+                  label='物品类别'
+                  color='green'
+                />
+                <StatsCard
+                  value={latestRecognitionTime}
+                  label='最近识别'
+                  color='green'
+                />
+              </View>
 
-              <FlatList
-                data={sceneUnderstanding.cachedScenes}
-                renderItem={({ item: entry, index }) => (
-                  <SceneHistoryCard
-                    entry={entry}
-                    index={index}
-                  />
-                )}
-                keyExtractor={(item, index) => `${item.cachedAt}-${index}`}
-                ListEmptyComponent={
-                  <EmptyState
-                    icon='📭'
-                    title='暂无缓存场景'
-                    description='使用视觉问答功能后,场景分析结果会自动保存在这里'
-                  />
-                }
-                scrollEnabled={false}
-              />
-            </View>
-          </>
-        ) : (
-          <>
-            {/* Object Recognition Stats */}
-            <View className='flex-row justify-between mb-4'>
-              <StatsCard
-                value={objectRecognition.records.length}
-                label='识别记录'
-                color='green'
-              />
-              <StatsCard
-                value={objectStats.categories.length}
-                label='物品类别'
-                color='green'
-              />
-              <StatsCard
-                value={latestRecognitionTime}
-                label='最近识别'
-                color='green'
-              />
-            </View>
+              {/* Action buttons */}
+              <View className='flex-row justify-between mb-5'>
+                <ActionButton
+                  label='清空所有记录'
+                  icon='🚮'
+                  variant='danger'
+                  onPress={() => objectRecognition.clearAllRecords()}
+                  disabled={objectRecognition.records.length === 0}
+                />
+              </View>
 
-            {/* Action buttons */}
-            <View className='flex-row justify-between mb-5'>
-              <ActionButton
-                label='清空所有记录'
-                icon='🚮'
-                variant='danger'
-                onPress={() => objectRecognition.clearAllRecords()}
-                disabled={objectRecognition.records.length === 0}
-              />
-            </View>
-
-            {/* Object recognition records list */}
-            <View className='mt-2'>
+              {/* List title */}
               <Text className='mb-3 text-lg font-bold text-gray-800'>
                 识别记录
               </Text>
-
-              <FlatList
-                data={objectRecognition.records}
-                renderItem={({ item: record }) => (
-                  <ObjectRecognitionCard
-                    record={record}
-                    onDelete={objectRecognition.deleteRecord}
-                    isExpanded={expandedDescriptions.has(record.id)}
-                    onToggleExpand={toggleDescription}
-                  />
-                )}
-                keyExtractor={(item) => item.id}
-                ListEmptyComponent={
-                  <EmptyState
-                    icon='📦'
-                    title='暂无识别记录'
-                    description='在主界面使用物品识别功能后，记录会显示在这里'
-                  />
-                }
-                scrollEnabled={false}
-              />
-            </View>
-          </>
-        )}
-      </ScrollView>
+            </>
+          }
+          ListEmptyComponent={
+            <EmptyState
+              icon='📦'
+              title='暂无识别记录'
+              description='在主界面使用物品识别功能后，记录会显示在这里'
+            />
+          }
+          contentContainerStyle={{ padding: 16 }}
+        />
+      )}
     </SafeAreaView>
   );
 };
