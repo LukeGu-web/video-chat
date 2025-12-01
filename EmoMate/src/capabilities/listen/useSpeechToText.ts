@@ -100,18 +100,14 @@ export const useSpeechToText = (): UseSpeechToTextReturn => {
       setError(null);
       setTranscript('');
 
-      // Check permission first to avoid unnecessary permission prompt
+      // Note: Permission should already be granted in WelcomeScreen
+      // Check permission status to provide better error messages
       const permissionStatus =
         await ExpoSpeechRecognitionModule.getPermissionsAsync();
 
-      // Only request permission if not already granted
       if (!permissionStatus.granted) {
-        const result =
-          await ExpoSpeechRecognitionModule.requestPermissionsAsync();
-        if (!result.granted) {
-          setError('Microphone permission denied');
-          return;
-        }
+        setError('语音识别权限未授予，请在设置中开启');
+        return;
       }
 
       // Fix: Set audio mode to recording before starting speech recognition

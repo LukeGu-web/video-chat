@@ -16,6 +16,7 @@ const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
   const [permissionStatus, setPermissionStatus] = useState<PermissionStatus>({
     camera: false,
     microphone: false,
+    speechRecognition: false,
     allGranted: false,
   });
   const [isCheckingPermissions, setIsCheckingPermissions] = useState(true);
@@ -38,7 +39,7 @@ const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
     if (!status.allGranted) {
       Alert.alert(
         '权限需求',
-        '请在设置中开启摄像头与麦克风权限以便与 AI 对话',
+        '请在设置中开启摄像头、麦克风和语音识别权限以便与 AI 对话',
         [{ text: '确定', onPress: () => {} }]
       );
     }
@@ -87,7 +88,7 @@ const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
         {!permissionStatus.allGranted && (
           <View className='items-center p-4 mb-8 bg-white rounded-lg'>
             <Text className='mb-4 text-base text-center text-black'>
-              请开启摄像头与麦克风权限以便与 AI 对话
+              请开启以下权限以便与 AI 对话
             </Text>
             <View className='items-center gap-2'>
               <Text
@@ -105,6 +106,15 @@ const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
                 }`}
               >
                 麦克风: {permissionStatus.microphone ? '已授权' : '未授权'}
+              </Text>
+              <Text
+                className={`text-sm font-medium ${
+                  permissionStatus.speechRecognition
+                    ? 'text-green-600'
+                    : 'text-red-600'
+                }`}
+              >
+                语音识别: {permissionStatus.speechRecognition ? '已授权' : '未授权'}
               </Text>
             </View>
           </View>
