@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 import { ChatMessage } from '../store/chatStore';
+import { formatAbsoluteTime } from '../utils/timeFormat';
 
 interface ChatBubbleProps {
   message: ChatMessage;
@@ -8,10 +9,7 @@ interface ChatBubbleProps {
 
 export const ChatBubble: React.FC<ChatBubbleProps> = ({ message }) => {
   const isUser = message.role === 'user';
-  const time = new Date(message.timestamp).toLocaleTimeString('zh-CN', { 
-    hour: '2-digit', 
-    minute: '2-digit' 
-  });
+  const time = formatAbsoluteTime(message.timestamp);
 
   return (
     <View className={`my-1 px-4 ${isUser ? 'items-end' : 'items-start'}`}>

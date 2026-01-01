@@ -23,6 +23,7 @@ import { buildScenePrompt, isSceneDataFresh } from '../../capabilities/vision/en
 import { SceneData } from '../../types/scene';
 import { ChatMessage, ChatAIConfig } from '../useChatAI';
 import { debugLog, debugWarn } from '../../utils/debug';
+import { getRelativeTime } from '../../utils/timeFormat';
 
 /**
  * Scene metadata returned by buildSceneContext
@@ -180,13 +181,13 @@ export function buildAPIRequestConfig(
     contextPrompt
   );
 
-  // Step 7: Filter and prepare context messages
+  // Step 7: Filter and prepare context messages with time annotations
   const contextMessages = messages
     .filter((msg) => msg.role !== 'system')
     .slice(-10) // Keep last 10 messages for context
     .map((msg) => ({
       role: msg.role,
-      content: msg.content,
+      content: `(${getRelativeTime(msg.timestamp)}) ${msg.content}`,
     }));
 
   return {
@@ -429,13 +430,13 @@ export function buildCacheableAPIRequestConfig(
       baseConfig.model // Pass model for token requirement check
     );
   } else {
-    // Use traditional message format
+    // Use traditional message format with time annotations
     contextMessages = messages
       .filter((msg) => msg.role !== 'system')
       .slice(-10)
       .map((msg) => ({
         role: msg.role,
-        content: msg.content,
+        content: `(${getRelativeTime(msg.timestamp)}) ${msg.content}`,
       }));
   }
 
@@ -485,7 +486,7 @@ export function buildCacheableMessages(
     debugLog('buildCacheableMessages', 'Not enough messages to cache, using standard format');
     return contextMessages.map((msg) => ({
       role: msg.role,
-      content: msg.content,
+      content: `(${getRelativeTime(msg.timestamp)}) ${msg.content}`,
     }));
   }
 
@@ -504,11 +505,11 @@ export function buildCacheableMessages(
   // Build cacheable message array
   const cacheableMessages: CacheableMessage[] = [];
 
-  // Add cached messages (all but the last one)
+  // Add cached messages (all but the last one) with time annotations
   for (let i = 0; i < cachedMessages.length - 1; i++) {
     cacheableMessages.push({
       role: cachedMessages[i].role,
-      content: cachedMessages[i].content,
+      content: `(${getRelativeTime(cachedMessages[i].timestamp)}) ${cachedMessages[i].content}`,
     });
   }
 
@@ -519,7 +520,7 @@ export function buildCacheableMessages(
     if (cachedTokens >= MIN_MESSAGE_CACHE_TOKENS) {
       cacheableMessages.push({
         role: lastCached.role,
-        content: lastCached.content,
+        content: `(${getRelativeTime(lastCached.timestamp)}) ${lastCached.content}`,
         cache_control: { type: 'ephemeral' }, // Cache breakpoint 2
       });
 
@@ -532,7 +533,7 @@ export function buildCacheableMessages(
       // Don't cache if too small
       cacheableMessages.push({
         role: lastCached.role,
-        content: lastCached.content,
+        content: `(${getRelativeTime(lastCached.timestamp)}) ${lastCached.content}`,
         // No cache_control
       });
 
@@ -544,11 +545,11 @@ export function buildCacheableMessages(
     }
   }
 
-  // Add recent messages (not cached)
+  // Add recent messages (not cached) with time annotations
   for (const msg of recentMessages) {
     cacheableMessages.push({
       role: msg.role,
-      content: msg.content,
+      content: `(${getRelativeTime(msg.timestamp)}) ${msg.content}`,
     });
   }
 
