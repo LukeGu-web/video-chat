@@ -32,47 +32,89 @@ export interface SmallTalkPhrase {
 
 /**
  * Small Talk Database
- * Organized by tier for dynamic selection
+ * Organized by language and tier for dynamic selection
  */
-const SMALL_TALK_DATABASE: Record<SmallTalkTier, SmallTalkPhrase[]> = {
-  [SmallTalkTier.SHORT]: [
-    { text: '让我看一看~', tier: SmallTalkTier.SHORT, estimatedDuration: 1500 },
-    { text: '嗯...', tier: SmallTalkTier.SHORT, estimatedDuration: 1000 },
-    { text: '诶？', tier: SmallTalkTier.SHORT, estimatedDuration: 800 },
-    { text: '这是什么呢？', tier: SmallTalkTier.SHORT, estimatedDuration: 1800 },
-  ],
+const SMALL_TALK_DATABASE: Record<
+  'zh' | 'en',
+  Record<SmallTalkTier, SmallTalkPhrase[]>
+> = {
+  zh: {
+    [SmallTalkTier.SHORT]: [
+      { text: '让我看一看~', tier: SmallTalkTier.SHORT, estimatedDuration: 1500 },
+      { text: '嗯...', tier: SmallTalkTier.SHORT, estimatedDuration: 1000 },
+      { text: '诶？', tier: SmallTalkTier.SHORT, estimatedDuration: 800 },
+      { text: '这是什么呢？', tier: SmallTalkTier.SHORT, estimatedDuration: 1800 },
+    ],
 
-  [SmallTalkTier.MEDIUM]: [
-    { text: '让我仔细看看...', tier: SmallTalkTier.MEDIUM, estimatedDuration: 2500 },
-    { text: '嗯...这个好像有点复杂呢~', tier: SmallTalkTier.MEDIUM, estimatedDuration: 3500 },
-    { text: '诶...让我想想这是什么~', tier: SmallTalkTier.MEDIUM, estimatedDuration: 3000 },
-    { text: '稍等一下，我认真看看~', tier: SmallTalkTier.MEDIUM, estimatedDuration: 2800 },
-  ],
+    [SmallTalkTier.MEDIUM]: [
+      { text: '让我仔细看看...', tier: SmallTalkTier.MEDIUM, estimatedDuration: 2500 },
+      { text: '嗯...这个好像有点复杂呢~', tier: SmallTalkTier.MEDIUM, estimatedDuration: 3500 },
+      { text: '诶...让我想想这是什么~', tier: SmallTalkTier.MEDIUM, estimatedDuration: 3000 },
+      { text: '稍等一下，我认真看看~', tier: SmallTalkTier.MEDIUM, estimatedDuration: 2800 },
+    ],
 
-  [SmallTalkTier.LONG]: [
-    {
-      text: '嗯...这个好像很有趣呢，让我好好研究一下~',
-      tier: SmallTalkTier.LONG,
-      estimatedDuration: 4500,
-    },
-    {
-      text: '诶...我好像在哪里见过类似的东西...让我想想~',
-      tier: SmallTalkTier.LONG,
-      estimatedDuration: 5000,
-    },
-    {
-      text: '哇...这个看起来挺特别的呢~',
-      tier: SmallTalkTier.LONG,
-      estimatedDuration: 3500,
-    },
-  ],
+    [SmallTalkTier.LONG]: [
+      {
+        text: '嗯...这个好像很有趣呢，让我好好研究一下~',
+        tier: SmallTalkTier.LONG,
+        estimatedDuration: 4500,
+      },
+      {
+        text: '诶...我好像在哪里见过类似的东西...让我想想~',
+        tier: SmallTalkTier.LONG,
+        estimatedDuration: 5000,
+      },
+      {
+        text: '哇...这个看起来挺特别的呢~',
+        tier: SmallTalkTier.LONG,
+        estimatedDuration: 3500,
+      },
+    ],
+  },
+
+  en: {
+    [SmallTalkTier.SHORT]: [
+      { text: 'Let me see~', tier: SmallTalkTier.SHORT, estimatedDuration: 1500 },
+      { text: 'Um...', tier: SmallTalkTier.SHORT, estimatedDuration: 1000 },
+      { text: 'Oh?', tier: SmallTalkTier.SHORT, estimatedDuration: 800 },
+      { text: 'What is this?', tier: SmallTalkTier.SHORT, estimatedDuration: 1800 },
+    ],
+
+    [SmallTalkTier.MEDIUM]: [
+      { text: 'Let me take a closer look...', tier: SmallTalkTier.MEDIUM, estimatedDuration: 2500 },
+      { text: 'Hmm... this looks a bit complex~', tier: SmallTalkTier.MEDIUM, estimatedDuration: 3500 },
+      { text: 'Um... let me think what this is~', tier: SmallTalkTier.MEDIUM, estimatedDuration: 3000 },
+      { text: 'Just a moment, let me look carefully~', tier: SmallTalkTier.MEDIUM, estimatedDuration: 2800 },
+    ],
+
+    [SmallTalkTier.LONG]: [
+      {
+        text: 'Hmm... this looks quite interesting, let me study it carefully~',
+        tier: SmallTalkTier.LONG,
+        estimatedDuration: 4500,
+      },
+      {
+        text: 'Oh... I think I\'ve seen something similar before... let me think~',
+        tier: SmallTalkTier.LONG,
+        estimatedDuration: 5000,
+      },
+      {
+        text: 'Wow... this looks pretty special~',
+        tier: SmallTalkTier.LONG,
+        estimatedDuration: 3500,
+      },
+    ],
+  },
 };
 
 /**
- * Select a random phrase from a specific tier
+ * Select a random phrase from a specific tier and language
  */
-function selectPhrase(tier: SmallTalkTier): SmallTalkPhrase {
-  const phrases = SMALL_TALK_DATABASE[tier];
+function selectPhrase(
+  tier: SmallTalkTier,
+  language: 'zh' | 'en' = 'zh'
+): SmallTalkPhrase {
+  const phrases = SMALL_TALK_DATABASE[language][tier];
   const randomIndex = Math.floor(Math.random() * phrases.length);
   return phrases[randomIndex];
 }
@@ -80,6 +122,7 @@ function selectPhrase(tier: SmallTalkTier): SmallTalkPhrase {
 /**
  * Small Talk Manager
  * Manages dynamic small talk playback during object recognition
+ * Supports both Chinese and English small talk
  */
 export class SmallTalkManager {
   private currentTier: SmallTalkTier = SmallTalkTier.SHORT;
@@ -90,13 +133,16 @@ export class SmallTalkManager {
   private aborted: boolean = false;
   private consecutiveFailures: number = 0;
   private readonly MAX_CONSECUTIVE_FAILURES = 2;
+  private language: 'zh' | 'en' = 'zh';
 
   constructor(
     onSpeak: (text: string) => Promise<void>,
-    onStop?: () => void
+    onStop?: () => void,
+    language: 'zh' | 'en' = 'zh'
   ) {
     this.onSpeakCallback = onSpeak;
     this.onStopCallback = onStop;
+    this.language = language;
   }
 
   /**
@@ -127,7 +173,7 @@ export class SmallTalkManager {
       return;
     }
 
-    const phrase = selectPhrase(this.currentTier);
+    const phrase = selectPhrase(this.currentTier, this.language);
 
     debugLog('SmallTalkManager', `Playing ${this.currentTier} tier`, {
       text: phrase.text,
@@ -242,7 +288,8 @@ export class SmallTalkManager {
  */
 export function createSmallTalkManager(
   onSpeak: (text: string) => Promise<void>,
-  onStop?: () => void
+  onStop?: () => void,
+  language: 'zh' | 'en' = 'zh'
 ): SmallTalkManager {
-  return new SmallTalkManager(onSpeak, onStop);
+  return new SmallTalkManager(onSpeak, onStop, language);
 }

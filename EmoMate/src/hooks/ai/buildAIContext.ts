@@ -61,7 +61,8 @@ export interface SceneContextResult {
 export function buildSceneContext(
   sceneContext: SceneData | null | undefined,
   currentScene: SceneData | null,
-  freshnessMinutes: number = 30
+  freshnessMinutes: number = 30,
+  language: 'zh' | 'en' = 'zh'
 ): SceneContextResult {
   // Step 1: Prioritize sceneContext from config to avoid state update delay
   const sceneToUse = sceneContext !== undefined ? sceneContext : currentScene;
@@ -90,7 +91,7 @@ export function buildSceneContext(
   });
 
   // Step 4: Build scene prompt if fresh
-  const scenePrompt = isFresh ? buildScenePrompt(sceneToUse, true, 5) : '';
+  const scenePrompt = isFresh ? buildScenePrompt(sceneToUse, true, 5, language) : '';
 
   // Step 5: Log prompt generation result
   if (scenePrompt) {
@@ -146,7 +147,8 @@ export function buildAPIRequestConfig(
   config: ChatAIConfig,
   conversationType: 'simple' | 'normal' | 'detailed' | 'storytelling',
   currentPersonality: string,
-  currentScene: SceneData | null
+  currentScene: SceneData | null,
+  currentLanguage: 'zh' | 'en' = 'zh'
 ): APIRequestConfig {
   // Step 1: Get and validate API key
   const apiKey = config.apiKey || getClaudeApiKey();
@@ -169,7 +171,8 @@ export function buildAPIRequestConfig(
   const { contextPrompt } = buildSceneContext(
     config.sceneContext,
     currentScene,
-    30
+    30,
+    currentLanguage
   );
 
   // Step 6: Build system message
@@ -373,7 +376,8 @@ export function buildCacheableAPIRequestConfig(
   conversationType: 'simple' | 'normal' | 'detailed' | 'storytelling',
   currentPersonality: string,
   currentScene: SceneData | null,
-  enableCache: boolean = process.env.NODE_ENV === 'production'
+  enableCache: boolean = process.env.NODE_ENV === 'production',
+  currentLanguage: 'zh' | 'en' = 'zh'
 ): CacheableAPIRequestConfig {
   // Get base configuration (without systemMessage)
   const baseConfig = buildAPIRequestConfig(
@@ -381,14 +385,16 @@ export function buildCacheableAPIRequestConfig(
     config,
     conversationType,
     currentPersonality,
-    currentScene
+    currentScene,
+    currentLanguage
   );
 
   // Build scene context
   const { contextPrompt } = buildSceneContext(
     config.sceneContext,
     currentScene,
-    30
+    30,
+    currentLanguage
   );
 
   // Get personality text

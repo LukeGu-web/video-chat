@@ -27,6 +27,8 @@ import {
   type RetrievalFeedback,
 } from '../capabilities/retrieval'; // Phase 3: User feedback system
 import { useChatStore, ChatMessage } from '../store/chatStore'; // Chat history persistence
+import { useUserStore } from '../store/userStore'; // User preferences and language state
+import { detectLanguage } from '../utils/languageDetection'; // Language detection
 
 // Re-export ChatMessage for convenience
 export type { ChatMessage };
@@ -146,14 +148,21 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       | 'storytelling' = 'normal',
     onSentence: (sentence: string) => void
   ): Promise<string> => {
+    // Get current language from user store
+    const currentLanguage = useUserStore.getState().currentLanguage;
+
+    // Generate language-aware personality
+    const languageAwarePersonality = createPersonalitySystemPrompt(currentLanguage);
+
     // Step 1.1: Use cacheable API config builder with prompt caching support
     const apiConfig = buildCacheableAPIRequestConfig(
       messages,
       config,
       conversationType,
-      currentPersonality,
+      languageAwarePersonality,
       currentScene,
-      true // Enable cache in production (will auto-detect NODE_ENV)
+      true, // Enable cache in production (will auto-detect NODE_ENV)
+      currentLanguage
     );
 
     const requestBody = {
@@ -326,6 +335,14 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
 
       // Update proactive conversation timer
       proactiveConversation.resetTimer();
+
+      // Detect language and update language state (Language support)
+      const detectedLanguage = detectLanguage(content);
+      useUserStore.getState().setCurrentLanguage(detectedLanguage);
+      debugLog('ChatAI', 'Language detected', {
+        content,
+        detectedLanguage,
+      });
 
       // Detect emotion (Step 1.3: Use extracted function)
       const detectedEmotion = detectUserEmotionFromText(content);
