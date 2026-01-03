@@ -41,6 +41,7 @@ export interface ChatAIConfig {
   voiceId?: string; // ElevenLabs 语音 ID
   userEmotion?: string; // 用户当前情绪状态
   backgroundStory?: string; // 背景故事上下文
+  objectRecognitionContext?: string; // 物体识别结果上下文（高优先级，带强调标记）
   sceneContext?: SceneData | null; // 场景上下文（Step 5.2: 直接传递，避免状态更新延迟）
   isVoiceMessage?: boolean; // 是否为语音消息
 }

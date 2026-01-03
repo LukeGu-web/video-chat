@@ -181,7 +181,8 @@ export function buildAPIRequestConfig(
     config.userEmotion,
     conversationType,
     config.backgroundStory,
-    contextPrompt
+    contextPrompt,
+    config.objectRecognitionContext
   );
 
   // Step 7: Filter and prepare context messages with time annotations
@@ -258,6 +259,7 @@ export function buildCacheableSystemPrompt(
   conversationType: 'simple' | 'normal' | 'detailed' | 'storytelling',
   backgroundStory?: string,
   environmentContext?: string,
+  objectRecognitionContext?: string,
   model: string = 'haiku'
 ): CacheableSystemBlock[] {
   const systemBlocks: CacheableSystemBlock[] = [];
@@ -311,7 +313,7 @@ export function buildCacheableSystemPrompt(
     // No cache_control - this is dynamic content
   });
 
-  // Block 3: Background story (OPTIONAL - not cached)
+  // Block 3: Background story (OPTIONAL - not cached, normal priority)
   if (backgroundStory) {
     systemBlocks.push({
       type: 'text',
@@ -320,7 +322,16 @@ export function buildCacheableSystemPrompt(
     });
   }
 
-  // Block 4: Environment context (OPTIONAL - not cached)
+  // Block 4: Object recognition context (OPTIONAL - not cached, HIGH PRIORITY)
+  if (objectRecognitionContext) {
+    systemBlocks.push({
+      type: 'text',
+      text: `# 📸 重要：刚刚识别的物品\n${objectRecognitionContext}\n\n⚠️ 请基于上述识别结果回答用户问题，这是最新的视觉信息，优先级高于之前的对话内容。`,
+      // No cache_control - recent recognition data
+    });
+  }
+
+  // Block 5: Environment context (OPTIONAL - not cached, medium priority)
   if (environmentContext) {
     systemBlocks.push({
       type: 'text',
@@ -411,6 +422,7 @@ export function buildCacheableAPIRequestConfig(
       conversationType,
       config.backgroundStory,
       contextPrompt,
+      config.objectRecognitionContext,
       baseConfig.model // Pass model for token requirement check
     );
     debugLog('buildCacheableAPIRequestConfig', 'Using cacheable system prompt format');
@@ -421,7 +433,8 @@ export function buildCacheableAPIRequestConfig(
       config.userEmotion,
       conversationType,
       config.backgroundStory,
-      contextPrompt
+      contextPrompt,
+      config.objectRecognitionContext
     );
     debugWarn('buildCacheableAPIRequestConfig', 'Using traditional system prompt format (cache disabled)');
   }

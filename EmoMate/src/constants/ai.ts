@@ -264,7 +264,8 @@ export const buildSystemPrompt = (
     | 'detailed'
     | 'storytelling' = 'normal',
   backgroundStory?: string,
-  environmentContext?: string
+  environmentContext?: string,
+  objectRecognitionContext?: string
 ): string => {
   const capabilityPrompt = generateCapabilityPrompt();
   const emotionalPrompt = generateEmotionalResponsePrompt(
@@ -276,17 +277,22 @@ export const buildSystemPrompt = (
   const currentTime = getCurrentDateTime();
   const timeSection = `\n\n# 当前时间\n${currentTime}\n\n重要提示：对话历史中的每条消息都带有时间标注（例如"刚才"、"3小时前"、"3天前"等），这些时间是相对于当前时间的。请注意消息的时间流逝，理解用户所说的"今天"、"昨天"、"明天"等时间概念。`;
 
-  // Add background story if provided
+  // Add background story if provided (normal priority)
   const backgroundSection = backgroundStory ? `\n\n${backgroundStory}` : '';
 
-  // Add environment context if provided
+  // Add object recognition context if provided (HIGH PRIORITY with emphasis)
+  const objectSection = objectRecognitionContext
+    ? `\n\n# 📸 重要：刚刚识别的物品\n${objectRecognitionContext}\n\n⚠️ 请基于上述识别结果回答用户问题，这是最新的视觉信息，优先级高于之前的对话内容。`
+    : '';
+
+  // Add environment context if provided (medium priority)
   const environmentSection = environmentContext
     ? `\n\n# 环境感知\n${environmentContext}`
     : '';
 
   return `${personality}
 
-${capabilityPrompt}${emotionalPrompt}${timeSection}${backgroundSection}${environmentSection}`;
+${capabilityPrompt}${emotionalPrompt}${timeSection}${backgroundSection}${objectSection}${environmentSection}`;
 };
 
 // 实用的能力查询函数

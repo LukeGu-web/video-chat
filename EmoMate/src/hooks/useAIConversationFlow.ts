@@ -275,6 +275,7 @@ export const useAIConversationFlow = (
           modelType: 'haiku',
           enableTTS: true,
           backgroundStory: combinedContext || undefined,
+          objectRecognitionContext: objectResult.context || undefined, // Separate object recognition context with HIGH PRIORITY
           sceneContext: sceneUnderstanding.currentScene,
           isVoiceMessage: true, // Mark as voice message
         });

@@ -62,35 +62,31 @@ export function buildConversationContext(
     combinedContext += formatStoryForAI(backgroundContext);
   }
 
-  // 2. Add object recognition context if triggered by keyword
-  if (objectContext) {
-    if (combinedContext) {
-      combinedContext += '\n\n';
-    }
-    combinedContext += objectContext;
-  } else {
-    // 3. Check if there's a recent object recognition record (within 5 minutes)
-    // This allows user to manually recognize an object, then ask AI about it
-    if (objectRecognitionRecords.length > 0) {
-      const latestRecord = objectRecognitionRecords[0]; // Already sorted newest first
-      const recordAge = Date.now() - latestRecord.createdAt;
-      const fiveMinutesInMs = 5 * 60 * 1000;
+  // NOTE: Object recognition context is now passed separately via objectRecognitionContext
+  // in ChatAIConfig, so we don't add it to backgroundStory anymore.
+  // This ensures object recognition gets HIGH PRIORITY in system prompt.
 
-      if (recordAge < fiveMinutesInMs) {
-        console.log(
-          '[ConversationContext] 📦 Using recent object recognition as context:',
-          {
-            name: latestRecord.data.objectName,
-            ageSeconds: Math.round(recordAge / 1000),
-          }
-        );
+  // 2. Check if there's a recent object recognition record (within 5 minutes)
+  // Only add to background context if no keyword was detected (fallback behavior)
+  if (!objectContext && objectRecognitionRecords.length > 0) {
+    const latestRecord = objectRecognitionRecords[0]; // Already sorted newest first
+    const recordAge = Date.now() - latestRecord.createdAt;
+    const fiveMinutesInMs = 5 * 60 * 1000;
 
-        if (combinedContext) {
-          combinedContext += '\n\n';
+    if (recordAge < fiveMinutesInMs) {
+      console.log(
+        '[ConversationContext] 📦 Using recent object recognition as background context:',
+        {
+          name: latestRecord.data.objectName,
+          ageSeconds: Math.round(recordAge / 1000),
         }
-        combinedContext += '【最近识别的物品】\n';
-        combinedContext += formatObjectRecognitionForAI(latestRecord.data);
+      );
+
+      if (combinedContext) {
+        combinedContext += '\n\n';
       }
+      combinedContext += '【最近识别的物品】\n';
+      combinedContext += formatObjectRecognitionForAI(latestRecord.data);
     }
   }
 
