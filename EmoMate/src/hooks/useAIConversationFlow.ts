@@ -38,7 +38,9 @@ export interface AIConversationFlowConfig {
       modelType?: 'haiku' | 'sonnet';
       enableTTS?: boolean;
       backgroundStory?: string;
+      objectRecognitionContext?: string; // Object recognition context (high priority)
       sceneContext?: any;
+      isVoiceMessage?: boolean; // Mark as voice-triggered message
     }
   ) => Promise<void>;
 

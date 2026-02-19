@@ -12,6 +12,7 @@ import {
 } from './src/screens';
 import { initializeTTSCache, TTSQueue } from './src/capabilities/speak'; // Phase 3: TTS 预热 + 缓存 - NEW ARCHITECTURE
 import { RootStackParamList } from './src/types/navigation';
+import { useMemoryStore } from './src/store';
 import './global.css';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -84,6 +85,12 @@ async function warmupTTS(): Promise<void> {
 }
 
 export default function App() {
+  // Memory system: hydrate user profile + preferences from MMKV on app launch
+  const loadFromStorage = useMemoryStore((s) => s.loadFromStorage);
+  useEffect(() => {
+    loadFromStorage();
+  }, [loadFromStorage]);
+
   // Phase 1: 应用启动时预加载过渡语音
   useEffect(() => {
     const initializeApp = async () => {
