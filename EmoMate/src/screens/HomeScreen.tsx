@@ -13,6 +13,7 @@ import {
   useVoiceConversationManager,
 } from '../hooks/';
 import { useAIConversationFlow } from '../hooks/useAIConversationFlow'; // Step 2.3: AI conversation flow hook
+import { useMemoryTriggers } from '../hooks/useMemoryTriggers';
 import { useSpeechToText } from '../capabilities/listen';
 import { useTTS } from '../capabilities/speak';
 import {
@@ -80,6 +81,12 @@ const HomeScreen: React.FC = () => {
     stopSpeaking,
     currentSegment,
   } = useChatAI({ personality: PERSONALITY_PROMPTS.gentle, enableTTS: true });
+
+  // Memory trigger system: message count, silence, background, and startup checks
+  useMemoryTriggers({
+    messages,
+    enabled: true,
+  });
 
   // TTS for small talk (voice-triggered object recognition only)
   const smallTalkTTS = useTTS({
