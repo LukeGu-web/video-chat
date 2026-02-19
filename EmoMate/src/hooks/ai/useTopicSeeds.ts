@@ -11,7 +11,9 @@ export function useTopicSeeds(): TopicSeed[] {
     const now = Date.now();
     const oneDayMs = 24 * 60 * 60 * 1000;
 
-    // 1. Upcoming/recently expiring high-importance facts (within 3 days)
+    // 1. Upcoming/recently expiring high-importance facts (within 3 days).
+    //    Note: only time-sensitive facts (with expiresAt set) reach this path;
+    //    permanent high-importance facts are surfaced via the memory block injection instead.
     const facts = getActiveFacts('high');
     for (const fact of facts.slice(0, 2)) {
       if (fact.expiresAt && fact.expiresAt - now < 3 * oneDayMs) {
@@ -50,5 +52,6 @@ export function useTopicSeeds(): TopicSeed[] {
     }
 
     return seeds.slice(0, 3);
-  }, []); // rebuild once per mount — fresh DB read each session
+  }, []); // computed once at render time — reads DB before startup extraction completes;
+         // seeds reflect data from the previous committed session, not any pending extraction.
 }
