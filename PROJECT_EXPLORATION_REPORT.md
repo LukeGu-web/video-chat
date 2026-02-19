@@ -1,658 +1,531 @@
 # Video-Chat 项目全面探索报告
 
-**报告日期**: 2025-01-21  
-**项目状态**: 🚀 生产就绪  
-**代码行数**: ~6,293 行 (EmoMate TypeScript/TSX)
+**报告日期**: 2026-02-19
+**项目状态**: 🚀 生产就绪 (92%)
+**代码行数**: ~24,000 行 (EmoMate TypeScript/TSX，相比 2025-01-21 的 ~6,300 行增长约 4 倍)
 
 ---
 
 ## 📋 目录
 
 1. [项目概述](#项目概述)
-2. [EmoMate - 移动应用](#emomate---移动应用)
-3. [Character - 网页应用](#character---网页应用)
-4. [核心功能模块](#核心功能模块)
-5. [已实现功能](#已实现功能)
-6. [待优化项](#待优化项)
-7. [技术栈](#技术栈)
-8. [文档体系](#文档体系)
+2. [EmoMate - 架构全景](#emomate---架构全景)
+3. [核心功能模块](#核心功能模块)
+   - 3.1 语音对话系统
+   - 3.2 TTS 系统（新架构）
+   - 3.3 四层记忆系统
+   - 3.4 视觉与环境感知系统
+   - 3.5 RAG 检索增强系统
+   - 3.6 情绪检测系统
+   - 3.7 主动对话系统
+   - 3.8 Live2D 动作系统
+   - 3.9 人格与个性化系统
+4. [Character - 网页应用](#character---网页应用)
+5. [技术栈](#技术栈)
+6. [状态管理体系](#状态管理体系)
+7. [已知技术债务与待优化项](#已知技术债务与待优化项)
+8. [开发指南](#开发指南)
 
 ---
 
 ## 项目概述
 
-**Video-Chat** 是一个多项目生态系统，用于 Live2D 角色交互和视频聊天功能，展示了 React Native 移动应用与网页 Live2D 字符显示之间的集成。
+**Video-Chat** 是一个以 Live2D 角色为核心的多模态 AI 伴侣应用，集成了语音对话、持久记忆、环境感知、检索增强生成（RAG）等能力。
+
+### 主要里程碑（2025-01-21 → 2026-02-19）
+
+| 里程碑 | 状态 |
+|--------|------|
+| 重构为 Capabilities 模块架构 | ✅ |
+| 四层持久记忆系统（MMKV + SQLite） | ✅ |
+| RAG 检索增强生成系统 | ✅ |
+| 视觉环境感知（Claude Vision + MLKit） | ✅ |
+| TTS 系统重构（TTSQueue + 并行合成） | ✅ |
+| Prompt Caching 成本优化 | ✅ |
+| 双语支持（中英文自动切换） | ✅ |
+| 对话摘要与用户反馈系统 | ✅ |
 
 ### 项目结构
 
 ```
 video-chat/
-├── EmoMate/                           # React Native 移动应用 (26 个文件夹)
+├── EmoMate/                    # React Native 移动应用
 │   ├── src/
-│   │   ├── components/                # 16 个 React 组件
-│   │   ├── screens/                   # 4 个屏幕
-│   │   ├── store/                     # Zustand 状态管理
-│   │   ├── utils/                     # 12 个工具函数
-│   │   ├── types/                     # TypeScript 类型定义
-│   │   └── constants/                 # 配置常量
-│   ├── docs/                          # 7 个文档文件
-│   ├── app.config.ts                  # Expo 配置
-│   ├── babel.config.js                # Babel 配置
-│   └── package.json
-├── character/                         # Remix 网页应用
-│   ├── app/
-│   │   ├── components/                # 2 个 Live2D 组件
-│   │   ├── routes/                    # 3 个路由
-│   │   ├── types/                     # Live2D 类型定义
-│   │   └── root.tsx
-│   ├── public/assets/live2d/          # Hiyori 模型文件
-│   ├── vite.config.ts
-│   └── package.json
-└── CLAUDE.md                          # 多项目文档
-
+│   │   ├── capabilities/       # 能力模块层（新架构）
+│   │   │   ├── emotion/        # 情绪状态管理
+│   │   │   ├── listen/         # 语音识别
+│   │   │   ├── motion/         # 动作选择器
+│   │   │   ├── retrieval/      # RAG 检索管道
+│   │   │   ├── speak/          # TTS（队列、提供者、缓存）
+│   │   │   └── vision/         # 相机、面部检测、场景理解、物体识别
+│   │   ├── components/         # UI 组件（20+ 个）
+│   │   ├── hooks/              # React 自定义 hooks（15+）
+│   │   │   └── ai/             # AI 专用 hooks
+│   │   ├── screens/            # 4 个屏幕（含新增 SceneHistoryScreen）
+│   │   ├── store/              # Zustand 状态管理（9 个 store）
+│   │   ├── types/              # TypeScript 类型定义
+│   │   ├── constants/          # 配置常量（ai.ts 1298 行）
+│   │   └── utils/              # 工具函数
+│   └── App.tsx                 # 根组件（音频配置 + TTS 预热 + 记忆 hydration）
+├── character/                  # Remix 网页应用（Live2D）
+└── CLAUDE.md
 ```
 
 ---
 
-## EmoMate - 移动应用
+## EmoMate - 架构全景
 
-### 项目信息
+### 版本信息（最新）
 
-- **类型**: React Native + Expo
-- **框架版本**: 
-  - Expo 53.0.20
-  - React Native 0.79.5
-  - React 19.0.0
-  - TypeScript 5.8.3
+| 依赖 | 版本 |
+|------|------|
+| Expo SDK | 54 |
+| React Native | 0.81.5 |
+| React | 19.1.0 |
+| TypeScript | 5.9.2 |
+| expo-sqlite | ~16.0.10（新增） |
+| react-native-mmkv | ^4.0.0 |
 
-- **核心依赖**:
-  - 语音系统: expo-audio, expo-speech, expo-speech-recognition
-  - 视觉系统: expo-camera, react-native-vision-camera, react-native-vision-camera-face-detector
-  - 动画: react-native-reanimated, react-native-worklets-core
-  - 状态管理: zustand (5.0.6) + immer
-  - 导航: @react-navigation (7.1.14)
-  - UI: nativewind (4.1.23), tailwindcss
+### Capabilities 模块架构
 
-### 文件组织
+旧架构将所有逻辑平铺在 `src/utils/`，新架构按能力领域划分到 `src/capabilities/`：
 
-**类型定义** (`src/types/`):
-- `emotion.ts` - 情绪类型和接口 (33 行)
-  - `EmotionType`: 'happy' | 'sad' | 'neutral' | 'angry' | 'surprised'
-  - `EmotionDetectionResult`: 情绪+信心度+时间戳
-  - `EmotionState`: 面部/文本/组合情绪
-  - `EmotionDetectorProps`: 组件属性接口
-
-**屏幕** (`src/screens/`):
-- `HomeScreen.tsx` - 主聊天屏幕 (150+ 行)
-- `WelcomeScreen.tsx` - 欢迎屏幕
-- `ChatHistoryScreen.tsx` - 聊天历史
-- `HiyoriScreen.tsx` - Hiyori Live2D 交互屏幕
-- `EmotionTestScreen.tsx` - 情绪检测测试屏幕 (80+ 行)
-
-**核心组件** (`src/components/`):
-- `BasicEmotionDetector.tsx` (17,030 字节) - 面部情绪检测
-- `ChatEmotionAnalyzer.tsx` (2,746 字节) - 文本情绪分析
-- `EmotionAwareCharacter.tsx` (4,633 字节) - 情绪感知角色
-- `HiyoriWebView.tsx` (21,448 字节) - WebView 集成
-- `Live2DCharacter.tsx` (6,620 字节) - Live2D 字符处理
-- `VoiceControl.tsx` - 语音控制
-- `ChatBubble.tsx`, `ChatList.tsx`, `CurrentSpeechBubble.tsx`
-- `LoadingDots.tsx`, `Toast.tsx`, `Header.tsx`
-- `EmotionProvider.tsx` - 情绪提供者
-
-**工具函数** (`src/utils/`):
-- `useChatAI.ts` (410 行) - Claude AI 集成
-- `useSpeechToText.ts` (145 行) - 语音识别
-- `useHybridTTS.ts` - 混合 TTS
-- `useElevenLabsTTS.ts` - ElevenLabs 语音合成
-- `emotionAnalysis.ts` (114 行) - 情绪分析算法
-- `faceDetection.ts` (177 行) - 面部检测 (MLKit 1.9.0)
-- `permissions.ts` - 权限管理
-- `debug.ts` - 调试工具
-
-**状态管理** (`src/store/`):
-- `userStore.ts` - 用户状态 (Zustand + Immer)
-- `useAIStatus.ts` - AI 状态管理
-
-**常量** (`src/constants/`):
-- `ai.ts` - Claude API 配置 + 能力管理
-- `personality.ts` - 兰兰人格设定
+```
+capabilities/
+├── emotion/
+│   ├── emotionAnalysis.ts     # 情绪分析算法
+│   ├── useEmotionState.ts     # 情绪状态 hook
+│   └── index.ts
+├── listen/
+│   ├── useSpeechToText.ts     # 语音识别
+│   └── index.ts
+├── motion/
+│   ├── motionMapper.ts        # 上下文感知动作选择器（398 行）
+│   └── index.ts
+├── retrieval/
+│   ├── ragPipeline.ts         # RAG 主管道
+│   ├── queryAnalyzer.ts       # 查询分析
+│   ├── multiSourceRetriever.ts
+│   ├── contextBuilder.ts      # 上下文构建
+│   ├── relevanceScoring.ts    # 相关性评分（295 行）
+│   ├── conversationSummarizer.ts  # 对话摘要（341 行）
+│   ├── userFeedback.ts        # 用户反馈（326 行）
+│   ├── performanceMonitor.ts  # 性能监控
+│   └── index.ts
+├── speak/
+│   ├── queue/TTSQueue.ts      # TTS 队列管理（413 行）
+│   ├── providers/
+│   │   ├── ElevenLabsProvider.ts
+│   │   └── ExpoSpeechProvider.ts
+│   ├── cache/AudioCache.ts    # 音频文件缓存
+│   ├── elevenLabsAPI.ts       # ElevenLabs API 封装
+│   ├── sentenceDetector.ts    # SSE 流式句子检测
+│   ├── smartSentenceBuffer.ts # 智能句子过滤（377 行）
+│   └── index.ts
+└── vision/
+    ├── camera/
+    │   ├── useCamera.ts
+    │   └── useCameraPermissions.ts
+    ├── faceDetection/
+    │   ├── useFaceDetection.ts    # MLKit 1.9.0 面部检测
+    │   ├── emotionAlgorithm.ts    # 情绪推断算法
+    │   ├── faceFeatures.ts        # 面部特征提取
+    │   └── worklets.ts            # Reanimated worklets
+    ├── environment/
+    │   ├── useSceneUnderstanding.ts  # 场景理解主 hook（816 行）
+    │   ├── buildScenePrompt.ts       # 场景提示词构建（333 行）
+    │   ├── sceneAnalysis.ts          # 核心分析逻辑
+    │   ├── sceneCache.ts             # 场景数据缓存
+    │   ├── sceneTimer.ts             # 定时器逻辑
+    │   └── sceneKeywords.ts          # 关键词检测（280 行）
+    ├── object/
+    │   └── useObjectRecognition.ts
+    ├── claudeVision.ts            # Claude Vision API（713 行）
+    ├── imageComparison.ts         # 图像变化检测（301 行）
+    ├── imageCompression.ts        # 图像压缩
+    └── index.ts
+```
 
 ---
 
-## 已实现的功能模块
+## 核心功能模块
 
-### 1. 语音对话系统
+### 3.1 语音对话系统
 
-**文件位置**:
-- `/src/utils/useChatAI.ts` (410 行)
-- `/src/constants/ai.ts` (150+ 行)
+**文件**: `src/hooks/useChatAI.ts`（658 行）
 
-**功能特性**:
+✅ **Claude AI 集成（含 Prompt Caching）**
+- 模型: claude-haiku-4-5 / claude-sonnet-4-6
+- 流式 SSE 响应
+- `cache_control: { type: 'ephemeral' }` 应用于稳定的系统提示块（人格 + 情绪响应块），降低 API 成本
+- `buildCacheableAPIRequestConfig()` 统一构建带缓存控制的请求配置
 
-✅ **Claude AI 集成**
-- 模型: claude-3-haiku, claude-3-sonnet
-- API 配置: 完整的 baseURL, headers, 请求体
-- 动态 Token 配置:
-  - simple: 80 tokens
-  - normal: 150 tokens
-  - detailed: 300 tokens
-  - storytelling: 500 tokens
-
-✅ **智能对话系统**
-- 对话类型检测: 简单/正常/详细/故事讲述
-- 情绪检测: 开心、难过、困惑、紧张、中立
-- 上下文维持: 保留最近 10 条消息
-- 人格系统: 兰兰温柔日本女高中生设定
-
-✅ **主动对话功能** (ProactiveConversation)
-- 1 分钟沉默 → 短暂检测
-- 2 分钟沉默 → 中等停顿检测
-- 3 分钟沉默 → 长时间停顿检测
-- 智能话题选择: 基于对话历史的上下文感知
-
-✅ **混合 TTS 系统**
-- ElevenLabs API: 高质量语音 (语音 ID: hkfHEbBvdQFNX4uWHqRF)
-- Expo Speech 后备: 设备内语音合成
-- 情感感知语音参数:
-  - gentle (轻柔): stability 0.4, similarity_boost 0.7
-  - happy (开心): stability 0.3, similarity_boost 0.65
-  - caring (关心): stability 0.6, similarity_boost 0.8
-
-**实现亮点**:
+✅ **RAG 集成**
 ```typescript
-// 对话类型检测函数
-const conversationType = detectConversationType(content, updatedMessages);
-
-// 情绪感知的 TTS 参数
-speak(aiResponse, voiceId, userEmotion)
-
-// 主动对话计时器管理
-setTimeout(() => sendProactiveMessage(topic), PROACTIVE_CONFIG.silenceDetection.shortPause)
+const ragResult = await executeRAG(userMessage, chatHistory, { enableRetrieval: true });
+// ragResult.context 注入到系统提示
 ```
 
-### 2. 表情识别系统
+✅ **智能对话类型检测**
+| 类型 | 字符数 | Max Tokens | 触发条件 |
+|------|--------|------------|----------|
+| simple | 20-50 | 80 | 问候、确认 |
+| normal | 50-120 | 150 | 日常聊天 |
+| detailed | 120-300 | 300 | 解释性内容 |
+| storytelling | 200-500 | 500 | 故事、剧情 |
 
-**文件位置**:
-- `/src/components/BasicEmotionDetector.tsx` (17,030 字节)
-- `/src/utils/faceDetection.ts` (177 行)
-- `/src/utils/emotionAnalysis.ts` (114 行)
+---
 
-**检测能力**:
+### 3.2 TTS 系统（capabilities/speak/）
 
-✅ **MLKit 人脸检测** (v1.9.0)
-- 库: react-native-vision-camera-face-detector
-- 检测参数:
-  - performanceMode: 'fast'
-  - classificationMode: 'all' (启用情绪分类)
-  - minFaceSize: 0.15
-  - trackingEnabled: false
+**核心设计**：`TTSQueue` — 并行合成 + 顺序播放
 
-✅ **五种情绪识别**:
-```typescript
-smilingProbability > 0.6                  → happy (开心)
-eyeOpen > 0.8 && smile < 0.3              → surprised (惊讶)
-eyeOpen < 0.4 && smile < 0.2              → sad (难过)
-smile < 0.1 && eyeOpen > 0.5              → angry (生气)
-其他                                       → neutral (中立)
+```
+文本 → sentenceDetector（SSE 流切句） → TTSQueue.enqueue()
+                                              ↓
+                               并行合成（最多 2 个并发）
+                               ElevenLabsProvider / AudioCache
+                                              ↓
+                                     顺序播放音频文件
 ```
 
-✅ **混合情绪分析**:
-- 关键词匹配: 快速识别常见情绪词
-- Claude API 语义分析: 深度理解文本情绪
-- 优先级: 文本情绪 > 面部情绪 > 中立
+✅ **TTSQueue 特性**（`queue/TTSQueue.ts`, 413 行）
+- 最多 2 个并发合成任务（避免 rate limit）
+- 最多 3 次重试
+- 支持 `cancel()`、`waitForCompletion()`
+- 完成回调和状态追踪
 
-✅ **UI 特性**:
-- 可拖拽浮动窗口 (120x160px)
-- 实时面部检测 (60fps)
-- 检测间隔配置: 可自定义
-- 两种模式: MLKit 真实检测 + 智能模拟后备
+✅ **AudioCache**（`cache/AudioCache.ts`）
+- 本地文件缓存避免重复合成
+- App 启动时预热 TTS（`App.tsx`）
 
-**技术实现**:
-```typescript
-// 使用 useFaceDetector hook
-const { detectFaces } = useFaceDetector(faceDetectionOptions);
+✅ **语音配置**
+- Voice ID: `hkfHEbBvdQFNX4uWHqRF`
+- 情绪感知语音参数:
 
-// Worklet 帧处理
-const frameProcessor = useFrameProcessor((frame) => {
-  'worklet';
-  const faces = detectFaces(frame);
-  updateEmotionWorklet(emotion, confidence);
-}, [detectFaces, updateEmotionWorklet]);
+| 情绪 | stability | similarity_boost | style |
+|------|-----------|-----------------|-------|
+| gentle | 0.4 | 0.7 | 0.25 |
+| happy | 0.3 | 0.65 | 0.4 |
+| caring | 0.6 | 0.8 | 0.2 |
+| shy | 0.45 | 0.75 | 0.35 |
+
+---
+
+### 3.3 四层记忆系统
+
+**设计目标**: 让 LanLan 跨 session 记住用户，对话有连续感。
+
+```
+Layer 1 (MMKV) ── UserProfile ──────── 用户基本信息（name, occupation, tags, language）
+Layer 2 (MMKV) ── UserPreferences ──── 偏好设置（wantsAdvice, prefersHumor, replyLength）
+Layer 3 (SQLite) ─ episodes ──────────  对话摘要（每次 ≤100 字，记录话题、情绪、关键事件）
+Layer 4 (SQLite) ─ facts ────────────── 知识事实（category, importance, expiresAt）
 ```
 
-### 3. 动画交互系统
+✅ **提取触发器**（`useMemoryTriggers.ts`）
+- 消息计数：每 20 条提取一次
+- 沉默：5 分钟无新消息
+- 后台：App 进入 background 时标记 pending
+- 启动：App 重启时处理上次未完成的 pending extraction
 
-**文件位置**:
-- `/src/components/HiyoriWebView.tsx` (21,448 字节)
-- `/src/components/Live2DCharacter.tsx` (6,620 字节)
-- `/src/components/EmotionAwareCharacter.tsx` (4,633 字节)
+✅ **提取流程**（`useMemoryExtraction.ts`）
+```
+对话片段 → Claude Haiku（1024 max_tokens）→ ExtractionResult JSON
+                                                    ↓
+                              updateProfile + updatePreferences（MMKV）
+                              insertEpisode + insertFact（SQLite）
+```
 
-**集成状态**: ✅ 完全集成
-
-✅ **Live2D 字符集成**:
-- 角色: Hiyori VTuber
-- 11 种动作: Idle, Happy, Surprised, Shy, Wave, Dance, Laugh, Thinking, Speaking, Excited, Sleepy
-- 网络: character 项目 (http://192.168.31.28:5174/)
-
-✅ **WebView Bridge 系统**:
+✅ **注入流程**（`buildMemoryContext.ts` → `buildAIContext.ts`）
 ```typescript
-interface HiyoriBridge {
-  playMotion: (motionName: string) => void;
-  getAvailableMotions: () => string[];
-  checkModelStatus: () => void;
-  reload: () => void;
+const { memoryBlock } = buildMemoryContext(profile, preferences);
+// memoryBlock 注入系统提示（非缓存块，每次对话都更新）
+```
+
+✅ **话题种子**（`useTopicSeeds.ts`）
+- 3 天内即将过期的高重要度 facts → 提问话题
+- 1 天前情绪低落的 episode → 关怀话题
+- 最新 episode 的 keyEvents → 后续跟进话题
+- 仅在 `messages.length === 0` 时作为 proactive message 的备用兜底
+
+✅ **App.tsx 集成**
+```typescript
+const loadFromStorage = useMemoryStore((s) => s.loadFromStorage);
+useEffect(() => { loadFromStorage(); }, [loadFromStorage]);
+// 在所有子 Screen 渲染前完成 MMKV hydration
+```
+
+---
+
+### 3.4 视觉与环境感知系统
+
+**核心文件**: `capabilities/vision/` 目录
+
+#### 场景理解（useSceneUnderstanding.ts, 816 行）
+
+✅ **工作流程**
+```
+相机帧捕获 → 图像压缩 → 变化检测（imageComparison）
+    ↓ 有足够变化时
+Claude Vision API（claudeVision.ts）
+    ↓
+SceneData（location, lighting, objects, mood, activities）
+    ↓
+sceneStore + AI 系统提示注入
+```
+
+✅ **触发机制**
+- 定时分析（可配置间隔）
+- 关键词触发（用户提到场景相关词汇）
+- 场景变化触发（图像差异超过阈值）
+- 对话活跃期降低分析频率
+
+✅ **场景缓存**（`sceneCache.ts`）
+- 持久化到 MMKV，跨 session 保留
+- 语义去重（相似场景不重复分析）
+
+#### 物体识别（useObjectRecognition.ts）
+
+✅ **高优先级注入**
+```typescript
+// 物体识别结果以强调标记注入 AI 上下文
+objectRecognitionContext: `[USER IS SHOWING YOU: ${result}]`
+```
+
+#### 面部情绪检测（faceDetection/）
+
+✅ **MLKit 1.9.0 集成**
+- `useFaceDetection` + Reanimated worklet 处理帧
+- 60fps 实时检测
+- 情绪算法（`emotionAlgorithm.ts`）:
+
+```
+smilingProbability > 0.6                 → joy (开心)
+eyeOpen > 0.8 && smile < 0.3            → surprise (惊讶)
+eyeOpen < 0.4 && smile < 0.2            → sadness (难过)
+smile < 0.1 && eyeOpen > 0.5            → anger (生气)
+其他                                      → neutral (中立)
+```
+
+#### 动态背景系统
+
+✅ **Background Scenes**（`constants/backgroundScenes.ts`, 721 行）
+- 基于对话内容和场景分析动态切换背景图
+- `useBackgroundSceneManager` 整合多个触发条件
+
+---
+
+### 3.5 RAG 检索增强生成系统
+
+**文件**: `capabilities/retrieval/` (8 个模块)
+
+```
+用户消息
+    ↓
+queryAnalyzer.ts ──── 分析查询意图和关键词
+    ↓
+multiSourceRetriever.ts ── 从多个来源检索相关上下文
+    ↓
+relevanceScoring.ts ──── 相关性评分和排序（295 行）
+    ↓
+contextBuilder.ts ──── 构建检索上下文字符串（注入 AI 提示）
+    ↓
+conversationSummarizer.ts ── Phase 3: 长对话摘要（341 行）
+    ↓
+userFeedback.ts ──── Phase 3: 收集用户隐式反馈（326 行）
+    ↓
+performanceMonitor.ts ── 记录 RAG 性能指标
+```
+
+✅ **集成方式**（在 `useChatAI.ts`）
+```typescript
+const ragResult = await executeRAG(userMessage, chatHistory, options);
+// ragResult.context 作为额外上下文注入系统提示
+```
+
+---
+
+### 3.6 情绪检测系统
+
+**双通道融合**:
+
+| 通道 | 文件 | 方式 |
+|------|------|------|
+| 面部 | `faceDetection/useFaceDetection.ts` | MLKit worklet |
+| 文本 | `capabilities/emotion/emotionAnalysis.ts` | 关键词 + Claude |
+| 融合 | `utils/emotionDetection.ts` | 文本优先 > 面部 > neutral |
+
+✅ **Plutchik 8 种基础情绪**（新版本升级自 5 种）:
+joy, sadness, anger, fear, surprise, disgust, trust, anticipation
+
+✅ **UI 组件**:
+- `components/vision/EmotionDetector.tsx` — 可拖拽浮动检测窗口
+- `components/vision/DraggableCameraView.tsx`
+
+---
+
+### 3.7 主动对话系统
+
+**文件**: `hooks/ai/useProactiveConversation.ts`（224 行）
+
+✅ **3 阶段沉默检测**:
+- Short pause → 轻柔的话题引出（可使用记忆话题种子）
+- Medium pause → 基于对话上下文的跟进问题
+- Long pause → 深度互动尝试
+
+✅ **话题种子集成**:
+```typescript
+const topicSeeds = useTopicSeeds();
+// messages.length === 0 时优先使用记忆话题
+const memoryHook = messages.length === 0 ? topicSeeds[0]?.hook : undefined;
+const topic = memoryHook ?? selectProactiveTopic('short', messages);
+```
+
+---
+
+### 3.8 Live2D 动作系统
+
+**文件**: `capabilities/motion/motionMapper.ts`（398 行）
+
+✅ **上下文感知动作选择**（新升级）:
+
+```typescript
+interface ConversationContext {
+  text?: string;          // 消息文本
+  emotion?: EmotionType;  // 检测情绪
+  isGreeting?: boolean;   // 是否问候
+  isQuestion?: boolean;   // 是否提问
+  isEncouragement?: boolean;
+  isCelebration?: boolean;
+  isEmpathy?: boolean;
+  aiSpeaking?: boolean;
+  aiThinking?: boolean;
 }
 ```
 
-✅ **通信协议**:
-- 消息格式: BridgeMessage (id, type, timestamp, data, error)
-- 消息类型: domReady, readinessUpdate, modelReady, heartbeat, motionResult
-- 超时保护: 10 秒超时
-- 重试机制: 最多 3 次加载尝试
+✅ **Plutchik 情绪 → 动作映射**:
 
-✅ **情绪映射**:
-```typescript
-// HomeScreen 中的 AI 状态 → Hiyori 动作映射
-listening         → Thinking (倾听思考)
-isGenerating      → Thinking (生成中)
-isSpeaking        → Speaking (播放中)
-默认              → Idle    (空闲)
+| 情绪 | 动作 |
+|------|------|
+| joy | Happy |
+| sadness | Sleepy |
+| anger | Surprised |
+| fear | Shy |
+| surprise | Surprised |
+| disgust | Thinking |
+| trust | Happy |
+| anticipation | Excited |
+
+✅ **动作优先级系统**:
+IDLE(0) < EMOTION(1) < CONTEXT(2) < AI_STATUS(3) < SPECIAL(4)
+
+✅ **11 种动作**:
+Idle, Happy, Surprised, Shy, Wave, Dance, Laugh, Thinking, Speaking, Excited, Sleepy
+
+---
+
+### 3.9 人格与个性化系统
+
+**文件**: `src/constants/personality.ts`（271 行）
+
+✅ **兰兰（LanLan）完整人设**:
+- 名字: 兰兰（17 岁日本女高中生风格）
+- 灵感: 毛利兰（《名侦探柯南》）
+- 说话特点: 短句、温柔、偶尔害羞
+- 惯用表达: "诶？"、"嗯…"、"欸嘿嘿"
+
+✅ **记忆连续性指令**（Task 5 新增）:
 ```
-
-### 4. 文本情绪分析
-
-**文件位置**:
-- `/src/components/ChatEmotionAnalyzer.tsx` (2,746 字节)
-- `/src/utils/emotionAnalysis.ts` (114 行)
-
-**功能**:
-
-✅ **关键词匹配** (快速识别):
-```typescript
-EMOTION_KEYWORDS = {
-  happy: ['开心', '高兴', '快乐', '兴奋', '愉快', ...],
-  sad: ['难过', '伤心', '沮丧', '失落', '痛苦', ...],
-  angry: ['生气', '愤怒', '气愤', '恼火', '烦躁', ...],
-  surprised: ['惊讶', '震惊', '意外', '吃惊', ...],
-  neutral: ['还好', '一般', '平常', '普通', ...]
-}
+# Conversation continuity
+If the user sends a simple greeting, naturally bring up ONE thing you remember —
+a recent worry, upcoming event, or something they mentioned.
+Do this only when it feels natural. One reference per opening.
 ```
-
-✅ **Claude API 语义分析** (深度识别):
-- 当关键词匹配失败时触发
-- 支持复杂情绪表达的理解
-- 5 种标准情绪响应
-
-✅ **优先级处理**:
-```typescript
-if (textEmotion && textEmotion !== 'neutral') {
-  return textEmotion;  // 文本情绪优先
-} else if (facialEmotion && facialEmotion !== 'neutral') {
-  return facialEmotion; // 次选面部情绪
-} else {
-  return 'neutral';     // 默认中立
-}
-```
-
-### 5. 人格与个性化系统
-
-**文件位置**:
-- `/src/constants/personality.ts` (80+ 行)
-- `/src/constants/ai.ts` (150+ 行)
-
-**人物设定**: 兰兰 (LanLan)
-
-✅ **基础设定**:
-- 名字: 兰兰
-- 年龄: 17 岁
-- 人格: 温柔的日本女高中生
-- 灵感: 毛利兰 (《名侦探柯南》)
-- 角色: 温柔姐姐
-
-✅ **核心特质**:
-- 温柔体贴 (Gentle & Empathetic)
-- 偶尔害羞 (Shy)
-- 不喜欢长篇大论 (Concise)
-- 遇到感性话题会真情流露 (Emotional)
-
-✅ **说话风格**:
-
-句式特征:
-- 长度: 20-50 字符 (简单), 50-120 (正常), 120-300 (详细), 200-500 (故事)
-- 语气: 温柔, 口语化
-- 避免正式或机械化语言
-
-常用表达:
-- 害羞/疑惑: "诶？", "嗯…", "欸嘿嘿", "那个…"
-- 口语: "嗯嗯", "是呢", "这样啊", "好的呢"
-- 赞同: "对对", "是的呢", "嗯嗯", "我也觉得"
-- 关心: "没事吧？", "怎么了", "要紧吗", "别担心哦"
-- 感叹: "哇！", "好棒！", "真的吗！", "太好了"
-
-✅ **行为准则**:
-应该做的:
-- 用温柔的语气回应
-- 认真倾听用户的话
-- 给予情感支持和共情
-- 用简短自然的话语表达
-- 在适当时候表现出害羞
-- 记住用户提过的话
-
-不应该做的:
-- 过于正式或冷冰冰
-- 长篇大论的解释
-- 重复相同的问题
-- 忽视用户的情感
-- 使用过多的感叹号
 
 ---
 
 ## Character - 网页应用
 
-### 项目信息
-
-- **类型**: Remix Web 应用
-- **框架版本**:
-  - Remix 2.16.8 with React 18.2.0
-  - Vite 6.0.0
-  - TypeScript 5.1.6
-
-- **核心依赖**:
-  - PIXI.js 7.4.3 (WebGL 渲染)
-  - pixi-live2d-display-mulmotion 0.5.0-mm-5 (Live2D)
-  - Tailwind CSS 3.4.4
-
-### 核心功能
-
-✅ **Live2D 模型显示**:
-- 角色: Hiyori VTuber
-- 文件: `/assets/live2d/hiyori_vts/hiyori.model3.json`
-- 缩放: 0.12x
-- 位置: 居中显示
-
-✅ **11 种动作支持**:
-```
-Idle      - 默认空闲
-Happy     - 开心
-Surprised - 惊讶
-Shy       - 害羞
-Wave      - 挥手
-Dance     - 舞蹈
-Laugh     - 大笑
-Thinking  - 思考
-Speaking  - 说话
-Excited   - 兴奋
-Sleepy    - 困顿
-```
-
-✅ **JavaScript Bridge**:
-```typescript
-window.HiyoriBridge = {
-  playMotion: (motionName: string) => void;
-  getAvailableMotions: () => string[];
-  isModelLoaded: () => boolean;
-  getReadinessState: () => ReadinessState;
-  getPerformanceMetrics: () => PerformanceMetrics;
-  sendHeartbeat: () => void;
-}
-```
-
-✅ **多阶段初始化**:
-1. DOM 加载 → domReady
-2. Live2D 核心加载 → live2dReady
-3. 模型加载 → modelReady
-4. Bridge 初始化 → bridgeReady
-5. 全部就绪 → allReady
-
-✅ **性能指标**:
-- DOM 加载时间: < 100ms
-- Live2D 核心加载: < 500ms
-- 模型加载: < 2000ms
-- 总初始化: < 3000ms
-- 动作响应: < 100ms
-
-✅ **心跳系统**:
-- 每 5 秒发送一次状态更新
-- 连接健康检查
-- 双向通信验证
+- **框架**: Remix 2.16.8 + PIXI.js 7.4.3 + pixi-live2d-display-mulmotion
+- **开发端口**: 5174
+- **功能**: Hiyori Live2D 模型渲染 + JavaScript Bridge（供 WebView 调用）
+- **Bridge API**: `playMotion`, `getAvailableMotions`, `isModelLoaded`, `getReadinessState`
+- **心跳**: 每 5 秒发送状态更新
+- **初始化**: 5 阶段（domReady → live2dReady → modelReady → bridgeReady → allReady）
 
 ---
 
-## 核心功能总览
+## 技术栈
 
-### 已完成功能
+### EmoMate
 
-| 功能模块 | 实现文件 | 状态 | 说明 |
-|---------|--------|------|------|
-| **语音系统** | useChatAI.ts | ✅ | Claude API + ElevenLabs TTS |
-| **语音识别** | useSpeechToText.ts | ✅ | 中文支持, expo-speech-recognition |
-| **面部检测** | BasicEmotionDetector.tsx | ✅ | MLKit 1.9.0, 5 种情绪 |
-| **文本分析** | ChatEmotionAnalyzer.tsx | ✅ | 关键词 + Claude 语义分析 |
-| **人格系统** | personality.ts | ✅ | 兰兰完整人设 |
-| **Live2D 集成** | HiyoriWebView.tsx | ✅ | 11 种动作, WebView Bridge |
-| **状态管理** | userStore.ts | ✅ | Zustand + Immer |
-| **主动对话** | useChatAI.ts (lines 137-190) | ✅ | 3 阶段沉默检测 |
-| **情绪感知** | EmotionProvider | ✅ | 全局情绪状态管理 |
-| **调试系统** | debug.ts | ✅ | 环境变量控制的调试模式 |
-| **权限管理** | permissions.ts | ✅ | 相机+麦克风权限 |
-| **导航系统** | App.tsx | ✅ | React Navigation Stack |
+| 类别 | 技术 | 版本 |
+|------|------|------|
+| 框架 | Expo | 54 |
+| RN | React Native | 0.81.5 |
+| UI | React | 19.1.0 |
+| 类型 | TypeScript | 5.9.2 |
+| AI | Claude API | claude-haiku-4-5 / claude-sonnet-4-6 |
+| TTS | ElevenLabs | REST API |
+| STT | expo-speech-recognition | ^2.1.1 |
+| 视觉 | react-native-vision-camera | ^4.7.2 |
+| 面部 | vision-camera-face-detector | ^1.9.0 |
+| 存储 | react-native-mmkv | ^4.0.0 |
+| 数据库 | expo-sqlite | ~16.0.10 |
+| 状态 | zustand + immer | 5.0.6 |
+| 动画 | react-native-reanimated | ~4.1.1 |
+| 导航 | @react-navigation | ^7 |
+| 样式 | nativewind | ^4.1.23 |
 
-### 技术栈详情
+---
 
-**前端框架**:
-- React Native 0.79.5 + Expo 53
-- React 19.0.0 (最新)
-- TypeScript 5.8.3 (严格模式)
+## 状态管理体系
 
-**AI/ML**:
-- Claude 3 (Haiku/Sonnet)
-- ElevenLabs TTS API
-- Expo Speech Recognition
-- MLKit 人脸检测
+9 个 Zustand store（均从 `src/store/index.ts` barrel export）:
 
-**状态与动画**:
-- Zustand 5.0.6 (状态管理)
-- Immer (不可变更新)
-- React Native Reanimated (60fps 动画)
-- React Native Worklets Core (性能线程)
-
-**UI/UX**:
-- Tailwind CSS
-- NativeWind
-- React Navigation
-
-**开发工具**:
-- Vite 6.0.0 (character 项目构建)
-- Remix 2.16.8 (web 应用)
-- Babel (worklets 支持)
+| Store | 存储后端 | 功能 |
+|-------|----------|------|
+| `userStore` | 内存 | 用户状态、AI 角色选择 |
+| `chatStore` | MMKV | 持久化对话历史 |
+| `emotionStore` | 内存 | 当前情绪状态（面部 + 文本） |
+| `sceneStore` | 内存 | 当前场景数据 |
+| `objectRecognitionStore` | 内存 | 物体识别结果 |
+| `backgroundStore` | 内存 | 动态背景状态 |
+| `monitorStore` | 内存 | 函数监控调试数据 |
+| `memoryStore` | MMKV | UserProfile + UserPreferences |
+| `memoryDatabase` | SQLite | episodes + facts 操作函数 |
 
 ---
 
 ## 已知技术债务与待优化项
 
-### 1. 表情识别准确性
+### 高优先级
 
-**当前状态**: MLKit 1.9.0 支持, 但需要真实测试
+| 项目 | 说明 |
+|------|------|
+| 测试框架 | 无测试覆盖（Jest + React Native Testing Library） |
+| 情绪类型扩展 | 现有 8 种（Plutchik），可扩展到更细粒度 |
+| 记忆话题种子 | medium/long pause 目前未使用 seeds[1]/seeds[2]（预留 v2） |
+| Live2D 口型同步 | LipSync 尚未实现 |
 
-**待优化**:
-- [ ] 在不同光线条件下的准确性测试
-- [ ] 多人脸检测支持
-- [ ] 面部遮挡情况处理
-- [ ] 更细致的情绪分类 (6+ 种)
+### 中优先级
 
-**建议**:
-```
-使用 Google ML Kit 的高级功能:
-- Face Contour 检测 (轮廓识别)
-- 更细致的表情参数
-- 自定义训练模型支持
-```
+| 项目 | 说明 |
+|------|------|
+| 离线语音识别 | 当前需要网络 |
+| 内存管理 | 长时间聊天的 messages 数组无上限 |
+| Android 完整测试 | 主要在 iOS 测试 |
+| CI/CD | 无自动化构建 |
 
-### 2. 语音识别语言支持
+### 低优先级
 
-**当前状态**: 中文支持 (zh-CN)
-
-**已知问题**:
-- iOS 需要启用听写功能或添加键盘语言
-- 需要本地识别模型
-- Android 支持更好
-
-**待优化**:
-- [ ] 多语言自动切换
-- [ ] 离线识别模式
-- [ ] 识别准确性优化
-- [ ] 实时转录反馈
-
-### 3. Live2D 动作系统
-
-**当前状态**: 11 种基础动作
-
-**待优化**:
-- [ ] 情绪到动作的更复杂映射
-- [ ] 动作队列管理 (多个动作组合)
-- [ ] 随机动作选择的智能化
-- [ ] 自定义动作支持
-- [ ] 口型同步 (LipSync)
-
-### 4. 性能优化
-
-**当前指标**:
-- WebView 初始化: ~2000ms
-- Live2D 模型加载: < 2000ms
-- 动作响应: < 100ms
-
-**待优化**:
-- [ ] 模型预加载
-- [ ] 内存使用优化 (尤其是长时间聊天)
-- [ ] 网络请求缓存
-- [ ] 帧率监控与自适应
-
-### 5. 错误处理与恢复
-
-**当前状态**: 基础错误处理
-
-**待优化**:
-- [ ] 网络断连自动重连
-- [ ] Live2D 加载失败恢复
-- [ ] 优雅降级策略
-- [ ] 详细的错误日志系统
-- [ ] 用户友好的错误提示
-
-### 6. 主动对话系统
-
-**当前状态**: 3 阶段沉默检测
-
-**待优化**:
-- [ ] 主动对话话题的多样性
-- [ ] 基于用户行为的智能判断
-- [ ] 对话疲劳检测
-- [ ] 主题连贯性改进
-- [ ] A/B 测试支持
-
-### 7. 安全性
-
-**当前状态**: 基础实现
-
-**待优化**:
-- [ ] API 密钥管理 (环境变量 ✅, 但需要加密存储)
-- [ ] 请求签名验证
-- [ ] 速率限制 (Rate Limiting)
-- [ ] 数据加密传输
-- [ ] 敏感信息过滤
-
-### 8. 测试覆盖
-
-**当前状态**: 无测试框架
-
-**待优化**:
-- [ ] 单元测试 (Jest)
-- [ ] 集成测试
-- [ ] E2E 测试 (Detox)
-- [ ] 性能测试
-- [ ] 回归测试
-
-### 9. 文档
-
-**当前状态**: 优秀 (7 个 markdown 文档)
-
-**待优化**:
-- [ ] API 文档 (OpenAPI/GraphQL)
-- [ ] 架构图 (Mermaid/PlantUML)
-- [ ] 部署指南
-- [ ] 贡献者指南
-- [ ] 故障排除扩展
-
-### 10. 跨平台支持
-
-**当前状态**: iOS 优先
-
-**待优化**:
-- [ ] Android 完整测试
-- [ ] Web 支持 (Expo Web)
-- [ ] 平台特定的性能优化
-- [ ] 权限管理差异处理
-
----
-
-## 文档体系
-
-### EmoMate 文档 (`/docs/`)
-
-| 文件 | 大小 | 内容 |
-|-----|------|------|
-| `EMOTION_DETECTION_MVP.md` | 8.5 KB | MVP 功能文档 |
-| `EMOTION_DETECTION_ARCHITECTURE.md` | 20.8 KB | 技术架构设计 |
-| `EMOTION_DETECTION_STATUS.md` | 13.6 KB | 功能状态报告 |
-| `FACE_DETECTION_COMPLETE_GUIDE.md` | 15.2 KB | MLKit 完整指南 |
-| `FACE_DETECTION_IMPLEMENTATION_SUMMARY.md` | 5.9 KB | 实施总结 |
-| `HIYORI_INTEGRATION.md` | 6.3 KB | Live2D 集成文档 |
-| `README.md` | 3.1 KB | 项目概览 |
-
-**总计**: ~73 KB 文档
-
-### 代码注释
-
-- 类型定义完整 (emotion.ts 33 行都有注释)
-- 关键函数有使用说明
-- 组件 API 文档清晰
-- 常量配置有详细说明
-
----
-
-## 最新功能变更
-
-### 最近 5 次提交
-
-1. **bc1193a** - `fix: clean up setTimeout` (2025-01-21)
-2. **f5f0e44** - `feat: enable MLKit` (2025-01-21)
-   - 启用 MLKit 1.9.0 面部检测
-   - 替代模拟检测模式
-   
-3. **0eb29e8** - `feat: upgrade react-native-vision-camera-face-detector` (2025-01-20)
-   - 升级到 1.9.0 版本
-   - 更新 Frame Processor API
-
-4. **b3f2d11** - `feat: Remove outdated emotion testing guide...` (2025-01-20)
-   - 清理过期文档
-   - 更新状态报告
-
-5. **970f0e1** - `feat: Add emotion detection status report` (2025-01-20)
-   - 添加详细的功能状态报告
-
-### 代码变更统计
-
-```
-文件变更: 21
-插入: 2,712 行
-删除: 2,092 行
-净增: 620 行
-
-主要变更:
-- HiyoriWebView.tsx: 885 行 (大幅重构)
-- BasicEmotionDetector.tsx: 193 行 (MLKit 集成)
-- faceDetection.ts: 177 行 (API 更新)
-```
+| 项目 | 说明 |
+|------|------|
+| 云同步记忆 | 记忆目前仅本地 |
+| API 文档 | 无 OpenAPI 规范 |
+| 架构图 | 无 Mermaid 图示 |
+| 多语言扩展 | 日语支持计划中 |
 
 ---
 
@@ -660,7 +533,7 @@ window.HiyoriBridge = {
 
 ### 启动开发环境
 
-**EmoMate (移动应用)**:
+**EmoMate（移动应用）**:
 ```bash
 cd EmoMate
 npm install
@@ -668,84 +541,57 @@ npm start              # 生产模式
 SHOW_TEST_COMPONENTS=true npm start  # 调试模式
 ```
 
-**Character (Web 应用)**:
+**Character（Web 应用）**:
 ```bash
 cd character
 npm install
 npm run dev           # http://192.168.31.28:5174/
-SHOW_TEST_COMPONENTS=true npm run dev  # 调试模式
 ```
 
-### 调试模式
-
-两个项目都支持通过环境变量启用调试:
-
+### TypeScript 全量检查
 ```bash
-# EmoMate - 显示 Hiyori WebView 状态面板
-SHOW_TEST_COMPONENTS=true npm start
-
-# Character - 显示 Live2D 加载时间和桥接状态
-SHOW_TEST_COMPONENTS=true npm run dev
+cd EmoMate
+npx tsc --noEmit
+# 期望: 0 errors
 ```
 
 ### 常见开发任务
 
-**1. 添加新情绪类型**:
-```typescript
-// src/types/emotion.ts
-export type EmotionType = 'happy' | 'sad' | 'neutral' | 'angry' | 'surprised' | 'NEW_EMOTION';
-
-// src/utils/emotionAnalysis.ts
-EMOTION_KEYWORDS['new_emotion'] = ['关键词1', '关键词2', ...];
+**添加新能力模块**:
+```
+1. 在 src/capabilities/<capability>/ 创建目录
+2. 实现功能文件
+3. 创建 index.ts barrel export
+4. 在 src/capabilities/index.ts 中 re-export
 ```
 
-**2. 添加新的 Hiyori 动作**:
-```typescript
-// src/constants/personality.ts
-export const HIYORI_MOTIONS = [..., 'NewMotion'] as const;
-
-// Character project: ensure model file has the motion
+**添加新 Zustand store**:
+```
+1. 创建 src/store/<name>Store.ts
+2. 在 src/store/index.ts 添加 export
 ```
 
-**3. 修改人格设定**:
-```typescript
-// src/constants/personality.ts
-AI_PERSONALITY.character.name = 'NewName';
-AI_PERSONALITY.behavior.should.push('New behavior rule');
+**添加新 Hiyori 动作**:
+```
+1. character/ 项目确保模型文件有对应动作
+2. src/store/useAIStatus.ts 更新 HiyoriMotion 类型
+3. src/capabilities/motion/motionMapper.ts 添加映射规则
 ```
 
 ---
 
-## 总结
+## 项目健康度（2026-02-19）
 
-### 项目健康度
-
-| 指标 | 评分 | 备注 |
-|-----|------|------|
-| 功能完整性 | 85% | 核心功能完成, 某些高级特性待优化 |
-| 代码质量 | 80% | TypeScript 类型安全, 需要测试框架 |
-| 文档完善度 | 90% | 文档详实, 但缺少 API 文档 |
-| 性能表现 | 75% | 满足基本需求, 有优化空间 |
-| 生产就绪度 | 85% | 可生产部署, 建议补充监控 |
-
-### 关键成就
-
-✅ **完整的 AI 伴侣系统**: Claude API + 兰兰人格 + 智能对话
-✅ **多模式情绪感知**: 面部检测 + 文本分析 + 组合判断
-✅ **Live2D 集成**: 11 种动作 + WebView Bridge + 心跳系统
-✅ **专业的语音系统**: ElevenLabs TTS + 情感参数 + Expo 后备
-✅ **生产级代码**: TypeScript + 类型安全 + 错误处理
-✅ **详实的文档**: 7 份技术文档 + 完整的 CLAUDE.md
-
-### 下一步建议
-
-1. **短期**: 添加测试框架, 完善错误处理
-2. **中期**: 性能优化, 支持更多情绪类型
-3. **长期**: 云同步, 用户分析, A/B 测试
+| 指标 | 评分 | 说明 |
+|------|------|------|
+| 功能完整性 | 92% | 核心功能全部完成，口型同步等高级特性待做 |
+| 代码质量 | 85% | TypeScript strict + capabilities 架构，需补测试 |
+| 文档完善度 | 88% | 29 份文档，缺少 API 规范和架构图 |
+| 性能表现 | 80% | TTS 并行合成 + 音频缓存，有进一步优化空间 |
+| 生产就绪度 | 90% | 核心链路稳定可靠，建议补充监控后上线 |
 
 ---
 
-**报告完成于**: 2025-01-21
-**维护者**: EmoMate Team
-**项目状态**: 🚀 生产就绪
-
+**报告完成于**: 2026-02-19
+**代码库**: `refactor` 分支
+**项目状态**: 🚀 生产就绪（92%）
