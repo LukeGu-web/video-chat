@@ -1,275 +1,85 @@
-# Hiyori Live2D Integration for EmoMate
+# Hiyori Live2D 集成
 
-This document explains how to integrate and use the Hiyori Live2D character in the EmoMate React Native application.
+**状态**: ✅ 生产就绪
+**最后更新**: 2026-02-19
 
-## Components Overview
+---
 
-### 1. HiyoriWebView
-The main component that embeds the Hiyori Live2D model via WebView.
+## 概述
 
-**Location:** `src/components/HiyoriWebView.tsx`
+Hiyori 是 EmoMate 的 Live2D 虚拟角色，通过 WebView 嵌入显示。React Native（EmoMate）与 Web 应用（character/）之间通过 JavaScript Bridge 双向通信，实现动作控制和状态同步。
 
-**Features:**
-- Loads Hiyori from local development server (http://localhost:5173/)
-- JavaScript Bridge communication
-- Model ready status tracking
-- Motion control interface
-- Error handling and loading states
+---
 
-### 2. HiyoriScreen
-A complete screen showcasing Hiyori with full control panel.
+## 架构
 
-**Location:** `src/screens/HiyoriScreen.tsx`
-
-**Features:**
-- Full-screen Hiyori display
-- Motion control buttons
-- Status indicators
-- Random motion player
-
-### 3. HiyoriIntegrationExample
-An example showing how to integrate Hiyori with other app features.
-
-**Location:** `src/components/HiyoriIntegrationExample.tsx`
-
-**Features:**
-- Emotion-based auto reactions
-- Speaking state integration
-- Simple API for other components
-
-## Setup Instructions
-
-### 1. Install Dependencies
-
-Make sure you have `react-native-webview` installed:
-
-```bash
-npm install react-native-webview
-# or
-yarn add react-native-webview
+```
+EmoMate（React Native）
+  └─ HiyoriWebView（WebView 封装）
+       └─ character 项目（Remix + PIXI.js + Live2D）
+            └─ HiyoriBridge（JavaScript Bridge）
 ```
 
-For iOS, also run:
-```bash
-cd ios && pod install
-```
+Character 服务器在本地开发时运行于 `http://<network-ip>:5174/`，EmoMate 的 WebView 通过网络 IP 连接（需在同一局域网）。
 
-### 2. Start Local Development Server
+---
 
-Make sure your Hiyori web application is running on port 5173:
+## 11 种动作
 
-```bash
-cd /path/to/video-chat/character
-npm run dev
-```
+| 动作 | 场景 | 类型 |
+|------|------|------|
+| Idle | 默认待机 | 持续 |
+| Happy | 开心情绪 | 持续 |
+| Shy | 害羞状态 | 持续 |
+| Sleepy | 疲惫/悲伤 | 持续 |
+| Speaking | AI 说话中 | 持续（循环）|
+| Thinking | AI 思考中 | 临时（循环）|
+| Wave | 问候/告别 | 临时（3 秒）|
+| Dance | 庆祝/欢乐 | 临时（5 秒）|
+| Laugh | 笑声/幽默 | 临时（3 秒）|
+| Excited | 兴奋/激动 | 临时（3 秒）|
+| Surprised | 惊讶反应 | 临时（2 秒）|
 
-The server should be accessible at `http://localhost:5173/`
+临时动作播放完成后自动返回 Idle；Speaking/Thinking 则循环播放直到状态切换。
 
-### 3. Import and Use Components
+---
 
-```tsx
-import { HiyoriWebView, HiyoriScreen } from '../src/components';
-import { HiyoriScreen } from '../src/screens';
-```
+## Bridge 通信协议
 
-## Usage Examples
+所有消息使用 JSON 格式：
 
-### Basic Usage
+| 消息类型 | 方向 | 用途 |
+|---------|------|------|
+| `domReady` | character → EmoMate | DOM 初始化完成 |
+| `modelReady` | character → EmoMate | Live2D 加载就绪 |
+| `motionResult` | character → EmoMate | 动作执行结果 |
+| `heartbeat` | character → EmoMate | 连接保活（5 秒间隔）|
+| `initError` | character → EmoMate | 初始化错误 |
+| `playMotion` | EmoMate → character | 触发动作命令 |
 
-```tsx
-import React, { useRef } from 'react';
-import { View } from 'react-native';
-import HiyoriWebView from '../components/HiyoriWebView';
+---
 
-const MyScreen = () => {
-  const hiyoriRef = useRef(null);
+## 情绪 → 动作自动映射
 
-  const handleModelReady = () => {
-    console.log('Hiyori is ready!');
-    // Play welcome animation
-    hiyoriRef.current?.hiyoriBridge?.playMotion('Wave');
-  };
+情绪检测结果通过 `motionMapper.ts` 自动转换为 Hiyori 动作。AI 说话时优先显示 Speaking 动作，用户问候时优先显示 Wave。详见 [HIYORI_MOTION_OPTIMIZATION.md](./HIYORI_MOTION_OPTIMIZATION.md)。
 
-  return (
-    <View style={{ flex: 1 }}>
-      <HiyoriWebView
-        ref={hiyoriRef}
-        onModelReady={handleModelReady}
-        onMotionResult={(motion, success, error) => {
-          console.log(`Motion ${motion}: ${success ? 'Success' : error}`);
-        }}
-      />
-    </View>
-  );
-};
-```
+---
 
-### Integration with Chat Features
+## 相关文件
 
-```tsx
-import React, { useRef, useEffect } from 'react';
-import HiyoriWebView from '../components/HiyoriWebView';
+| 文件 | 职责 |
+|------|------|
+| `components/HiyoriWebView.tsx` | WebView 封装，Bridge 通信，初始化状态跟踪 |
+| `components/EmotionAwareCharacter.tsx` | 情绪感知的动作控制组件 |
+| `components/Live2DCharacter.tsx` | 动作选择和循环管理 |
+| `capabilities/motion/motionMapper.ts` | 情绪 + 上下文 → 动作映射逻辑 |
+| `screens/HiyoriScreen.tsx` | Hiyori 测试/展示界面 |
+| `../character/` | Live2D Web 应用（独立项目）|
 
-const ChatWithHiyori = () => {
-  const hiyoriRef = useRef(null);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [currentEmotion, setCurrentEmotion] = useState('neutral');
+---
 
-  // React to speaking state
-  useEffect(() => {
-    if (isSpeaking) {
-      hiyoriRef.current?.hiyoriBridge?.playMotion('Speaking');
-    } else {
-      hiyoriRef.current?.hiyoriBridge?.playMotion('Idle');
-    }
-  }, [isSpeaking]);
+## 开发注意事项
 
-  // React to emotion changes
-  useEffect(() => {
-    const emotionMotions = {
-      happy: 'Happy',
-      sad: 'Sleepy',
-      excited: 'Excited',
-      surprised: 'Surprised',
-    };
-    
-    const motion = emotionMotions[currentEmotion] || 'Idle';
-    hiyoriRef.current?.hiyoriBridge?.playMotion(motion);
-  }, [currentEmotion]);
-
-  return (
-    <HiyoriWebView
-      ref={hiyoriRef}
-      onModelReady={() => {
-        hiyoriRef.current?.hiyoriBridge?.playMotion('Wave');
-      }}
-    />
-  );
-};
-```
-
-### Full Screen Experience
-
-```tsx
-import React from 'react';
-import { HiyoriScreen } from '../screens';
-
-const App = () => {
-  return <HiyoriScreen />;
-};
-```
-
-## Available Motions
-
-- `Idle` - Default peaceful state
-- `Happy` - Cheerful and joyful
-- `Surprised` - Surprised reaction
-- `Shy` - Shy/embarrassed response
-- `Wave` - Friendly greeting wave
-- `Dance` - Dancing motion
-- `Laugh` - Laughing animation
-- `Thinking` - Thoughtful pose
-- `Speaking` - Speaking animation
-- `Excited` - Excited animation
-- `Sleepy` - Sleepy animation
-
-## API Reference
-
-### HiyoriWebView Props
-
-```tsx
-interface HiyoriWebViewProps {
-  style?: any;
-  onModelReady?: () => void;
-  onMotionResult?: (motion: string, success: boolean, error?: string) => void;
-}
-```
-
-### HiyoriBridge Interface
-
-```tsx
-interface HiyoriBridge {
-  playMotion: (motionName: string) => void;
-  getAvailableMotions: () => void;
-  checkModelStatus: () => void;
-}
-```
-
-### Accessing the Bridge
-
-```tsx
-// Through ref
-hiyoriRef.current?.hiyoriBridge?.playMotion('Happy');
-
-// Check if model is ready
-const isReady = hiyoriRef.current?.hiyoriBridge?.checkModelStatus();
-```
-
-## Navigation Integration
-
-To add HiyoriScreen to your navigation:
-
-```tsx
-// In your navigation stack
-import { HiyoriScreen } from '../screens';
-
-const Stack = createStackNavigator();
-
-function AppNavigator() {
-  return (
-    <Stack.Navigator>
-      <Stack.Screen name="Home" component={HomeScreen} />
-      <Stack.Screen 
-        name="Hiyori" 
-        component={HiyoriScreen}
-        options={{ title: 'Hiyori Live2D' }}
-      />
-    </Stack.Navigator>
-  );
-}
-```
-
-## Troubleshooting
-
-### Common Issues
-
-1. **WebView not loading:**
-   - Make sure the development server is running on port 5173
-   - Check network permissions in your app
-   - Verify the URL is accessible from your device/emulator
-
-2. **Model not responding:**
-   - Wait for the `onModelReady` callback before sending commands
-   - Check console logs for JavaScript errors
-   - Ensure the Hiyori web app is working in browser first
-
-3. **Bridge not available:**
-   - The bridge is initialized after the model loads
-   - Always check `isModelReady` before calling bridge methods
-
-### Debug Mode
-
-In development builds, you can enable debug information:
-
-```tsx
-<HiyoriWebView
-  // ... other props
-  onMessage={(event) => {
-    console.log('WebView message:', event.nativeEvent.data);
-  }}
-/>
-```
-
-## Performance Notes
-
-- The WebView loads a full Live2D application, so initial loading may take a few seconds
-- Consider showing loading indicators while the model initializes
-- For production, consider hosting the Hiyori web app on a CDN instead of localhost
-
-## Next Steps
-
-1. Integrate with your existing chat features
-2. Add emotion detection from text/voice
-3. Create custom motion sequences
-4. Add parameter controls (eye movement, expressions)
-5. Implement background scenes or environments
+- Character 服务器必须以 `0.0.0.0` 绑定（已在 `vite.config.ts` 配置）才能从手机访问
+- WebView 中 JavaScript 注入需等待 `modelReady` 消息后才能执行
+- 调试时设置环境变量 `SHOW_TEST_COMPONENTS=true` 可显示连接状态和动作历史

@@ -1,114 +1,92 @@
-# 架构设计
+# TTS 语音合成系统
 
-### 🏗️ 目录结构
+**状态**: ✅ 生产就绪
+**架构版本**: v2.0（TTSQueue + 并行合成）
 
-```
-src/
-├── types/                          # 项目级类型定义
-│   └── speak/                     # TTS 类型定义层 - 所有 TTS TypeScript 类型集中管理
-│       ├── index.ts               # 统一类型导出 (~20 行)
-│       ├── common.ts              # 通用类型定义 (~100 行)
-│       ├── provider.ts            # Provider 接口定义 (~50 行)
-│       ├── cache.ts               # 缓存接口定义 (~40 行)
-│       └── queue.ts               # 队列接口定义 (~50 行)
-│
-└── capabilities/
-    └── speak/
-        ├── core/                   # 核心层 - 纯函数，无副作用
-        │   ├── constants.ts       # 常量和配置 (~30 行)
-        │   └── elevenLabsAPI.ts   # ElevenLabs API 封装 (~150 行)
-        │
-        ├── providers/              # Provider 层 - TTS 实现
-        │   ├── ExpoSpeechProvider.ts      # Expo Speech 实现 (~120 行)
-        │   └── ElevenLabsProvider.ts      # ElevenLabs 实现 (~180 行)
-        │
-        ├── cache/                  # 缓存层
-        │   └── AudioCache.ts      # 音频缓存实现 (~180 行)
-        │
-        ├── queue/                  # 队列层
-        │   └── TTSQueue.ts        # 队列管理实现 (~300 行)
-        │
-        ├── hooks/                  # Hook 层 - React 集成
-        │   ├── useTTS.ts          # 统一 TTS Hook (~150 行)
-        │   └── useTTSQueue.ts     # 队列 Hook (~100 行)
-        │
-        └── index.ts                # 公共 API 导出 (~30 行)
-```
+---
 
-### 🔄 依赖关系图
+## 概述
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                         应用层                                │
-│                    (useChatAI.ts, etc.)                     │
-└─────────────────────────────────────────────────────────────┘
-                            ▲
-                            │
-┌─────────────────────────────────────────────────────────────┐
-│                      Hooks 层 (React)                        │
-│              useTTS()  /  useTTSQueue()                     │
-└─────────────────────────────────────────────────────────────┘
-                            ▲
-                            │
-┌─────────────────────────────────────────────────────────────┐
-│                       队列层 (Queue)                         │
-│                      TTSQueue Class                         │
-└─────────────────────────────────────────────────────────────┘
-                            ▲
-                            │
-                    ┌───────┴───────┐
-                    │               │
-┌───────────────────▼─┐   ┌────────▼────────────┐
-│   Provider 层       │   │   缓存层 (Cache)     │
-│   ExpoSpeech /      │   │   AudioCache        │
-│   ElevenLabs        │   │                     │
-└───────────────────┬─┘   └─────────────────────┘
-                    │               │
-                    │               │
-                    └───────┬───────┘
-                            │
-┌───────────────────────────▼─────────────────────┐
-│              核心层 (Core)                       │
-│          constants / elevenLabsAPI              │
-│          (纯函数，无副作用)                       │
-└─────────────────────────────────────────────────┘
-                            ▲
-                            │
-┌───────────────────────────▼─────────────────────┐
-│            类型定义层 (Types)                     │
-│          src/types/speak/                        │
-│   common / provider / cache / queue             │
-│   (所有 TypeScript 接口和类型)                    │
-└─────────────────────────────────────────────────┘
-```
+EmoMate 的 TTS 系统实现了**并行合成 + 顺序播放**的流水线：AI 流式输出文本时，系统实时切割句子并立即发起合成，句子合成完成后按顺序依次播放，做到"说话不等待"的体验。
 
-### 🎨 架构特点
+---
 
-#### 1. 分层清晰
+## 核心架构
 
-| 层级 | 职责 | 位置 | 依赖 | 特点 |
-|------|------|------|------|------|
-| **Types** | 所有 TypeScript 类型定义 | `src/types/speak/` | 无 | 类型安全，避免循环依赖，项目级共享 |
-| **Core** | API 调用、常量 | `capabilities/speak/core/` | Types | 纯函数，可独立测试 |
-| **Provider** | TTS 实现逻辑 | `capabilities/speak/providers/` | Types, Core | 可插拔，易扩展 |
-| **Cache** | 音频缓存管理 | `capabilities/speak/cache/` | Types, Core | 独立模块，可选 |
-| **Queue** | 队列和播放控制 | `capabilities/speak/queue/` | Types, Core, Provider, Cache | 核心业务逻辑 |
-| **Hook** | React 集成 | `capabilities/speak/hooks/` | Types, Queue, Provider | UI 状态管理 |
+文件位于 `src/capabilities/speak/`，分为四层：
 
-#### 2. 单向依赖
+**类型层**（`src/types/speak/`）：集中管理所有 TTS 相关的 TypeScript 类型，包含通用类型、Provider 接口、缓存接口、队列接口。
 
-- ✅ 高层依赖低层
-- ✅ Types 层在项目级别，无任何依赖
-- ✅ 避免循环依赖
+**Provider 层**：两个实现：
+- `ElevenLabsProvider` — 主用，高质量网络 TTS
+- `ExpoSpeechProvider` — 后备，设备本地 TTS
 
-#### 3. 项目级类型共享
+**缓存层**（`AudioCache`）：将合成结果缓存为本地音频文件，相同文本无需重复合成。
 
-- ✅ Types 位于 `src/types/speak/`，便于跨模块共享
-- ✅ 其他模块（如 `listen`、`sense` 等）也可以引用
-- ✅ 符合大型项目的最佳实践
+**队列层**（`TTSQueue`）：核心组件，管理并发合成和顺序播放。
 
-#### 4. 接口驱动
+---
 
-- ✅ Provider 基于接口 `TTSProvider`
-- ✅ 易于添加新 Provider (Google TTS, Azure TTS, etc.)
-- ✅ 支持依赖注入和 Mock
+## TTSQueue 工作原理
+
+流程：AI 流式响应 → `sentenceDetector` 实时切句 → `TTSQueue.enqueue()` 入队 → 最多 2 个并发合成任务 → 音频文件就绪后顺序播放。
+
+关键参数：
+- 最多 2 个并发合成（避免触发 ElevenLabs rate limit）
+- 失败自动重试，最多 3 次，间隔 1 秒
+- 支持 `cancel()`（用户打断时立即停止）
+- 支持 `waitForCompletion()`（等待当前语音播放完毕）
+
+---
+
+## ElevenLabs 配置
+
+**语音 ID**：`hkfHEbBvdQFNX4uWHqRF`（专为兰兰优化）
+
+**情绪感知参数**：根据检测到的用户情绪动态调整语音风格：
+
+| 情绪 | stability | similarity_boost | style |
+|------|-----------|-----------------|-------|
+| gentle（默认） | 0.4 | 0.7 | 0.25 |
+| happy | 0.3 | 0.65 | 0.4 |
+| caring | 0.6 | 0.8 | 0.2 |
+| shy | 0.45 | 0.75 | 0.35 |
+
+---
+
+## App 启动预热
+
+`App.tsx` 在启动时执行 TTS 预热：向 ElevenLabs 发送一个极短的测试请求（"嗯"），预建立 HTTPS 连接并验证 API key，避免第一句话出现明显延迟。预热失败不影响 App 正常启动。
+
+同时在启动时调用 `initializeTTSCache()` 确保本地缓存目录存在。
+
+---
+
+## 音频会话配置
+
+启动时通过 `expo-audio` 的 `setAudioModeAsync` 配置：
+- `playsInSilentMode: true` — 静音模式下仍可播放
+- `allowsRecording: false` — 初始关闭录音以确保扬声器输出
+- `shouldPlayInBackground: true` — 后台可继续播放
+- `interruptionMode: 'duckOthers'` — 播放时压低其他音频
+- `shouldRouteThroughEarpiece: false` — Android 使用扬声器而非听筒
+
+---
+
+## SmartSentenceBuffer（已禁用）
+
+`smartSentenceBuffer.ts` 实现了基于内容评分的智能句子过滤（三层防御：System Prompt 排序 → 实时过滤 → 最终验证），但因为会导致句子不完整而已被禁用。目前的内容完整性依靠人格提示词直接指导 AI 排序输出。
+
+---
+
+## 相关文件
+
+| 文件 | 职责 |
+|------|------|
+| `capabilities/speak/queue/TTSQueue.ts` | 队列管理核心 |
+| `capabilities/speak/providers/ElevenLabsProvider.ts` | ElevenLabs 合成 |
+| `capabilities/speak/providers/ExpoSpeechProvider.ts` | 本地 TTS 后备 |
+| `capabilities/speak/cache/AudioCache.ts` | 音频文件缓存 |
+| `capabilities/speak/elevenLabsAPI.ts` | API 封装 |
+| `capabilities/speak/sentenceDetector.ts` | SSE 流切句 |
+| `constants/speak.ts` | 语音相关常量 |

@@ -1,101 +1,68 @@
 # EmoMate 文档索引
 
-欢迎来到EmoMate项目文档！这里包含了完整的技术文档和使用指南。
-
-## 📚 文档导航
-
-### 🎯 核心功能文档
-- **[情绪检测MVP](./EMOTION_DETECTION_MVP.md)** - 完整的情绪感知功能介绍和使用指南
-  - BasicEmotionDetector组件说明
-  - 智能情绪模拟算法
-  - EmotionProvider状态管理
-  - Live2D角色响应系统
-
-### 🏗️ 技术架构文档  
-- **[情绪检测架构设计](./EMOTION_DETECTION_ARCHITECTURE.md)** - 深度技术实现细节
-  - 多层架构设计
-  - 组件交互模式
-  - 性能优化策略
-  - 扩展性设计
-
-### 🔧 问题解决文档
-- **[故障排除指南](./EMOTION_DETECTION_TROUBLESHOOTING.md)** - 常见问题和解决方案
-  - 依赖冲突问题
-  - 摄像头相关问题
-  - 动画和UI问题
-  - 性能优化建议
-
-### 🎭 集成相关文档
-- **[Hiyori Live2D集成](./HIYORI_INTEGRATION.md)** - Live2D角色系统集成
-  - WebView桥接通信
-  - 动画控制系统
-  - 网络配置指南
-
-### 🤖 AI系统文档
-- **[AI能力集成](./AI_CAPABILITY_INTEGRATION.md)** - AI能力感知与集成系统
-  - 视觉感知能力配置
-  - 情绪检测能力声明
-  - 角色动作表达能力
-  - System Prompt增强
-
-## 🚀 快速开始
-
-如果你是第一次接触EmoMate项目，建议按以下顺序阅读：
-
-1. **先读MVP文档** → 了解整体功能和使用方式
-2. **再看架构文档** → 理解技术实现和设计思路  
-3. **遇到问题时查看故障排除** → 快速解决常见问题
-4. **需要集成时参考集成文档** → 了解跨组件交互
-
-## 📋 文档规范
-
-### 更新原则
-- **新功能必须有文档** - 每个新组件或功能都需要在相应文档中说明
-- **问题解决必须记录** - 遇到并解决的问题都应该更新到故障排除指南
-- **架构变更必须同步** - 重大架构调整需要更新架构文档
-
-### 格式规范
-- **语言**: 中文为主，技术术语保留英文
-- **代码示例**: 使用TypeScript，包含完整可运行代码
-- **版本标记**: 每个文档都标明版本号和更新时间
-
-## 🔄 版本历史
-
-### v1.0.0 (2025-01-20) - MVP就绪
-- ✅ 完成BasicEmotionDetector智能情绪检测
-- ✅ 建立EmotionProvider状态管理系统
-- ✅ 实现Live2D角色情绪响应
-- ✅ 移除依赖冲突，达到生产就绪状态
-- ✅ 建立完整文档体系
-
-## 📞 技术支持
-
-### 快速查找
-- **组件API**: 查看MVP文档的API接口部分
-- **架构问题**: 参考架构文档的设计模式
-- **错误解决**: 搜索故障排除指南的错误代码
-- **集成问题**: 查看Live2D集成文档
-
-### 文档反馈
-如果发现文档有误或需要补充，请：
-1. 检查是否有更新版本
-2. 查看相关的故障排除指南
-3. 参考架构文档了解设计原理
+**最后更新**: 2026-02-19
 
 ---
 
-## 📁 文件结构
-```
-docs/
-├── README.md                           # 本文档索引 (你在这里)
-├── EMOTION_DETECTION_MVP.md           # 情绪检测MVP功能文档
-├── EMOTION_DETECTION_ARCHITECTURE.md  # 技术架构设计文档
-├── EMOTION_DETECTION_TROUBLESHOOTING.md # 故障排除指南
-└── HIYORI_INTEGRATION.md              # Hiyori Live2D集成文档
-```
+## AI 系统
+
+| 文档 | 内容 |
+|------|------|
+| [AI_CAPABILITY_INTEGRATION.md](./AI_CAPABILITY_INTEGRATION.md) | AI 能力声明与系统提示注入（10 项能力）|
+| [AI_DIALOGUE_OPTIMIZATION.md](./AI_DIALOGUE_OPTIMIZATION.md) | 句子完整性、语气词过滤、情绪分析优化 |
+| [PROMPT_CACHING_IMPLEMENTATION_SUMMARY.md](./PROMPT_CACHING_IMPLEMENTATION_SUMMARY.md) | Prompt Caching（节省 75% 成本，降低 73% 延迟）|
 
 ---
 
-*文档索引最后更新: 2025-01-20*  
-*EmoMate版本: MVP 1.0.0*  
-*状态: 生产就绪* ✅
+## 记忆系统
+
+| 文档 | 内容 |
+|------|------|
+| [MEMORY_SYSTEM_DESIGN.md](./MEMORY_SYSTEM_DESIGN.md) | 四层记忆架构（UserProfile / Preferences / Episodes / Facts）|
+| [RAG_SYSTEM_DESIGN.md](./RAG_SYSTEM_DESIGN.md) | 检索增强生成（历史对话检索注入上下文）|
+
+---
+
+## 情绪与视觉
+
+| 文档 | 内容 |
+|------|------|
+| [EMOTION_DETECTION_ARCHITECTURE.md](./EMOTION_DETECTION_ARCHITECTURE.md) | 双通道情绪检测（MLKit 面部 + 文本分析）|
+| [FACE_DETECTION_COMPLETE_GUIDE.md](./FACE_DETECTION_COMPLETE_GUIDE.md) | 面部检测实现指南（Development Build 要求、关键决策、常见问题）|
+| [VISUAL_CAPABILITY.md](./VISUAL_CAPABILITY.md) | 场景理解系统（Claude Vision API，三种触发机制）|
+
+---
+
+## 语音合成（TTS）
+
+| 文档 | 内容 |
+|------|------|
+| [TTS_FEATURES.md](./TTS_FEATURES.md) | TTSQueue 并行合成 + 顺序播放架构，ElevenLabs 情绪参数 |
+
+---
+
+## Live2D 角色
+
+| 文档 | 内容 |
+|------|------|
+| [HIYORI_INTEGRATION.md](./HIYORI_INTEGRATION.md) | Hiyori WebView 集成，Bridge 协议，11 种动作 |
+| [HIYORI_MOTION_OPTIMIZATION.md](./HIYORI_MOTION_OPTIMIZATION.md) | 上下文感知动作选择，优先级系统，情绪组合映射 |
+| [MOTION_LOOP_FEATURE.md](./MOTION_LOOP_FEATURE.md) | Speaking/Thinking 动作循环播放实现 |
+
+---
+
+## 其他功能
+
+| 文档 | 内容 |
+|------|------|
+| [BILINGUAL_SUPPORT.md](./BILINGUAL_SUPPORT.md) | 中英文自动检测与切换 |
+| [BACKGROUND_SCENES_GUIDE.md](./BACKGROUND_SCENES_GUIDE.md) | 背景场景配置系统（时间/天气/优先级）|
+| [SMART_CONTENT_PRIORITIZATION_SUMMARY.md](./SMART_CONTENT_PRIORITIZATION_SUMMARY.md) | SmartSentenceBuffer（已禁用，仅存档）|
+
+---
+
+## 快速导航
+
+- 了解项目整体状态 → 查阅根目录 `PROJECT_EXPLORATION_REPORT.md`
+- 了解各系统集成方式 → 查阅根目录 `CLAUDE.md`
+- 了解特定功能实现 → 查阅本目录对应文档

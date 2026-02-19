@@ -1,299 +1,148 @@
-# Memory System Design
+# 四层记忆系统
 
-**Date**: 2026-02-19
-**Status**: Design approved, pending implementation
-**Goal**: Make conversations feel natural and continuous — like talking to a real friend
+**完成日期**: 2026-02-19
+**状态**: ✅ 已完整实现（Tasks 1-7 全部完成）
+**目标**: 让对话有连续感——LanLan 能记住用户，跨 session 自然延续
 
 ---
 
-## Background
+## 背景与设计动机
 
-The core problem is not just "the AI doesn't remember you." It's that **there is no sense of shared life between the user and LanLan**. Real friendships feel natural because:
+核心问题不只是"AI 不记得你"，而是**用户与 LanLan 之间没有共同生活感**。真正的友谊之所以自然，是因为对方记得你说过的话、会主动提起往事、有持续跟进的话题线。
 
-- Your friend remembers what you said last time
-- Your friend proactively brings up things from before
-- You have ongoing "threads" — things you follow together over time
-- There is no need to "find a topic" — shared history creates natural hooks
+识别出的五个痛点：
 
-The five pain points identified:
-
-| # | Pain Point | Root Cause |
+| # | 痛点 | 根因 |
 | --- | --- | --- |
-| 1 | Every new conversation starts from zero | No memory persistence |
-| 2 | Replies feel formulaic or overly sweet | Personality prompt not grounded in user context |
-| 3 | LanLan never mentions past conversations | No memory injection |
-| 4 | Response rhythm feels unnatural | (Separate concern) |
-| 5 | User doesn't know what to talk about | No conversation seeds from shared history |
+| 1 | 每次对话从零开始 | 没有跨 session 持久化 |
+| 2 | 回复感觉公式化 | 人格提示词没有用户上下文锚定 |
+| 3 | 从不主动提起过去 | 没有记忆注入 |
+| 4 | 用户不知道聊什么 | 没有基于共同历史的话题种子 |
+| 5 | 对话节奏不自然 | （由人格提示词调优单独处理） |
 
 ---
 
-## Architecture Overview
+## 四层架构
 
-```text
-[Conversation in progress]
-User message → Claude reply
-                  ↓ Every 20 messages / 5-minute silence
-             Extraction pipeline (Haiku) → Write to MMKV + SQLite
+### Layer 1 — 用户档案（UserProfile）
 
-[App goes to background]
-Mark pendingExtraction → Process on next launch
+- **存储**：MMKV（JSON）
+- **更新频率**：极低（姓名、职业、标签等基本不变）
+- **注入**：每次对话都注入
 
-[Conversation starts]
-Read 4-layer memory → Assemble system prompt memory block
-                    → Generate topic seeds
-                    → LanLan naturally references last session
-```
+包含：姓名、职业、标签（如"学生/夜猫子/内向"）、典型活跃时段、语言偏好。
 
----
+### Layer 2 — 用户偏好（UserPreferences）
 
-## Four-Layer Memory Architecture
+- **存储**：MMKV（JSON）
+- **更新频率**：较慢（从行为中逐步校准）
+- **注入**：每次对话都注入
 
-### Layer 1 — User Profile
+包含：是否想要建议（`wantsAdvice`）、是否喜欢幽默、回复长度偏好、敏感话题、正式程度。
 
-**Storage**: MMKV (JSON)
-**Update frequency**: Very slow (almost never changes)
-**Always injected**: Yes
+### Layer 3 — 对话摘要（episodes）
 
-```typescript
-interface UserProfile {
-  name?: string;
-  occupation?: string;
-  tags: string[];             // e.g. ['学生', '夜猫子', '内向']
-  typicalActiveHour?: number; // e.g. 22 = 10pm
-  preferredLanguage: 'zh' | 'en';
-}
-```
+- **存储**：SQLite（`episodes` 表）
+- **更新频率**：每次提取触发后写入
+- **注入**：最近 5 条
 
-### Layer 2 — User Preferences
+每条记录包含：时间戳、摘要（≤100 字）、话题列表、用户情绪、关键事件、用户最后一句话（用于 session 连续性）。
 
-**Storage**: MMKV (JSON)
-**Update frequency**: Slow (gradually calibrated from behavior)
-**Always injected**: Yes
+`last_words` 字段让 LanLan 能在下次对话中自然接上话茬。
 
-```typescript
-interface UserPreferences {
-  wantsAdvice: boolean;      // false = just wants to be heard
-  prefersHumor: boolean;
-  replyLength: 'short' | 'medium' | 'long';
-  sensitiveTopics: string[]; // topics to avoid
-  formalityLevel: 'casual' | 'formal';
-}
-```
+### Layer 4 — 知识事实（facts）
 
-### Layer 3 — Episode Summaries
+- **存储**：SQLite（`facts` 表）
+- **更新频率**：实时提取（对话中提到即写入）
+- **注入**：高重要度事实（最多 20 条）
 
-**Storage**: SQLite
-**Update frequency**: After each extraction trigger
-**Injected**: Most recent 5 episodes
+每条记录包含：创建/更新时间、分类（person/preference/goal/event/opinion）、实体、内容、标签、重要度（high/normal）、过期时间。
 
-```sql
-CREATE TABLE episodes (
-  id           INTEGER PRIMARY KEY,
-  timestamp    INTEGER NOT NULL,
-  summary      TEXT NOT NULL,    -- max 100 characters
-  topics       TEXT,             -- JSON array: ['考试', '压力']
-  user_emotion TEXT,             -- 'happy' | 'sad' | 'anxious' | 'neutral'
-  key_events   TEXT,             -- JSON array: ['said she wants to travel', 'mentioned mom']
-  last_words   TEXT              -- verbatim last message for session continuity
-);
-```
-
-### Layer 4 — Knowledge Facts
-
-**Storage**: SQLite
-**Update frequency**: Real-time (extracted as mentioned)
-**Injected**: High-importance facts (max 20)
-
-```sql
-CREATE TABLE facts (
-  id          INTEGER PRIMARY KEY,
-  created_at  INTEGER NOT NULL,
-  updated_at  INTEGER,
-  category    TEXT NOT NULL,          -- 'person'|'preference'|'goal'|'event'|'opinion'
-  entity      TEXT,                   -- '猫', '考试', '电影'
-  content     TEXT NOT NULL,          -- '有只橘猫叫小白'
-  tags        TEXT,                   -- JSON array for search
-  importance  TEXT DEFAULT 'normal',  -- 'high' | 'normal'
-  expires_at  INTEGER                 -- NULL = permanent; or Unix timestamp
-);
-```
-
-`expires_at` handles time-sensitive facts. For example, "has an exam next week" naturally expires after the exam date — it won't become permanent noise.
+`expires_at` 处理时效性事实——"下周考试"在考试日后自然失效，不会变成永久噪声。
 
 ---
 
-## Extraction Pipeline
+## 提取管道
 
-### Trigger Strategy
+### 触发策略
 
-| Trigger | When | Purpose |
+| 触发器 | 时机 | 作用 |
 | --- | --- | --- |
-| Every 20 messages | During active use | Rolling extraction, prevents message buildup |
-| 5-minute silence | During long pauses | Natural break point |
-| App goes to background | User closes/switches app | Universal fallback, catches short sessions |
-| App launches (startup check) | Next open after backgrounding | Safety net for failed extractions |
+| 每 20 条消息 | 活跃使用中 | 滚动提取，防止消息积压 |
+| 5 分钟沉默 | 长时间停顿 | 自然断点 |
+| App 进入后台 | 用户关闭/切换 App | 写入 pending flag 到 MMKV |
+| App 启动时检查 | 后台后的下次启动 | 处理上次未完成的 pending extraction |
 
-### Background Trigger Implementation
+### 后台触发逻辑
 
-When the app goes to background, there are only ~30 seconds of execution time (iOS). Heavy operations will be killed. Solution:
+iOS App 进入后台时只有约 30 秒执行时间，异步 API 调用会被系统杀死。解决方案：后台时**只写 MMKV**（毫秒级），下次启动时再处理。
 
-```text
-App goes to background (AppState: active → background)
-    ↓
-Immediately write to MMKV (milliseconds):
-  { pendingExtraction: true, unprocessedMessages: [...] }
-    ↓
-App suspends
+### 提取模型
 
-App launches next time
-    ↓
-Check for pendingExtraction flag
-    ↓ found
-Run extraction silently in background before loading UI
-Clear flag on completion
-```
+使用 **Claude Haiku**（快速且廉价）。一次调用同时提取四层数据：更新 profile/preferences、生成 episode 摘要、提取 facts。
 
-### Extraction Prompt
-
-One Claude (Haiku) call extracts all four layers simultaneously:
-
-```json
-// Prompt instructs Claude to return this structure:
-{
-  "profile": {
-    "name": "...",
-    "occupation": "...",
-    "tags": ["..."]
-  },
-  "preferences": {
-    "wantsAdvice": true,
-    "replyLength": "short"
-  },
-  "episode": {
-    "summary": "summary in under 100 characters",
-    "topics": ["exam", "stress"],
-    "user_emotion": "anxious",
-    "key_events": ["said exam is next week", "mentioned poor sleep"],
-    "last_words": "verbatim last message from user"
-  },
-  "facts": [
-    {
-      "category": "goal",
-      "entity": "exam",
-      "content": "has final exam next week, feeling a lot of pressure",
-      "tags": ["school", "exam"],
-      "importance": "high",
-      "expires_at": "2026-03-01"
-    }
-  ]
-}
-```
-
-- `profile` — only fill if new information found, otherwise `null`
-- `preferences` — only fill if a clear preference signal was detected
-- `episode` — always fill
-- `facts` — list any recordable facts mentioned; empty array if none
-
-**Use Haiku, not Sonnet** — structured extraction does not require the most capable model. Faster and cheaper.
+提取结果的处理规则：
+- `profile`：仅当发现**新信息**时更新
+- `preferences`：仅当检测到**明确信号**时更新
+- `episode`：**每次必填**
+- `facts`：列出本段对话中提到的可记录事实，无则留空
 
 ---
 
-## Injection Pipeline
+## 注入管道
 
-### Token Budget
+### Token 预算
 
-```text
-User profile + preferences    ~100 tokens   (always injected)
-Last 5 episode summaries      ~400 tokens   (always injected)
-High-importance facts         ~200 tokens   (always injected)
-─────────────────────────────────────────────────────────────
-Total                         ~700 tokens   (acceptable overhead)
-```
-
-### Memory Block Structure (injected into system prompt)
-
-```text
-# About this user
-Name: Xiaoming, university student, usually chats late at night
-
-# User preferences
-- Does not like being given direct advice, prefers to be heard
-- Prefers short replies, occasional humor
-
-# Recent memory
-[3 days ago] Talked about exam stress, anxious, said "no matter how much I study it feels like not enough"
-[yesterday] Mood improved, talked about favorite game, mentioned wanting a new GPU
-[earlier today] Said headache, probably didn't sleep well
-
-# Important facts
-- Has an orange cat named Xiaobai [pet]
-- Final exam next week [goal / high priority]
-- Does not like horror movies [preference]
-```
-
-### Conversation Continuity Instruction
-
-Added to system prompt to address the "starts from zero" and "nothing to talk about" pain points:
-
-```text
-# Opening behavior
-If the user sends a simple greeting or short message,
-naturally bring up one thing you remember — for example:
-- "You mentioned your exam was coming up — how did it go?"
-- "How is Xiaobai doing?"
-- "You had a headache earlier, feeling better now?"
-
-Do not do this every time — only when it feels natural.
-Never list multiple things at once. One reference per opening.
-```
-
-### Topic Seeds
-
-Generated at conversation start from memory. Used when the user says they "don't know what to talk about":
-
-```typescript
-interface TopicSeed {
-  topic: string; // e.g. "exam results"
-  hook: string;  // e.g. "你说下周要考试，结果怎么样了？"
-  source: 'event' | 'fact' | 'episode';
-}
-
-// Generation logic:
-// 1. Upcoming/recently expired facts (exam tomorrow, trip next week)
-// 2. Unresolved threads from recent episodes (mentioned wanting to buy something)
-// 3. Emotional follow-ups (was anxious 3 days ago — check in)
-```
-
-LanLan does not recite these seeds directly. They inform her proactive behavior — she brings them up naturally when the conversation has a lull.
-
----
-
-## Solving the Five Pain Points
-
-| Pain Point | Solution |
+| 内容 | Token 估算 |
 | --- | --- |
-| Every conversation starts from zero | Profile + recent episodes always injected |
-| Replies feel formulaic | Preferences layer adjusts personality prompt to match user style |
-| Never mentions past | Conversation continuity instruction + `last_words` field |
-| Doesn't know what to talk about | Topic seeds generated from memory |
-| Response rhythm | (Handled separately by personality prompt tuning) |
+| 用户档案 + 偏好 | ~100 tokens |
+| 最近 5 条 episode 摘要 | ~400 tokens |
+| 高重要度 facts（最多 20 条） | ~200 tokens |
+| **合计** | **~700 tokens** |
+
+### 内存块结构
+
+注入到系统提示的内存块分四节：
+
+1. **About this user** — 姓名、标签、典型活跃时间
+2. **User preferences** — 是否想要建议、偏好风格等
+3. **Recent memory** — 最近 5 条 episode（格式："[3天前] 摘要内容"）
+4. **Important facts** — 高重要度事实列表
+
+### 对话连续性指令
+
+人格提示词末尾追加：用户发简单打招呼时，LanLan 自然提起一件她记得的事（最近的担忧、即将到来的事件、之前提到的细节）。每次只提一件，不堆砌。
+
+### 话题种子（Topic Seeds）
+
+`useTopicSeeds` 在每次 session 开始时从记忆中生成 2-3 个话题钩子，供主动对话系统在沉默时使用：
+
+- 3 天内即将过期的高重要度 facts（如"明天考试"）
+- 1 天前情绪低落的 episode（跟进关怀）
+- 最新 episode 的 keyEvents（后续跟进）
+
+话题种子不直接发送给用户，而是供 LanLan 在对话有停顿时自然引出。
 
 ---
 
-## Integration with Existing Architecture
+## 实现文件
 
-- **Extraction triggers**: Extend `useAppStateSceneTimer.ts` for background detection; reuse silence detection from proactive conversation system
-- **MMKV**: Already used by `chatStore.ts` and `userStore.ts` — add profile and preferences keys
-- **SQLite**: Add via `expo-sqlite` — new dependency
-- **Extraction call**: New `useMemoryExtraction.ts` hook
-- **Injection**: Extend `buildAIContext.ts` with memory block assembly
-- **Prompt caching**: The memory block (profile + preferences) is stable enough to be cached with `cache_control: ephemeral`
+| 文件 | 职责 |
+| --- | --- |
+| `src/types/memory.ts` | 全部类型定义 |
+| `src/store/memoryDatabase.ts` | SQLite 操作（episodes + facts） |
+| `src/store/memoryStore.ts` | MMKV 操作（profile + preferences） |
+| `src/hooks/useMemoryExtraction.ts` | Claude Haiku 提取 + 写入逻辑 |
+| `src/hooks/useMemoryTriggers.ts` | 四种触发器管理 |
+| `src/hooks/ai/buildMemoryContext.ts` | 组装内存块字符串 |
+| `src/hooks/ai/useTopicSeeds.ts` | 话题种子生成 |
+| `App.tsx` | mount 时调用 `loadFromStorage()` hydrate MMKV |
 
 ---
 
-## What This Does Not Cover
+## 已知限制
 
-- **Multi-language memory**: Memory extracted and stored in the language used. Cross-language retrieval not addressed.
-- **Memory editing UI**: No user-facing interface to view or correct memories. Future consideration.
-- **Memory conflicts**: If user gives contradictory information (e.g., changes job), latest fact overwrites. No conflict resolution logic.
-- **Privacy**: All data is local. No encryption at rest in this design.
+- **多语言记忆**：记忆以对话语言存储，不做跨语言检索
+- **无记忆编辑 UI**：用户暂时无法查看或修正 LanLan 记住的内容
+- **记忆冲突**：用户给出矛盾信息时（如换了工作），最新事实覆盖旧的，无冲突解决逻辑
+- **隐私**：所有数据本地存储，暂无静态加密
