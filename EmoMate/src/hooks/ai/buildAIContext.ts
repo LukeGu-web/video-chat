@@ -260,7 +260,8 @@ export function buildCacheableSystemPrompt(
   backgroundStory?: string,
   environmentContext?: string,
   objectRecognitionContext?: string,
-  model: string = 'haiku'
+  model: string = 'haiku',
+  memoryBlock?: string
 ): CacheableSystemBlock[] {
   const systemBlocks: CacheableSystemBlock[] = [];
 
@@ -340,6 +341,14 @@ export function buildCacheableSystemPrompt(
     });
   }
 
+  // Memory context — injected without cache_control since it updates frequently
+  if (memoryBlock) {
+    systemBlocks.push({
+      type: 'text',
+      text: `# Memory\n${memoryBlock}`,
+    });
+  }
+
   debugLog('buildCacheableSystemPrompt', 'Created system blocks', {
     totalBlocks: systemBlocks.length,
     cachedBlocks: systemBlocks.filter((b) => b.cache_control).length,
@@ -388,7 +397,8 @@ export function buildCacheableAPIRequestConfig(
   currentPersonality: string,
   currentScene: SceneData | null,
   enableCache: boolean = process.env.NODE_ENV === 'production',
-  currentLanguage: 'zh' | 'en' = 'zh'
+  currentLanguage: 'zh' | 'en' = 'zh',
+  memoryBlock?: string
 ): CacheableAPIRequestConfig {
   // Get base configuration (without systemMessage)
   const baseConfig = buildAPIRequestConfig(
@@ -423,7 +433,8 @@ export function buildCacheableAPIRequestConfig(
       config.backgroundStory,
       contextPrompt,
       config.objectRecognitionContext,
-      baseConfig.model // Pass model for token requirement check
+      baseConfig.model, // Pass model for token requirement check
+      memoryBlock
     );
     debugLog('buildCacheableAPIRequestConfig', 'Using cacheable system prompt format');
   } else {

@@ -12,6 +12,8 @@ import { TTSQueue } from '../capabilities/speak'; // Phase 2: TTS队列管理 - 
 import { useSceneStore } from '../store/sceneStore'; // Scene context
 import { SceneData } from '../types/scene'; // Scene data type
 import { buildCacheableAPIRequestConfig } from './ai/buildAIContext'; // Unified API config builder with caching support (Step 1.1: Refactoring)
+import { buildMemoryContext } from './ai/buildMemoryContext'; // Memory block injection (Task 5)
+import { useMemoryStore } from '../store/memoryStore'; // Memory store for profile and preferences
 import { useProactiveConversation } from './ai/useProactiveConversation'; // Proactive conversation system (Step 1.2: Refactoring)
 import { detectUserEmotionFromText } from '../utils/emotionDetection'; // Emotion detection (Step 1.3: Refactoring)
 import {
@@ -98,6 +100,10 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
   // Get current scene context from store (Step 5.1)
   const currentScene = useSceneStore((state) => state.currentScene);
 
+  // Get memory profile and preferences for memory block injection (Task 5)
+  const { profile, preferences } = useMemoryStore();
+  const { memoryBlock } = buildMemoryContext(profile, preferences);
+
   // Phase 3: Global TTS queue reference for user interruption
   const currentTTSQueue = useRef<TTSQueue | null>(null);
 
@@ -163,7 +169,8 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       languageAwarePersonality,
       currentScene,
       true, // Enable cache in production (will auto-detect NODE_ENV)
-      currentLanguage
+      currentLanguage,
+      memoryBlock // Task 5: Inject memory block into system prompt
     );
 
     const requestBody = {

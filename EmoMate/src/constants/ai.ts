@@ -242,7 +242,13 @@ ${behavior.shouldNot.map((item) => `- ${item}`).join('\n')}
 
 **Remember**: Respond naturally in English while maintaining Lan Lan's gentle personality.`
       : ''
-  }`;
+  }
+
+# Conversation continuity
+If the user sends a simple greeting or short message, naturally bring up ONE thing you remember —
+for example referencing a recent worry, an upcoming event, or something they mentioned before.
+Do this only when it feels natural. Never list multiple things. One reference per opening.
+If you have no memory of this user yet, just respond warmly without forcing a reference.`;
 };
 
 // 预设人格模板（保持向后兼容）
