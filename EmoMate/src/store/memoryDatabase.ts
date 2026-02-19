@@ -104,10 +104,12 @@ export function insertFact(fact: Omit<Fact, 'id' | 'updatedAt'>): void {
   );
 }
 
-export function getActiveFacts(importanceFilter?: FactImportance): Fact[] {
+export function getActiveFacts(importanceFilter?: FactImportance, limit?: number): Fact[] {
   const database = getDatabase();
   const now = Date.now();
 
+  // Push LIMIT to SQL to avoid loading all rows into JS when only a subset is needed.
+  const limitClause = limit ? ` LIMIT ${limit}` : '';
   const rows = database.getAllSync<{
     id: number;
     created_at: number;
@@ -119,9 +121,10 @@ export function getActiveFacts(importanceFilter?: FactImportance): Fact[] {
     importance: string;
     expires_at: number | null;
   }>(
-    importanceFilter
-      ? `SELECT * FROM facts WHERE (expires_at IS NULL OR expires_at > ?) AND importance = ? ORDER BY importance DESC, created_at DESC`
-      : `SELECT * FROM facts WHERE (expires_at IS NULL OR expires_at > ?) ORDER BY importance DESC, created_at DESC`,
+    `SELECT * FROM facts
+     WHERE (expires_at IS NULL OR expires_at > ?)
+     ${importanceFilter ? 'AND importance = ?' : ''}
+     ORDER BY importance DESC, created_at DESC${limitClause}`,
     importanceFilter ? [now, importanceFilter] : [now]
   );
 

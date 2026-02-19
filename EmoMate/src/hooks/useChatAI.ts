@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import {
   CLAUDE_API_CONFIG,
   AI_ERROR_MESSAGES,
@@ -102,7 +102,12 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
 
   // Get memory profile and preferences for memory block injection (Task 5)
   const { profile, preferences } = useMemoryStore();
-  const { memoryBlock } = buildMemoryContext(profile, preferences);
+  // Memoize DB reads: buildMemoryContext calls getAllSync twice; re-run only when
+  // profile or preferences change to avoid redundant SQLite reads on every render.
+  const { memoryBlock } = useMemo(
+    () => buildMemoryContext(profile, preferences),
+    [profile, preferences]
+  );
 
   // Phase 3: Global TTS queue reference for user interruption
   const currentTTSQueue = useRef<TTSQueue | null>(null);

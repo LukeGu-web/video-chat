@@ -51,8 +51,9 @@ export function buildMemoryContext(
   preferences: UserPreferences
 ): MemoryContext {
   const episodes = getRecentEpisodes(MAX_EPISODES);
-  const allFacts = getActiveFacts();
-  const factsToShow = allFacts.slice(0, MAX_FACTS);
+  // Pass MAX_FACTS as a SQL LIMIT so the database returns only what is needed,
+  // avoiding a full table scan followed by a JS-side slice.
+  const factsToShow = getActiveFacts(undefined, MAX_FACTS);
 
   const hasMemory = episodes.length > 0 || factsToShow.length > 0;
   const lastWords = episodes.length > 0 ? episodes[0].lastWords || null : null;
