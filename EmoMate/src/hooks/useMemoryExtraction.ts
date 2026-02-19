@@ -6,6 +6,12 @@ import { useMemoryStore } from '../store/memoryStore';
 import { insertEpisode, insertFact } from '../store/memoryDatabase';
 import { debugLog, debugWarn } from '../utils/debug';
 
+function isExtractionResult(val: unknown): val is ExtractionResult {
+  if (typeof val !== 'object' || val === null) return false;
+  const v = val as Record<string, unknown>;
+  return 'episode' in v && typeof v['episode'] === 'object';
+}
+
 // Use haiku for extraction — cheap and fast
 const EXTRACTION_MODEL = CLAUDE_API_CONFIG.models.haiku;
 
@@ -77,10 +83,13 @@ async function callExtractionAPI(messages: ChatMessage[]): Promise<ExtractionRes
     throw new Error(`Extraction API error: ${response.status}`);
   }
 
-  const data = await response.json();
-  const text = data.content[0]?.text ?? '';
+  const data = await response.json() as { content?: Array<{ text?: string }> };
+  const text = data.content?.[0]?.text;
+  if (!text) throw new Error('Empty extraction response');
 
-  return JSON.parse(text) as ExtractionResult;
+  const parsed = JSON.parse(text) as unknown;
+  if (!isExtractionResult(parsed)) throw new Error('Invalid extraction response structure');
+  return parsed;
 }
 
 export interface UseMemoryExtractionReturn {
@@ -119,10 +128,16 @@ export function useMemoryExtraction(): UseMemoryExtractionReturn {
 
       // Save facts
       if (result.facts.length > 0) {
+        let savedCount = 0;
         for (const fact of result.facts) {
-          insertFact({ ...fact, createdAt: Date.now() });
+          try {
+            insertFact({ ...fact, createdAt: Date.now() });
+            savedCount++;
+          } catch (factError) {
+            debugWarn('useMemoryExtraction', 'Failed to save fact', { fact, factError });
+          }
         }
-        debugLog('useMemoryExtraction', 'Facts saved', { count: result.facts.length });
+        debugLog('useMemoryExtraction', 'Facts saved', { count: savedCount, total: result.facts.length });
       }
 
       setLastExtractionTimestamp(Date.now());
