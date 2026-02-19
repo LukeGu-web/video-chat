@@ -20,6 +20,7 @@ import {
 } from '../../constants/ai';
 import { TTSQueue } from '../../capabilities/speak';
 import { ChatMessage } from '../useChatAI';
+import { useTopicSeeds } from './useTopicSeeds';
 
 /**
  * Proactive conversation hook configuration
@@ -65,6 +66,8 @@ export const useProactiveConversation = (
     onProactiveMessage,
     onSpeakingStateChange,
   } = config;
+
+  const topicSeeds = useTopicSeeds();
 
   // State refs
   const lastUserMessageTime = useRef<number>(Date.now());
@@ -143,7 +146,8 @@ export const useProactiveConversation = (
       if (!hasShownProactiveMessage.current && enabled) {
         console.log('[ProactiveConversation] Short pause detected');
         hasShownProactiveMessage.current = true;
-        const topic = selectProactiveTopic('short', messages);
+        const memoryHook = messages.length === 0 ? topicSeeds[0]?.hook : undefined;
+        const topic = memoryHook ?? selectProactiveTopic('short', messages);
         sendProactiveMessageInternal(topic);
 
         // Medium pause detection
@@ -170,6 +174,7 @@ export const useProactiveConversation = (
     isLoading,
     isSpeaking,
     messages,
+    topicSeeds,
     clearTimer,
     sendProactiveMessageInternal,
   ]);
