@@ -70,6 +70,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       },
     ],
     'expo-asset',
+    'expo-sqlite',
   ],
   extra: {
     eas: {
