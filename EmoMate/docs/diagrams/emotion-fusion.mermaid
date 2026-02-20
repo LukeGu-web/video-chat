@@ -1,0 +1,44 @@
+flowchart TD
+    subgraph FaceChannel["📷 面部通道（实时 60fps）"]
+        Camera["摄像头帧"]
+        Worklet["Reanimated Worklet\n独立 JS 线程"]
+        MLKit["MLKit 面部检测\nsmilingProbability · eyeOpenProbability"]
+        FaceAlgo["emotionAlgorithm\nsmile/eyeOpen 阈值 → 情绪类型"]
+        Throttle["节流\n每 3s · 置信度 > 0.6 才更新"]
+        FaceEmo(["facialEmotion"])
+    end
+
+    subgraph TextChannel["💬 文本通道（每条消息）"]
+        UserText["用户文本 / AI 回复文本"]
+        LenCheck{"< 4 字符\n或纯语气词？"}
+        NeutralFast["直接返回 neutral\n跳过 API 调用"]
+        Keyword["关键词匹配\n中文情绪词典"]
+        KeyMatch{"命中？"}
+        ClaudeAPI["Claude API 语义分析\n理解隐性情绪"]
+        TextEmo(["textEmotion"])
+    end
+
+    subgraph Fusion["融合（emotionStore · Zustand）"]
+        Rule["优先级规则\ntextEmotion > facialEmotion > neutral"]
+        Combined(["combinedEmotion"])
+    end
+
+    subgraph Output["输出"]
+        Mapper["motionMapper\n优先级 0–4\nAI状态 · 对话场景 · 基础情绪"]
+        Live2D["Hiyori Live2D\n动作触发"]
+        TTSParam["ElevenLabs 语音参数\nstability · similarity_boost · style"]
+    end
+
+    Camera --> Worklet --> MLKit --> FaceAlgo --> Throttle --> FaceEmo
+
+    UserText --> LenCheck
+    LenCheck -->|"是"| NeutralFast --> TextEmo
+    LenCheck -->|"否"| Keyword --> KeyMatch
+    KeyMatch -->|"命中"| TextEmo
+    KeyMatch -->|"未命中"| ClaudeAPI --> TextEmo
+
+    FaceEmo --> Rule
+    TextEmo --> Rule
+    Rule --> Combined
+    Combined --> Mapper --> Live2D
+    Combined --> TTSParam

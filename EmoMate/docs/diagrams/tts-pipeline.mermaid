@@ -1,0 +1,42 @@
+flowchart LR
+    Claude["Claude API\n流式文本"]
+
+    subgraph Detector["sentenceDetector"]
+        SD["切句\n· 标点 / 长度检测\n· 纯语气词过滤\n· flush() 末尾补全"]
+    end
+
+    subgraph TQ["TTSQueue"]
+        direction TB
+        Queue["队列\n(ordered)"]
+
+        subgraph Workers["并发合成（max 2）"]
+            W1["Worker 1"]
+            W2["Worker 2"]
+        end
+
+        Retry["失败自动重试\n最多 3 次 · 间隔 1s"]
+        Cache["AudioCache\n本地音频文件"]
+        Player["顺序播放器\n等待前序完成后播放"]
+        Cancel["cancel()\n立即停止合成 & 播放"]
+    end
+
+    subgraph Providers["Provider"]
+        EL["ElevenLabsProvider\n主用 · 高质量"]
+        Expo["ExpoSpeechProvider\n后备 · 离线 / 降级"]
+    end
+
+    User["🔊 用户"]
+
+    Claude -->|"文本片段"| SD
+    SD -->|"完整句子"| Queue
+    Queue --> W1 & W2
+    W1 & W2 -->|"合成请求"| EL
+    EL -->|"API 失败"| Retry
+    Retry -->|"超出重试上限"| Expo
+    Retry -->|"重试"| EL
+    EL -->|"音频文件"| Cache
+    Expo -->|"音频"| Cache
+    Cache --> Player
+    Player -->|"🔊 顺序播放"| User
+    Cancel -.->|"打断"| Player
+    Cancel -.->|"取消队列"| Workers
