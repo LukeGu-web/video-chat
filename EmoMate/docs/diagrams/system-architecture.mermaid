@@ -1,0 +1,78 @@
+graph TB
+    User((👤 用户))
+
+    subgraph EmoMate["📱 EmoMate — React Native"]
+        direction TB
+
+        subgraph Input["输入层"]
+            STT["语音识别\nlisten/"]
+            FaceDetect["面部检测\nvision/faceDetection/\nMLKit @ 60fps"]
+            SceneDetect["场景理解\nvision/environment/\nClaude Vision"]
+        end
+
+        subgraph Core["对话核心"]
+            ChatAI["useChatAI"]
+            BuildCtx["buildAIContext\n能力声明 · 记忆注入 · Prompt Cache"]
+        end
+
+        subgraph MemSys["记忆系统"]
+            MMKV["MMKV\nProfile / Preferences"]
+            SQLite["SQLite\nEpisodes / Facts"]
+            MemOps["提取 & 注入\nuseMemoryExtraction\nbuildMemoryContext"]
+        end
+
+        subgraph RAGSys["RAG 检索增强"]
+            QA["queryAnalyzer"]
+            MS["multiSourceRetriever"]
+            RS["relevanceScoring"]
+            CB["contextBuilder"]
+        end
+
+        subgraph OutputLayer["输出层"]
+            SentDet["sentenceDetector\n流式切句 · 标点补全"]
+            TTSQ["TTSQueue\n并行合成 · 顺序播放"]
+            EmoAna["emotionAnalysis\n关键词 + Claude 语义"]
+            MotMap["motionMapper\n优先级 0–4"]
+        end
+
+        Bridge["HiyoriWebView\nJavaScript Bridge"]
+    end
+
+    subgraph CharApp["🌐 character/ — Remix + PIXI.js"]
+        Live2D["Hiyori Live2D\n11 种动作"]
+    end
+
+    subgraph ExtSvc["☁️ 外部服务"]
+        ClaudeAPI["Claude API\nSonnet · Haiku"]
+        ElevenLabs["ElevenLabs TTS"]
+        MLKit["MLKit\nOn-device"]
+    end
+
+    User -->|"🎤 语音"| STT
+    User -->|"📷 摄像头"| FaceDetect
+    User -->|"📷 摄像头"| SceneDetect
+
+    STT --> ChatAI
+    FaceDetect --> MLKit
+    FaceDetect --> EmoAna
+    SceneDetect -->|"图像帧"| ClaudeAPI
+
+    ChatAI --> BuildCtx
+    ChatAI <--> MemOps
+    ChatAI --> QA
+
+    MemOps <--> MMKV
+    MemOps <--> SQLite
+    QA --> MS --> RS --> CB --> ChatAI
+
+    BuildCtx -->|"系统提示 + cache"| ClaudeAPI
+    ClaudeAPI -->|"流式响应"| SentDet
+    SentDet --> TTSQ
+    SentDet --> EmoAna
+
+    TTSQ -->|"文本"| ElevenLabs
+    ElevenLabs -->|"🔊 音频"| User
+
+    EmoAna --> MotMap
+    MotMap -->|"playMotion"| Bridge
+    Bridge <-->|"JSON messages"| Live2D

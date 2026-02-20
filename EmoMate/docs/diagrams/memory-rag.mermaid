@@ -1,0 +1,63 @@
+flowchart TD
+    subgraph Triggers["⏰ 提取触发器"]
+        T1["每 20 条消息"]
+        T2["5 分钟沉默"]
+        T3["App 进入后台\n→ 写 MMKV pending flag"]
+        T4["App 启动检查\n→ 处理 pending"]
+    end
+
+    subgraph Extraction["🧠 记忆提取（Claude Haiku）"]
+        EX["useMemoryExtraction\n一次调用同时提取四层"]
+    end
+
+    subgraph Storage["💾 持久化存储"]
+        subgraph MMKV["MMKV（快速读写）"]
+            L1["Layer 1: UserProfile\n姓名 · 职业 · 标签 · 时段"]
+            L2["Layer 2: UserPreferences\n建议偏好 · 幽默 · 正式程度"]
+        end
+        subgraph SQLite["SQLite（结构化）"]
+            L3["Layer 3: Episodes\n摘要 · 话题 · 情绪 · last_words"]
+            L4["Layer 4: Facts\n实体 · 分类 · 重要度 · expires_at"]
+        end
+    end
+
+    subgraph Injection["📨 上下文注入（~700 tokens）"]
+        INJ["buildMemoryContext\nAbout user · Preferences\nRecent memory · Key facts"]
+        SEEDS["useTopicSeeds\n话题种子（沉默时引出）"]
+    end
+
+    subgraph RAG["🔍 RAG 检索增强"]
+        QA["queryAnalyzer\n时间 · 关键词 · 意图 · 实体"]
+        MS["multiSourceRetriever\n聊天记录 · 物品识别 · 场景记录"]
+        SC["relevanceScoring\n时间权重 · 关键词匹配 · 上下文"]
+        CTX["contextBuilder\n格式化 → 自然语言 · token 预算控制"]
+        SUM["conversationSummarizer\n长对话自动摘要（Phase 3）"]
+    end
+
+    subgraph Prompt["📋 最终系统提示"]
+        P1["人格设定（cache Block 1, ~1000 tokens）"]
+        P2["能力声明（cache Block 2, ~200 tokens）"]
+        P3["对话历史前 5 条（cache Block 3, ~100 tokens）"]
+        P4["记忆块（~700 tokens）"]
+        P5["RAG 检索结果（动态）"]
+        P6["实时：情绪 · 场景 · 最新消息"]
+    end
+
+    T1 & T2 & T3 & T4 --> EX
+    EX -->|"新信息时更新"| L1
+    EX -->|"明确信号时更新"| L2
+    EX -->|"每次必填"| L3
+    EX -->|"有则提取"| L4
+
+    L1 & L2 --> INJ
+    L3 -->|"最近 5 条"| INJ
+    L4 -->|"高重要度, 最多 20 条"| INJ
+    L3 & L4 --> SEEDS
+
+    INJ --> P4
+    SEEDS -.->|"沉默时主动引出"| P6
+
+    QA --> MS --> SC --> CTX --> P5
+    CTX --> SUM
+
+    P1 & P2 & P3 & P4 & P5 & P6 --> Claude(["Claude API"])

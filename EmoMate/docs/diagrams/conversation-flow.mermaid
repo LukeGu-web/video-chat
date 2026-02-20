@@ -1,0 +1,48 @@
+sequenceDiagram
+    actor User as 👤 用户
+    participant STT as 语音识别
+    participant ChatAI as useChatAI
+    participant RAG as RAG Pipeline
+    participant Mem as 记忆系统
+    participant Claude as Claude API
+    participant Sent as sentenceDetector
+    participant Queue as TTSQueue
+    participant EL as ElevenLabs
+    participant Emo as emotionAnalysis
+    participant Live2D as Hiyori Live2D
+
+    User->>STT: 🎤 语音输入
+    STT->>ChatAI: 文本 + 语言检测
+
+    par 并行准备上下文
+        ChatAI->>RAG: 分析查询 → 多源检索 → 评分
+        RAG-->>ChatAI: 相关历史上下文
+    and
+        ChatAI->>Mem: 读取 Profile/Preferences/Episodes/Facts
+        Mem-->>ChatAI: 记忆块（~700 tokens）
+    end
+
+    ChatAI->>Claude: 系统提示（能力+记忆+RAG）<br/>+ 对话历史（Prompt Cache）
+
+    loop 流式响应
+        Claude-->>Sent: 文本片段
+        Sent-->>Sent: 句子完整性检测 · 标点补全
+
+        alt 检测到完整句子
+            Sent->>Queue: enqueue(sentence)
+            Sent->>Emo: 情绪分析
+
+            par 并行合成
+                Queue->>EL: 合成请求（最多 2 个并发）
+                EL-->>Queue: 音频文件
+            end
+
+            Emo->>Live2D: motionMapper → playMotion
+        end
+    end
+
+    Queue-->>User: 🔊 顺序播放音频
+
+    Note over ChatAI,Mem: 每 20 条消息 / 5 分钟沉默 → 触发记忆提取
+    ChatAI->>Claude: 提取请求（Haiku）
+    Claude-->>Mem: 写入 Episodes + Facts
