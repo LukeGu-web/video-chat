@@ -27,7 +27,7 @@
     "expo-file-system": "~55.0.15",
     "expo-image-manipulator": "~55.0.14",
     "expo-speech": "~55.0.12",
-    "expo-speech-recognition": "^2.1.1",
+    "expo-speech-recognition": "^3.1.2",
     "expo-sqlite": "~55.0.14",
     "expo-status-bar": "~55.0.5",
     "immer": "^10.1.1",
