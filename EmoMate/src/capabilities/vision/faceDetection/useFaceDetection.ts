@@ -6,7 +6,7 @@
 import { useState, useCallback, useMemo, useRef } from 'react';
 import { useFrameProcessor } from 'react-native-vision-camera';
 import { useFaceDetector } from 'react-native-vision-camera-face-detector';
-import type { FaceDetectionOptions } from 'react-native-vision-camera-face-detector';
+import type { FrameFaceDetectionOptions as FaceDetectionOptions } from 'react-native-vision-camera-face-detector';
 import { Worklets } from 'react-native-worklets-core';
 import { EmotionType } from '../../../types/emotion';
 import { debugLog, isDebugMode } from '../../../utils/debug';

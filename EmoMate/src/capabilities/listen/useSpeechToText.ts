@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import {
   ExpoSpeechRecognitionModule,
   useSpeechRecognitionEvent,
-  getSupportedLocales,
 } from 'expo-speech-recognition';
 import { audioModeManager } from '../../utils/audioModeManager';
 
@@ -32,7 +31,7 @@ export const useSpeechToText = (): UseSpeechToTextReturn => {
   useEffect(() => {
     const checkSupport = async () => {
       try {
-        const supported = await getSupportedLocales();
+        const supported = await ExpoSpeechRecognitionModule.getSupportedLocales({});
 
         // supported could be array or object depending on platform
         let availableLanguages: any[] = [];

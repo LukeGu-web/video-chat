@@ -9,6 +9,7 @@ import {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
+  type AnimatedStyle,
 } from 'react-native-reanimated';
 import { constrainPosition, Position } from '../utils/cameraUtils';
 import { CAMERA_CONSTANTS, ANIMATION_CONSTANTS } from '../constants/vision';
@@ -37,9 +38,7 @@ export interface UseDraggableReturn {
   /** Pan responder handlers */
   panHandlers: ReturnType<typeof PanResponder.create>['panHandlers'];
   /** Animated style for the container */
-  animatedStyle: {
-    transform: { scale: number }[];
-  };
+  animatedStyle: AnimatedStyle<{ transform: { scale: number }[] }>;
 }
 
 /**

@@ -2,7 +2,8 @@ import { ExpoConfig, ConfigContext } from 'expo/config';
 import * as dotenv from 'dotenv';
 dotenv.config();
 
-export default ({ config }: ConfigContext): ExpoConfig => ({
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export default ({ config }: ConfigContext): any => ({
   ...config,
   name: 'Yume',
   slug: 'EmoMate',
