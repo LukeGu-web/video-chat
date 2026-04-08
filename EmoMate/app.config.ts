@@ -78,7 +78,7 @@ export default ({ config }: ConfigContext): any => ({
       projectId: 'd96cc4b9-d302-44a3-83f0-362985174c0e',
     },
     claudeApiKey: process.env.CLAUDE_API_KEY,
-    elevenLabsApiKey: process.env.ELEVENLABS_API_KEY,
+    fishAudioApiKey: process.env.FISH_AUDIO_API_KEY,
     hiyoriViewUrl: process.env.HIYORI_VIEW_URL,
     showTestComponents: process.env.SHOW_TEST_COMPONENTS === 'true',
   },
