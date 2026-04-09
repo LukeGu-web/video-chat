@@ -75,7 +75,7 @@ export function useTTS(config?: Partial<TTSConfig>): UseTTSReturn {
         // Check if provider is available
         const isAvailable = await provider.isAvailable();
         if (!isAvailable && currentProvider === 'fishaudio' && config?.fallbackToExpo) {
-          console.warn('[useTTS] ElevenLabs not available, falling back to Expo Speech');
+          console.warn('[useTTS] Fish Audio not available, falling back to Expo Speech');
           setCurrentProvider('expo');
           setIsGenerating(false);
           await speak(text, options);
@@ -103,7 +103,7 @@ export function useTTS(config?: Partial<TTSConfig>): UseTTSReturn {
 
         // Fallback to Expo if configured
         if (config?.fallbackToExpo && currentProvider === 'fishaudio') {
-          console.warn('[useTTS] ElevenLabs failed, falling back to Expo Speech');
+          console.warn('[useTTS] Fish Audio failed, falling back to Expo Speech');
           setCurrentProvider('expo');
           await speak(text, options);
         }
