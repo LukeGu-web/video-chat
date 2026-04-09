@@ -3,7 +3,7 @@
 /**
  * TTS Provider type
  */
-export type TTSProviderType = 'expo' | 'elevenlabs';
+export type TTSProviderType = 'expo' | 'fishaudio';
 
 /**
  * TTS playback mode
