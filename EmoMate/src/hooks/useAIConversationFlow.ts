@@ -26,6 +26,7 @@ import {
 import { detectObjectKeywords } from '../capabilities/vision';
 import { createRecognitionSmallTalkManager } from '../utils/objectRecognitionHelper';
 import type { SmallTalkManager } from '../utils/smallTalk';
+import { FISH_AUDIO_CONFIG } from '../constants/ai';
 
 /**
  * AI conversation flow configuration
@@ -175,7 +176,7 @@ export const useAIConversationFlow = (
             async (text: string) => {
               console.log(`[AIConversationFlow] Playing small talk: ${text}`);
               await smallTalkTTS.speak(text, {
-                voiceId: 'hkfHEbBvdQFNX4uWHqRF',
+                voiceId: FISH_AUDIO_CONFIG.voices.lanlan,
               });
             },
             () => {

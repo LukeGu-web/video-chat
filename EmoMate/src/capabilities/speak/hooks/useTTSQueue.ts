@@ -7,7 +7,7 @@ import {
   TTSSynthesisOptions,
 } from '../../../types/speak';
 import { TTSQueue } from '../queue/TTSQueue';
-import { ElevenLabsProvider } from '../providers/ElevenLabsProvider';
+import { FishAudioProvider } from '../providers/FishAudioProvider';
 import { globalAudioCache } from '../cache/AudioCache';
 
 /**
@@ -47,7 +47,7 @@ export function useTTSQueue(config?: TTSQueueConfig): UseTTSQueueReturn {
 
   // Initialize queue
   useEffect(() => {
-    const provider = new ElevenLabsProvider();
+    const provider = new FishAudioProvider();
     const cache = globalAudioCache;
 
     const queueConfig: TTSQueueConfig = {

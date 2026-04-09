@@ -32,14 +32,14 @@ export const getClaudeApiKey = (): string | undefined => {
   return Constants.expoConfig?.extra?.claudeApiKey;
 };
 
-// 获取 ElevenLabs API Key
-export const getElevenLabsApiKey = (): string | undefined => {
-  return Constants.expoConfig?.extra?.elevenLabsApiKey;
+// Get Fish Audio API Key
+export const getFishAudioApiKey = (): string | undefined => {
+  return Constants.expoConfig?.extra?.fishAudioApiKey;
 };
 
 // 基于角色设定的系统提示
 export const createPersonalitySystemPrompt = (
-  currentLanguage: 'zh' | 'en' = 'zh'
+  currentLanguage: 'zh' | 'en' = 'zh',
 ): string => {
   const character = AI_PERSONALITY.character;
   const behavior = AI_PERSONALITY.behavior;
@@ -271,12 +271,12 @@ export const buildSystemPrompt = (
     | 'storytelling' = 'normal',
   backgroundStory?: string,
   environmentContext?: string,
-  objectRecognitionContext?: string
+  objectRecognitionContext?: string,
 ): string => {
   const capabilityPrompt = generateCapabilityPrompt();
   const emotionalPrompt = generateEmotionalResponsePrompt(
     userEmotion,
-    conversationType
+    conversationType,
   );
 
   // Add current time context
@@ -377,92 +377,55 @@ export const TTS_CONFIG = {
   language: 'zh-CN',
 };
 
-// ElevenLabs 配置 - 温柔姐姐型语音优化
-export const ELEVENLABS_CONFIG = {
-  baseURL: 'https://api.elevenlabs.io/v1',
-  models: {
-    multilingual: 'eleven_multilingual_v2',
-    turbo: 'eleven_turbo_v2_5',
-  },
-  defaultModel: 'eleven_multilingual_v2' as const,
-  // 语音 ID 配置
+// Fish Audio configuration - optimized for 兰兰 (gentle older sister)
+export const FISH_AUDIO_CONFIG = {
+  baseURL: 'https://api.fish.audio/v1',
+  version: 's2-pro' as const,
   voices: {
-    // 兰兰专用语音 - 温柔姐姐型
-    lanlan_gentle: 'hkfHEbBvdQFNX4uWHqRF', // 专为兰兰角色优化的语音
-    // 备用语音
-    chinese_female: 'hkfHEbBvdQFNX4uWHqRF', // Bella - 多语言女声
-    chinese_male: 'TxGEqnHWrfWFTfGW9XjX', // Josh - 多语言男声
-    multilingual_female: 'EXAVITQu4vr4xnSDxMaL', // Bella
-    multilingual_male: 'TxGEqnHWrfWFTfGW9XjX', // Josh
-    default: 'hkfHEbBvdQFNX4uWHqRF', // 默认使用兰兰专用语音
+    lanlan: '5c353fdb312f4888836a9a5680099ef0',
+    default: '5c353fdb312f4888836a9a5680099ef0',
   },
-  defaultVoice: 'lanlan_gentle' as const,
-
-  // 温柔姐姐型语音设置 - 优化自然度
+  defaultVoice: 'lanlan' as const,
   settings: {
-    stability: 0.7, // 降低稳定性，增加语调变化和自然感
-    similarity_boost: 0.75, // 降低相似度，允许更多语音变化
-    style: 0.3, // 提高风格化，增加情感表达
-    use_speaker_boost: true, // 启用说话者增强
-    // 新增语音控制参数
-    optimize_streaming_latency: 3, // 优化实时性
-    output_format: 'mp3_44100_128', // 高质量音频
+    format: 'mp3',
+    latency: 'normal',
+    temperature: 0.78,
+    top_p: 0.75,
+    normalize: true,
+    repetition_penalty: 1.2,
+    prosody: { speed: 0.93, volume: 0, normalize_loudness: true },
   },
-
-  // 情感化语音设置 - 优化自然度和停顿
   emotionalSettings: {
-    // 温柔关心时的设置
     gentle: {
-      stability: 0.5, // 降低稳定性，增加自然变化
-      similarity_boost: 0.7, // 允许更多变化
-      style: 0.25, // 适度风格化，表现温柔
-      use_speaker_boost: true,
-      optimize_streaming_latency: 3,
+      temperature: 0.78,
+      top_p: 0.75,
+      textPrefix: '',
+      prosody: { speed: 0.93 },
     },
-
-    // 开心时的设置
     happy: {
-      stability: 0.4, // 更低稳定性，增加活力和变化
-      similarity_boost: 0.65, // 允许更多情感变化
-      style: 0.4, // 较高风格化，表现开心情绪
-      use_speaker_boost: true,
-      optimize_streaming_latency: 2, // 更快响应
+      temperature: 0.85,
+      top_p: 0.8,
+      textPrefix: '(excited)',
+      prosody: { speed: 1.0 },
     },
-
-    // 难过/关心时的设置
     caring: {
-      stability: 0.8, // 适中稳定性，保持关怀语调
-      similarity_boost: 0.8, // 保持温柔特征
-      style: 0.2, // 轻度风格化，自然关怀语调
-      use_speaker_boost: true,
-      optimize_streaming_latency: 4, // 稍慢，更温柔
+      temperature: 0.7,
+      top_p: 0.7,
+      textPrefix: '(sad)',
+      prosody: { speed: 0.88 },
     },
-
-    // 害羞时的设置
     shy: {
-      stability: 0.5, // 适度稳定性，保持害羞的自然感
-      similarity_boost: 0.75, // 保持害羞特征
-      style: 0.35, // 较高风格化，表现害羞情绪
-      use_speaker_boost: true,
-      optimize_streaming_latency: 3,
+      temperature: 0.72,
+      top_p: 0.72,
+      textPrefix: '',
+      prosody: { speed: 0.9 },
     },
-
-    // 思考时的设置
     thinking: {
-      stability: 0.6, // 中等稳定性，表现思考状态
-      similarity_boost: 0.7, // 保持角色特征
-      style: 0.25, // 适中风格化，表现思考
-      use_speaker_boost: true,
-      optimize_streaming_latency: 4, // 稍慢，表现思考过程
+      temperature: 0.68,
+      top_p: 0.7,
+      textPrefix: '',
+      prosody: { speed: 0.95 },
     },
-  },
-
-  // 语音质量设置
-  quality: {
-    output_format: 'mp3_44100_128', // 高质量音频格式
-    optimize_streaming_latency: 0, // 优化延迟
-    previous_text: '', // 用于上下文连续性
-    next_text: '', // 用于上下文连续性
   },
 };
 
@@ -485,7 +448,7 @@ export interface AICapability {
 
 export const getAICapabilities = (): AICapability[] => {
   const claudeApiKey = getClaudeApiKey();
-  const elevenLabsApiKey = getElevenLabsApiKey();
+  const fishAudioApiKey = getFishAudioApiKey();
 
   return [
     {
@@ -499,8 +462,8 @@ export const getAICapabilities = (): AICapability[] => {
       id: 'voice_synthesis',
       name: '语音合成',
       description: '可以将文字转换为自然的语音，用真人般的声音说话',
-      isAvailable: !!elevenLabsApiKey,
-      provider: 'ElevenLabs',
+      isAvailable: !!fishAudioApiKey,
+      provider: 'Fish Audio',
     },
     {
       id: 'voice_recognition',
@@ -591,7 +554,7 @@ export const generateCapabilityPrompt = (): string => {
     (cap) =>
       cap.id === 'visual_perception' ||
       cap.id === 'scene_understanding' ||
-      cap.id === 'object_recognition'
+      cap.id === 'object_recognition',
   );
 
   const visionGuidance = hasVision
@@ -615,7 +578,11 @@ ${capabilityList}
 // 根据用户情绪和对话类型生成合适的回应风格提示
 export const generateEmotionalResponsePrompt = (
   userEmotion?: string,
-  conversationType: 'simple' | 'normal' | 'detailed' | 'storytelling' = 'normal'
+  conversationType:
+    | 'simple'
+    | 'normal'
+    | 'detailed'
+    | 'storytelling' = 'normal',
 ): string => {
   if (!userEmotion) return '';
 
@@ -623,10 +590,10 @@ export const generateEmotionalResponsePrompt = (
     conversationType === 'simple'
       ? '1句话'
       : conversationType === 'normal'
-      ? '1-2句话'
-      : conversationType === 'detailed'
-      ? '2-3句话'
-      : '可以详细讲述';
+        ? '1-2句话'
+        : conversationType === 'detailed'
+          ? '2-3句话'
+          : '可以详细讲述';
 
   switch (userEmotion.toLowerCase()) {
     case 'happy':
@@ -675,7 +642,11 @@ export const generateEmotionalResponsePrompt = (
 // 智能验证和优化回应格式 - 根据对话类型动态调整 (Phase 4: 优化完整性)
 export const validateAndOptimizeResponse = (
   response: string,
-  conversationType: 'simple' | 'normal' | 'detailed' | 'storytelling' = 'normal'
+  conversationType:
+    | 'simple'
+    | 'normal'
+    | 'detailed'
+    | 'storytelling' = 'normal',
 ): string => {
   const lengthConfig = getResponseLengthConfig(conversationType);
   let optimized = response.trim();
@@ -733,84 +704,6 @@ export const validateAndOptimizeResponse = (
   }
 
   return optimized;
-};
-
-// 根据用户情绪获取对应的语音设置
-export const getEmotionalVoiceSettings = (userEmotion?: string) => {
-  if (!userEmotion) return ELEVENLABS_CONFIG.settings;
-
-  const emotionalSettings = ELEVENLABS_CONFIG.emotionalSettings;
-
-  switch (userEmotion.toLowerCase()) {
-    case 'happy':
-    case 'excited':
-    case 'joy':
-      return emotionalSettings.happy;
-
-    case 'sad':
-    case 'depressed':
-    case 'upset':
-      return emotionalSettings.caring; // 用关怀语调回应难过
-
-    case 'confused':
-    case 'thinking':
-      return emotionalSettings.thinking;
-
-    case 'nervous':
-    case 'shy':
-      return emotionalSettings.shy;
-
-    case 'neutral':
-    default:
-      return emotionalSettings.gentle; // 默认使用温柔语调
-  }
-};
-
-// 获取兰兰专用语音ID
-export const getLanLanVoiceId = (): string => {
-  return ELEVENLABS_CONFIG.voices.lanlan_gentle;
-};
-
-// 优化语音自然度的文本预处理
-export const preprocessTextForNaturalSpeech = (text: string): string => {
-  let processed = text;
-
-  // 在标点符号后添加适当的停顿标记
-  processed = processed.replace(/([。！？])/g, '$1 <break time="0.5s"/>');
-  processed = processed.replace(/([，；：])/g, '$1 <break time="0.2s"/>');
-  processed = processed.replace(/([…])/g, '<break time="0.8s"/>');
-
-  // 为语气词添加适当的语调标记
-  processed = processed.replace(
-    /(呢|哦|啊|嗯)/g,
-    '<emphasis level="moderate">$1</emphasis>'
-  );
-  processed = processed.replace(
-    /(诶嘿嘿|欸嘿嘿)/g,
-    '<prosody rate="slow" pitch="+2st">$1</prosody>'
-  );
-  processed = processed.replace(
-    /(嗯…|那个…)/g,
-    '<prosody rate="x-slow">$1</prosody>'
-  );
-
-  // 为感叹词添加语调变化
-  processed = processed.replace(
-    /(哇|太好了|真的吗)/g,
-    '<prosody pitch="+3st">$1</prosody>'
-  );
-  processed = processed.replace(
-    /(没事吧|好担心|要紧吗)/g,
-    '<prosody pitch="-1st" rate="slow">$1</prosody>'
-  );
-
-  // 为疑问句添加语调上升
-  processed = processed.replace(
-    /([^？]*？)/g,
-    '<prosody pitch="+2st">$1</prosody>'
-  );
-
-  return processed;
 };
 
 // 主动对话配置
@@ -891,7 +784,7 @@ export const getCurrentTimePeriod = ():
 
 // 分析对话上下文，提取关键话题
 export const analyzeConversationContext = (
-  messages: any[]
+  messages: any[],
 ): {
   currentTopic: string | null;
   topicType:
@@ -966,7 +859,7 @@ export const analyzeConversationContext = (
     topicType = 'movie';
     // 提取可能的电影名称或相关讨论点
     const movieMatch = conversationText.match(
-      /(电影|影片|片子)[\s]*([^\s，。！？]{2,10})/
+      /(电影|影片|片子)[\s]*([^\s，。！？]{2,10})/,
     );
     currentTopic = movieMatch ? movieMatch[2] : '电影';
     lastDiscussion = recentMessages
@@ -978,7 +871,7 @@ export const analyzeConversationContext = (
   ) {
     topicType = 'book';
     const bookMatch = conversationText.match(
-      /(书|小说)[\s]*([^\s，。！？]{2,10})/
+      /(书|小说)[\s]*([^\s，。！？]{2,10})/,
     );
     currentTopic = bookMatch ? bookMatch[2] : '书';
     lastDiscussion = recentMessages
@@ -1026,7 +919,7 @@ export const generateContextualTopic = (
     currentTopic: string | null;
     topicType: string | null;
     lastDiscussion: string;
-  }
+  },
 ): string => {
   const { currentTopic, topicType } = context;
 
@@ -1108,7 +1001,7 @@ export const generateContextualTopic = (
 
 // 通用话题选择（原有逻辑）
 export const selectGeneralTopic = (
-  pauseType: 'short' | 'medium' | 'long'
+  pauseType: 'short' | 'medium' | 'long',
 ): string => {
   const topics = PROACTIVE_CONVERSATION_CONFIG.topics;
 
@@ -1136,14 +1029,14 @@ export const selectGeneralTopic = (
 // 智能选择主动话题（整合上下文分析）
 export const selectProactiveTopic = (
   pauseType: 'short' | 'medium' | 'long',
-  conversationHistory: any[] = []
+  conversationHistory: any[] = [],
 ): string => {
   // 分析对话上下文
   const context = analyzeConversationContext(conversationHistory);
 
   // 调试日志
   console.log(
-    `[ProactiveTopic] ${pauseType}停顿 | 话题类型: ${context.topicType} | 当前话题: ${context.currentTopic}`
+    `[ProactiveTopic] ${pauseType}停顿 | 话题类型: ${context.topicType} | 当前话题: ${context.currentTopic}`,
   );
 
   // 根据上下文生成相关话题
@@ -1156,7 +1049,7 @@ export const selectProactiveTopic = (
 // 对话类型检测
 export const detectConversationType = (
   userMessage: string,
-  conversationHistory: any[]
+  conversationHistory: any[],
 ): 'simple' | 'normal' | 'detailed' | 'storytelling' => {
   const message = userMessage.toLowerCase();
 
@@ -1239,7 +1132,7 @@ export const detectConversationType = (
 
 // 智能长度控制 - 根据对话类型调整 (Phase 2.1: 平衡简短和完整性)
 export const getResponseLengthConfig = (
-  conversationType: 'simple' | 'normal' | 'detailed' | 'storytelling'
+  conversationType: 'simple' | 'normal' | 'detailed' | 'storytelling',
 ) => {
   switch (conversationType) {
     case 'simple':
@@ -1284,15 +1177,18 @@ export const getResponseLengthConfig = (
   }
 };
 
-// 导出语音配置用于外部访问
+// Export voice config for external access
 export const VOICE_CONFIG = {
-  // 兰兰专用语音配置
   lanlan: {
-    voiceId: getLanLanVoiceId(),
-    defaultSettings: ELEVENLABS_CONFIG.settings,
-    emotionalSettings: ELEVENLABS_CONFIG.emotionalSettings,
+    referenceId: FISH_AUDIO_CONFIG.voices.lanlan,
+    defaultSettings: FISH_AUDIO_CONFIG.settings,
+    emotionalSettings: FISH_AUDIO_CONFIG.emotionalSettings,
   },
-
-  // 获取语音设置的便捷方法
-  getVoiceSettings: getEmotionalVoiceSettings,
+  getEmotionSettings: (emotion?: string) => {
+    const key = emotion as keyof typeof FISH_AUDIO_CONFIG.emotionalSettings;
+    return (
+      FISH_AUDIO_CONFIG.emotionalSettings[key] ??
+      FISH_AUDIO_CONFIG.emotionalSettings.gentle
+    );
+  },
 };

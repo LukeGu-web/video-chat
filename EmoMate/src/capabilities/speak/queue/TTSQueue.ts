@@ -7,7 +7,7 @@ import {
   TTSQueueStatus as TTSQueueStatusInfo,
   TTSSynthesisOptions,
 } from '../../../types/speak';
-import { ElevenLabsProvider } from '../providers/ElevenLabsProvider';
+import { FishAudioProvider } from '../providers/FishAudioProvider';
 import { AudioCache } from '../cache/AudioCache';
 import { safeDeleteFile } from '../../../utils/fileSystemHelpers';
 
@@ -23,12 +23,12 @@ export class TTSQueue implements ITTSQueue {
   private activeSynthesisTasks = 0;
   private onPlaybackComplete?: () => void;
   private isCancelled = false;
-  private provider: ElevenLabsProvider;
+  private provider: FishAudioProvider;
   private cache: AudioCache;
 
   constructor(
     config: TTSQueueConfig = {},
-    provider?: ElevenLabsProvider,
+    provider?: FishAudioProvider,
     cache?: AudioCache
   ) {
     this.config = {
@@ -37,7 +37,7 @@ export class TTSQueue implements ITTSQueue {
       retryDelay: 1000, // Default: 1s delay between retries
       ...config,
     };
-    this.provider = provider || new ElevenLabsProvider();
+    this.provider = provider || new FishAudioProvider();
     this.cache = cache || new AudioCache();
   }
 
@@ -108,7 +108,7 @@ export class TTSQueue implements ITTSQueue {
 
       console.log(`[TTSQueue] Synthesizing ${item.id}... (attempt ${item.retryCount + 1})`);
 
-      // Use ElevenLabsProvider to synthesize
+      // Use FishAudioProvider to synthesize
       const result = await this.provider.synthesize(item.text, options);
 
       item.audioUri = result.audioUri;

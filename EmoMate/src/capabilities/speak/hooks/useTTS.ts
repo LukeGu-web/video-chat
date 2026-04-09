@@ -7,7 +7,7 @@ import {
   TTSSynthesisOptions,
   TTSProvider,
 } from '../../../types/speak';
-import { ElevenLabsProvider } from '../providers/ElevenLabsProvider';
+import { FishAudioProvider } from '../providers/FishAudioProvider';
 import { ExpoSpeechProvider } from '../providers/ExpoSpeechProvider';
 
 /**
@@ -33,7 +33,7 @@ export function useTTS(config?: Partial<TTSConfig>): UseTTSReturn {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentProvider, setCurrentProvider] = useState<TTSProviderType>(
-    config?.provider || 'elevenlabs'
+    config?.provider || 'fishaudio'
   );
 
   // Provider instances
@@ -42,7 +42,7 @@ export function useTTS(config?: Partial<TTSConfig>): UseTTSReturn {
   // Initialize providers
   useEffect(() => {
     const providers = providersRef.current;
-    providers.set('elevenlabs', new ElevenLabsProvider());
+    providers.set('fishaudio', new FishAudioProvider());
     providers.set('expo', new ExpoSpeechProvider());
 
     return () => {
@@ -74,8 +74,8 @@ export function useTTS(config?: Partial<TTSConfig>): UseTTSReturn {
 
         // Check if provider is available
         const isAvailable = await provider.isAvailable();
-        if (!isAvailable && currentProvider === 'elevenlabs' && config?.fallbackToExpo) {
-          console.warn('[useTTS] ElevenLabs not available, falling back to Expo Speech');
+        if (!isAvailable && currentProvider === 'fishaudio' && config?.fallbackToExpo) {
+          console.warn('[useTTS] Fish Audio not available, falling back to Expo Speech');
           setCurrentProvider('expo');
           setIsGenerating(false);
           await speak(text, options);
@@ -102,8 +102,8 @@ export function useTTS(config?: Partial<TTSConfig>): UseTTSReturn {
         setIsSpeaking(false);
 
         // Fallback to Expo if configured
-        if (config?.fallbackToExpo && currentProvider === 'elevenlabs') {
-          console.warn('[useTTS] ElevenLabs failed, falling back to Expo Speech');
+        if (config?.fallbackToExpo && currentProvider === 'fishaudio') {
+          console.warn('[useTTS] Fish Audio failed, falling back to Expo Speech');
           setCurrentProvider('expo');
           await speak(text, options);
         }

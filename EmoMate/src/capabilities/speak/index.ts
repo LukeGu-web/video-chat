@@ -15,7 +15,7 @@ export { useTTSQueue } from './hooks/useTTSQueue';
 export type { UseTTSQueueReturn } from './hooks/useTTSQueue';
 
 // Providers
-export { ElevenLabsProvider } from './providers/ElevenLabsProvider';
+export { FishAudioProvider } from './providers/FishAudioProvider';
 export { ExpoSpeechProvider } from './providers/ExpoSpeechProvider';
 
 // Cache
@@ -31,7 +31,7 @@ export { TTSQueue } from './queue/TTSQueue';
 
 // Core
 export { CACHE_PHRASES } from '../../constants/speak';
-export { synthesizeWithElevenLabs } from './elevenLabsAPI';
+export { synthesizeWithFishAudio } from './fishAudioAPI';
 
 // ==================== LEGACY INFRASTRUCTURE (Still in use) ====================
 

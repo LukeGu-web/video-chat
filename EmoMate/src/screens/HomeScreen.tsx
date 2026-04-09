@@ -90,7 +90,7 @@ const HomeScreen: React.FC = () => {
 
   // TTS for small talk (voice-triggered object recognition only)
   const smallTalkTTS = useTTS({
-    provider: 'elevenlabs',
+    provider: 'fishaudio',
     mode: 'simple',
     fallbackToExpo: true,
   });

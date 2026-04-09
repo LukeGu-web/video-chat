@@ -1,4 +1,4 @@
-// src/capabilities/speak/providers/ElevenLabsProvider.ts
+// src/capabilities/speak/providers/FishAudioProvider.ts
 
 import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
 import {
@@ -6,23 +6,22 @@ import {
   TTSSynthesisOptions,
   TTSSynthesisResult,
 } from '../../../types/speak';
-import { synthesizeWithElevenLabs } from '../elevenLabsAPI';
-import { getElevenLabsApiKey } from '../../../constants/ai';
+import { synthesizeWithFishAudio } from '../fishAudioAPI';
+import { getFishAudioApiKey } from '../../../constants/ai';
 import { audioModeManager } from '../../../utils/audioModeManager';
 
 /**
- * ElevenLabs TTS Provider
- * Implements TTSProvider interface for ElevenLabs service
- * Uses expo-audio for reliable playback control
+ * Fish Audio TTS Provider
+ * Implements TTSProvider interface using Fish Audio s2-pro model
  */
-export class ElevenLabsProvider implements TTSProvider {
-  readonly name = 'elevenlabs';
+export class FishAudioProvider implements TTSProvider {
+  readonly name = 'fishaudio';
   private currentPlayer: AudioPlayer | null = null;
   private currentSubscription: { remove: () => void } | null = null;
   private isCurrentlyPlaying = false;
 
   async isAvailable(): Promise<boolean> {
-    const apiKey = getElevenLabsApiKey();
+    const apiKey = getFishAudioApiKey();
     return !!apiKey;
   }
 
@@ -30,7 +29,7 @@ export class ElevenLabsProvider implements TTSProvider {
     text: string,
     options?: TTSSynthesisOptions
   ): Promise<TTSSynthesisResult> {
-    return synthesizeWithElevenLabs(text, options);
+    return synthesizeWithFishAudio(text, options);
   }
 
   async play(
@@ -42,56 +41,39 @@ export class ElevenLabsProvider implements TTSProvider {
     }
   ): Promise<void> {
     try {
-      // Cleanup previous player if exists
       this.cleanupCurrentPlayer();
 
-      // CRITICAL: Set audio mode to PLAYBACK for louder speaker output
-      // This sets allowsRecording: false and shouldRouteThroughEarpiece: false
+      // Set audio mode to playback for louder speaker output
       await audioModeManager.setPlaybackMode();
 
-      // Create new audio player
       this.currentPlayer = createAudioPlayer({ uri: audioUri });
-
-      // Set volume to maximum
       this.currentPlayer.volume = 1.0;
 
-      console.log(
-        '[ElevenLabsProvider] 🔊 Created audio player for:',
-        audioUri
-      );
+      console.log('[FishAudioProvider] 🔊 Created audio player for:', audioUri);
 
-      // Set playback status listener
       this.currentSubscription = this.currentPlayer.addListener(
         'playbackStatusUpdate',
         (status) => {
           if (status.playing && !this.isCurrentlyPlaying) {
             this.isCurrentlyPlaying = true;
-            console.log('[ElevenLabsProvider] ▶️ Playback started');
+            console.log('[FishAudioProvider] ▶️ Playback started');
             callbacks?.onStart?.();
           }
-
           if (status.didJustFinish) {
-            console.log('[ElevenLabsProvider] ✅ Playback finished');
+            console.log('[FishAudioProvider] ✅ Playback finished');
             this.isCurrentlyPlaying = false;
-
-            // Cleanup before calling callback
             this.cleanupCurrentPlayer();
-
             callbacks?.onEnd?.();
           }
         }
       );
 
-      // Start playback
       this.currentPlayer.play();
-      console.log('[ElevenLabsProvider] 🎵 Started playback');
+      console.log('[FishAudioProvider] 🎵 Started playback');
     } catch (error) {
       this.isCurrentlyPlaying = false;
-      console.error('[ElevenLabsProvider] ❌ Play error:', error);
-
-      // Cleanup on error
+      console.error('[FishAudioProvider] ❌ Play error:', error);
       this.cleanupCurrentPlayer();
-
       const err = error instanceof Error ? error : new Error(String(error));
       callbacks?.onError?.(err);
       throw err;
@@ -99,46 +81,38 @@ export class ElevenLabsProvider implements TTSProvider {
   }
 
   async stop(): Promise<void> {
-    console.log('[ElevenLabsProvider] 🛑 Stopping playback');
-
+    console.log('[FishAudioProvider] 🛑 Stopping playback');
     if (this.currentPlayer) {
       try {
         this.currentPlayer.pause();
       } catch (e) {
-        console.warn('[ElevenLabsProvider] ⚠️ Error pausing player:', e);
+        console.warn('[FishAudioProvider] ⚠️ Error pausing player:', e);
       }
     }
-
     this.isCurrentlyPlaying = false;
     this.cleanupCurrentPlayer();
   }
 
   async cleanup(): Promise<void> {
-    console.log('[ElevenLabsProvider] 🧹 Cleanup');
+    console.log('[FishAudioProvider] 🧹 Cleanup');
     this.isCurrentlyPlaying = false;
     this.cleanupCurrentPlayer();
   }
 
-  /**
-   * Cleanup current player and subscription
-   */
   private cleanupCurrentPlayer(): void {
-    // Remove event listener
     if (this.currentSubscription) {
       try {
         this.currentSubscription.remove();
       } catch (e) {
-        console.warn('[ElevenLabsProvider] ⚠️ Error removing subscription:', e);
+        console.warn('[FishAudioProvider] ⚠️ Error removing subscription:', e);
       }
       this.currentSubscription = null;
     }
-
-    // Remove player
     if (this.currentPlayer) {
       try {
         this.currentPlayer.remove();
       } catch (e) {
-        console.warn('[ElevenLabsProvider] ⚠️ Error removing player:', e);
+        console.warn('[FishAudioProvider] ⚠️ Error removing player:', e);
       }
       this.currentPlayer = null;
     }
