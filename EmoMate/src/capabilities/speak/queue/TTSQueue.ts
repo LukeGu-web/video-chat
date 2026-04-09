@@ -108,7 +108,7 @@ export class TTSQueue implements ITTSQueue {
 
       console.log(`[TTSQueue] Synthesizing ${item.id}... (attempt ${item.retryCount + 1})`);
 
-      // Use ElevenLabsProvider to synthesize
+      // Use FishAudioProvider to synthesize
       const result = await this.provider.synthesize(item.text, options);
 
       item.audioUri = result.audioUri;
