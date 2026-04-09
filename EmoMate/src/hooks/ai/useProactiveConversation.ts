@@ -17,6 +17,7 @@ import { useRef, useCallback, useEffect } from 'react';
 import {
   PROACTIVE_CONVERSATION_CONFIG,
   selectProactiveTopic,
+  FISH_AUDIO_CONFIG,
 } from '../../constants/ai';
 import { TTSQueue } from '../../capabilities/speak';
 import { ChatMessage } from '../useChatAI';
@@ -98,7 +99,7 @@ export const useProactiveConversation = (
       // Play TTS for proactive message
       setTimeout(async () => {
         try {
-          const voiceId = 'hkfHEbBvdQFNX4uWHqRF';
+          const voiceId = FISH_AUDIO_CONFIG.voices.lanlan;
           const ttsQueue = new TTSQueue({
             onItemStart: (item) => {
               onSpeakingStateChange?.(true, item.text);

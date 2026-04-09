@@ -5,6 +5,7 @@ import {
   createPersonalitySystemPrompt,
   validateAndOptimizeResponse,
   detectConversationType,
+  FISH_AUDIO_CONFIG,
 } from '../constants/ai';
 import { parseSSEChunk } from '../capabilities/speak/sentenceDetector'; // Phase 2: 句子检测
 import { TTSQueue } from '../capabilities/speak'; // Phase 2: TTS队列管理 - NEW ARCHITECTURE
@@ -80,7 +81,7 @@ export const useChatAIWithLanLan = (
   return useChatAI({
     ...initialConfig,
     personality: createPersonalitySystemPrompt(),
-    voiceId: 'hkfHEbBvdQFNX4uWHqRF', // 使用兰兰的专用语音
+    voiceId: FISH_AUDIO_CONFIG.voices.lanlan, // use Fish Audio reference ID for 兰兰
   });
 };
 
@@ -393,7 +394,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       };
 
       // Initialize TTS queue (Phase 3: Store in ref for interruption)
-      const voiceId = enhancedConfig?.voiceId || 'hkfHEbBvdQFNX4uWHqRF';
+      const voiceId = enhancedConfig?.voiceId || FISH_AUDIO_CONFIG.voices.lanlan;
       const userEmotion = enhancedConfig?.userEmotion;
       const ttsQueue = new TTSQueue({
         // Phase 3: Callbacks for subtitle display
