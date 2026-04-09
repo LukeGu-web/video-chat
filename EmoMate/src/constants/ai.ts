@@ -382,8 +382,8 @@ export const FISH_AUDIO_CONFIG = {
   baseURL: 'https://api.fish.audio/v1',
   version: 's2-pro' as const,
   voices: {
-    lanlan: '5c353fdb312f4888836a9a5680099ef0',
-    default: '5c353fdb312f4888836a9a5680099ef0',
+    lanlan: 'fbe02f8306fc4d3d915e9871722a39d5',
+    default: 'fbe02f8306fc4d3d915e9871722a39d5',
   },
   defaultVoice: 'lanlan' as const,
   settings: {
