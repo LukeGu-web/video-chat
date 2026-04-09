@@ -37,7 +37,6 @@ export async function synthesizeWithFishAudio(
     .toString(36)
     .substring(7)}.mp3`;
   const file = new File(Paths.document, fileName);
-  file.create();
 
   const requestBody = {
     text: processedText,
@@ -57,6 +56,7 @@ export async function synthesizeWithFishAudio(
   };
 
   try {
+    file.create();
     const audioUri = await makeFishAudioRequest(url, apiKey, requestBody, file);
     return { audioUri, duration: undefined };
   } catch (error) {
@@ -115,6 +115,11 @@ async function makeFishAudioRequest(
     xhr.onerror = async () => {
       await safeDeleteFile(file.uri);
       reject(new Error('Network request failed'));
+    };
+
+    xhr.onabort = async () => {
+      await safeDeleteFile(file.uri);
+      reject(new Error('Request was aborted'));
     };
 
     xhr.send(JSON.stringify(body));
