@@ -39,7 +39,7 @@ export const getFishAudioApiKey = (): string | undefined => {
 
 // 基于角色设定的系统提示
 export const createPersonalitySystemPrompt = (
-  currentLanguage: 'zh' | 'en' = 'zh'
+  currentLanguage: 'zh' | 'en' = 'zh',
 ): string => {
   const character = AI_PERSONALITY.character;
   const behavior = AI_PERSONALITY.behavior;
@@ -271,12 +271,12 @@ export const buildSystemPrompt = (
     | 'storytelling' = 'normal',
   backgroundStory?: string,
   environmentContext?: string,
-  objectRecognitionContext?: string
+  objectRecognitionContext?: string,
 ): string => {
   const capabilityPrompt = generateCapabilityPrompt();
   const emotionalPrompt = generateEmotionalResponsePrompt(
     userEmotion,
-    conversationType
+    conversationType,
   );
 
   // Add current time context
@@ -382,8 +382,8 @@ export const FISH_AUDIO_CONFIG = {
   baseURL: 'https://api.fish.audio/v1',
   version: 's2-pro' as const,
   voices: {
-    lanlan: '5ae25bb863d548879af70c0d0667f070',
-    default: '5ae25bb863d548879af70c0d0667f070',
+    lanlan: '5c353fdb312f4888836a9a5680099ef0',
+    default: '5c353fdb312f4888836a9a5680099ef0',
   },
   defaultVoice: 'lanlan' as const,
   settings: {
@@ -396,11 +396,36 @@ export const FISH_AUDIO_CONFIG = {
     prosody: { speed: 0.93, volume: 0, normalize_loudness: true },
   },
   emotionalSettings: {
-    gentle:   { temperature: 0.78, top_p: 0.75, textPrefix: '',          prosody: { speed: 0.93 } },
-    happy:    { temperature: 0.85, top_p: 0.80, textPrefix: '(excited)', prosody: { speed: 1.00 } },
-    caring:   { temperature: 0.70, top_p: 0.70, textPrefix: '(sad)',     prosody: { speed: 0.88 } },
-    shy:      { temperature: 0.72, top_p: 0.72, textPrefix: '',          prosody: { speed: 0.90 } },
-    thinking: { temperature: 0.68, top_p: 0.70, textPrefix: '',          prosody: { speed: 0.95 } },
+    gentle: {
+      temperature: 0.78,
+      top_p: 0.75,
+      textPrefix: '',
+      prosody: { speed: 0.93 },
+    },
+    happy: {
+      temperature: 0.85,
+      top_p: 0.8,
+      textPrefix: '(excited)',
+      prosody: { speed: 1.0 },
+    },
+    caring: {
+      temperature: 0.7,
+      top_p: 0.7,
+      textPrefix: '(sad)',
+      prosody: { speed: 0.88 },
+    },
+    shy: {
+      temperature: 0.72,
+      top_p: 0.72,
+      textPrefix: '',
+      prosody: { speed: 0.9 },
+    },
+    thinking: {
+      temperature: 0.68,
+      top_p: 0.7,
+      textPrefix: '',
+      prosody: { speed: 0.95 },
+    },
   },
 };
 
@@ -529,7 +554,7 @@ export const generateCapabilityPrompt = (): string => {
     (cap) =>
       cap.id === 'visual_perception' ||
       cap.id === 'scene_understanding' ||
-      cap.id === 'object_recognition'
+      cap.id === 'object_recognition',
   );
 
   const visionGuidance = hasVision
@@ -553,7 +578,11 @@ ${capabilityList}
 // 根据用户情绪和对话类型生成合适的回应风格提示
 export const generateEmotionalResponsePrompt = (
   userEmotion?: string,
-  conversationType: 'simple' | 'normal' | 'detailed' | 'storytelling' = 'normal'
+  conversationType:
+    | 'simple'
+    | 'normal'
+    | 'detailed'
+    | 'storytelling' = 'normal',
 ): string => {
   if (!userEmotion) return '';
 
@@ -561,10 +590,10 @@ export const generateEmotionalResponsePrompt = (
     conversationType === 'simple'
       ? '1句话'
       : conversationType === 'normal'
-      ? '1-2句话'
-      : conversationType === 'detailed'
-      ? '2-3句话'
-      : '可以详细讲述';
+        ? '1-2句话'
+        : conversationType === 'detailed'
+          ? '2-3句话'
+          : '可以详细讲述';
 
   switch (userEmotion.toLowerCase()) {
     case 'happy':
@@ -613,7 +642,11 @@ export const generateEmotionalResponsePrompt = (
 // 智能验证和优化回应格式 - 根据对话类型动态调整 (Phase 4: 优化完整性)
 export const validateAndOptimizeResponse = (
   response: string,
-  conversationType: 'simple' | 'normal' | 'detailed' | 'storytelling' = 'normal'
+  conversationType:
+    | 'simple'
+    | 'normal'
+    | 'detailed'
+    | 'storytelling' = 'normal',
 ): string => {
   const lengthConfig = getResponseLengthConfig(conversationType);
   let optimized = response.trim();
@@ -751,7 +784,7 @@ export const getCurrentTimePeriod = ():
 
 // 分析对话上下文，提取关键话题
 export const analyzeConversationContext = (
-  messages: any[]
+  messages: any[],
 ): {
   currentTopic: string | null;
   topicType:
@@ -826,7 +859,7 @@ export const analyzeConversationContext = (
     topicType = 'movie';
     // 提取可能的电影名称或相关讨论点
     const movieMatch = conversationText.match(
-      /(电影|影片|片子)[\s]*([^\s，。！？]{2,10})/
+      /(电影|影片|片子)[\s]*([^\s，。！？]{2,10})/,
     );
     currentTopic = movieMatch ? movieMatch[2] : '电影';
     lastDiscussion = recentMessages
@@ -838,7 +871,7 @@ export const analyzeConversationContext = (
   ) {
     topicType = 'book';
     const bookMatch = conversationText.match(
-      /(书|小说)[\s]*([^\s，。！？]{2,10})/
+      /(书|小说)[\s]*([^\s，。！？]{2,10})/,
     );
     currentTopic = bookMatch ? bookMatch[2] : '书';
     lastDiscussion = recentMessages
@@ -886,7 +919,7 @@ export const generateContextualTopic = (
     currentTopic: string | null;
     topicType: string | null;
     lastDiscussion: string;
-  }
+  },
 ): string => {
   const { currentTopic, topicType } = context;
 
@@ -968,7 +1001,7 @@ export const generateContextualTopic = (
 
 // 通用话题选择（原有逻辑）
 export const selectGeneralTopic = (
-  pauseType: 'short' | 'medium' | 'long'
+  pauseType: 'short' | 'medium' | 'long',
 ): string => {
   const topics = PROACTIVE_CONVERSATION_CONFIG.topics;
 
@@ -996,14 +1029,14 @@ export const selectGeneralTopic = (
 // 智能选择主动话题（整合上下文分析）
 export const selectProactiveTopic = (
   pauseType: 'short' | 'medium' | 'long',
-  conversationHistory: any[] = []
+  conversationHistory: any[] = [],
 ): string => {
   // 分析对话上下文
   const context = analyzeConversationContext(conversationHistory);
 
   // 调试日志
   console.log(
-    `[ProactiveTopic] ${pauseType}停顿 | 话题类型: ${context.topicType} | 当前话题: ${context.currentTopic}`
+    `[ProactiveTopic] ${pauseType}停顿 | 话题类型: ${context.topicType} | 当前话题: ${context.currentTopic}`,
   );
 
   // 根据上下文生成相关话题
@@ -1016,7 +1049,7 @@ export const selectProactiveTopic = (
 // 对话类型检测
 export const detectConversationType = (
   userMessage: string,
-  conversationHistory: any[]
+  conversationHistory: any[],
 ): 'simple' | 'normal' | 'detailed' | 'storytelling' => {
   const message = userMessage.toLowerCase();
 
@@ -1099,7 +1132,7 @@ export const detectConversationType = (
 
 // 智能长度控制 - 根据对话类型调整 (Phase 2.1: 平衡简短和完整性)
 export const getResponseLengthConfig = (
-  conversationType: 'simple' | 'normal' | 'detailed' | 'storytelling'
+  conversationType: 'simple' | 'normal' | 'detailed' | 'storytelling',
 ) => {
   switch (conversationType) {
     case 'simple':
@@ -1153,6 +1186,9 @@ export const VOICE_CONFIG = {
   },
   getEmotionSettings: (emotion?: string) => {
     const key = emotion as keyof typeof FISH_AUDIO_CONFIG.emotionalSettings;
-    return FISH_AUDIO_CONFIG.emotionalSettings[key] ?? FISH_AUDIO_CONFIG.emotionalSettings.gentle;
+    return (
+      FISH_AUDIO_CONFIG.emotionalSettings[key] ??
+      FISH_AUDIO_CONFIG.emotionalSettings.gentle
+    );
   },
 };
