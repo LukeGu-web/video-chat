@@ -10,6 +10,7 @@ import {
   ChatHistoryScreen,
   SceneHistoryScreen,
 } from './src/screens';
+import { AmplifiedAudioPlayer } from './src/components/AmplifiedAudioPlayer';
 import { initializeTTSCache, TTSQueue } from './src/capabilities/speak'; // Phase 3: TTS 预热 + 缓存 - NEW ARCHITECTURE
 import { RootStackParamList } from './src/types/navigation';
 import { useMemoryStore } from './src/store';
@@ -120,6 +121,7 @@ export default function App() {
 
   return (
     <GestureHandlerRootView className='flex-1'>
+      <AmplifiedAudioPlayer />
       <NavigationContainer>
         <Stack.Navigator
           initialRouteName='Welcome'

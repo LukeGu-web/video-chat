@@ -13,6 +13,7 @@
 3. [核心功能模块](#核心功能模块)
    - 3.1 语音对话系统
    - 3.2 TTS 系统（新架构）
+   - 3.2a 音量增幅系统（隐藏 WebView + Web Audio GainNode）
    - 3.3 四层记忆系统
    - 3.4 视觉与环境感知系统
    - 3.5 RAG 检索增强系统
@@ -209,6 +210,73 @@ const ragResult = await executeRAG(userMessage, chatHistory, { enableRetrieval: 
 | happy | 0.3 | 0.65 | 0.4 |
 | caring | 0.6 | 0.8 | 0.2 |
 | shy | 0.45 | 0.75 | 0.35 |
+
+---
+
+### 3.2a 音量增幅系统（隐藏 WebView + Web Audio GainNode）
+
+**背景**：`expo-audio` 的 `AudioPlayer.volume` 封顶 1.0（系统最大音量），无法做软件增益。`react-native-audio-api`（原计划方案，有 GainNode）因其 ffmpeg 头文件与 VisionCamera 的 `Frame.h` 发生符号冲突，导致 EAS Build 失败，故放弃。
+
+**解决方案**：在 App 根节点挂载一个**不可见 WebView**，利用浏览器的 Web Audio API 实现 GainNode 软件增益，绕过 iOS 系统音量上限。
+
+#### 相关文件
+
+| 文件 | 说明 |
+|------|------|
+| `src/capabilities/speak/providers/amplifiedAudioBridge.ts` | Native ↔ WebView 通信单例桥 |
+| `src/components/AmplifiedAudioPlayer.tsx` | 隐藏 WebView 组件（挂载于 App 根节点） |
+| `src/capabilities/speak/providers/FishAudioProvider.ts` | TTS 播放提供者，调用 bridge 完成播放 |
+| `App.tsx` | 挂载 `<AmplifiedAudioPlayer />`，App 启动即注册 WebView |
+
+#### 工作原理
+
+```
+FishAudioProvider.play(uri)
+    ↓ base64 编码本地缓存音频文件
+amplifiedAudioBridge.play(base64, gain=3.0, callbacks)
+    ↓ injectJavaScript → window.handleNativeMessage()
+隐藏 WebView（HTML 内嵌）
+    ↓ <audio> 元素播放（mediaPlaybackRequiresUserAction=false 绕过手势限制）
+    ↓ audio.onplay 事件中 ctx.resume() → 解锁 AudioContext
+    ↓ createMediaElementSource(audio) → GainNode(3×) → destination
+    ↓ ReactNativeWebView.postMessage → onMessage prop
+FishAudioProvider callbacks（onStart / onEnd / onError）
+```
+
+**为什么用 `<audio>` 而非 `AudioBufferSourceNode`**：iOS WebView 的 AudioContext 在没有用户手势的情况下始终处于 `suspended` 状态，`AudioBufferSourceNode` 完全无声。改用 `<audio>` 元素后，`mediaPlaybackRequiresUserAction={false}` 保证自动播放，`onplay` 事件成功作为伪手势解锁了 AudioContext。
+
+#### 调整音量增幅
+
+**增大或减小增幅**，只需修改一处常量：
+
+```typescript
+// 文件: src/capabilities/speak/providers/amplifiedAudioBridge.ts
+export const AUDIO_GAIN = 3.0; // 当前 300%，修改此值即可
+```
+
+| 场景 | 建议值 | 效果 |
+|------|--------|------|
+| 恢复系统原始音量 | `1.0` | 无软件增益，等同 expo-audio 默认行为 |
+| 轻微增强 | `1.5` | 约 150%，适合安静环境 |
+| 当前默认 | `3.0` | 约 300%，适合嘈杂环境 |
+| 最大增强 | `5.0` | 约 500%，可能出现失真，谨慎使用 |
+
+修改后**无需重新构建**，Expo Metro 热重载即可生效。
+
+> ⚠️ 增益过高（>4.0）可能导致音频削波失真。建议在实机上试听后确定合适值。
+
+#### 动态修改增益（运行时）
+
+如需在运行时按场景动态调整，可向 `bridge.play()` 传入不同 `gain` 参数，`AUDIO_GAIN` 常量仅作为默认值：
+
+```typescript
+// FishAudioProvider.ts 中调用处
+import { amplifiedAudioBridge, AUDIO_GAIN } from './amplifiedAudioBridge';
+
+amplifiedAudioBridge.play(base64, AUDIO_GAIN, { onEnd, onError });
+// 或临时传入自定义增益：
+amplifiedAudioBridge.play(base64, 2.0, { onEnd, onError }); // 本次播放使用 200%
+```
 
 ---
 

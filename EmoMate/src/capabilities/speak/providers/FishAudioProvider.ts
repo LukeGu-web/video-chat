@@ -1,6 +1,6 @@
 // src/capabilities/speak/providers/FishAudioProvider.ts
 
-import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
+import { File } from 'expo-file-system';
 import {
   TTSProvider,
   TTSSynthesisOptions,
@@ -9,16 +9,17 @@ import {
 import { synthesizeWithFishAudio } from '../fishAudioAPI';
 import { getFishAudioApiKey } from '../../../constants/ai';
 import { audioModeManager } from '../../../utils/audioModeManager';
+import { amplifiedAudioBridge, AUDIO_GAIN } from './amplifiedAudioBridge';
 
 /**
  * Fish Audio TTS Provider
- * Implements TTSProvider interface using Fish Audio s2-pro model
+ * Implements TTSProvider interface using Fish Audio s2-pro model.
+ * Audio playback is routed through a hidden WebView with Web Audio API GainNode
+ * to achieve volume amplification beyond the system maximum (AUDIO_GAIN = 3.0 = 300%).
  */
 export class FishAudioProvider implements TTSProvider {
   readonly name = 'fishaudio';
-  private currentPlayer: AudioPlayer | null = null;
-  private currentSubscription: { remove: () => void } | null = null;
-  private isCurrentlyPlaying = false;
+  private isCancelled = false;
 
   async isAvailable(): Promise<boolean> {
     const apiKey = getFishAudioApiKey();
@@ -40,40 +41,43 @@ export class FishAudioProvider implements TTSProvider {
       onError?: (error: Error) => void;
     }
   ): Promise<void> {
-    try {
-      this.cleanupCurrentPlayer();
+    this.isCancelled = false;
 
-      // Set audio mode to playback for louder speaker output
+    try {
+      // Ensure audio routes through speaker, not earpiece
       await audioModeManager.setPlaybackMode();
 
-      this.currentPlayer = createAudioPlayer({ uri: audioUri });
-      this.currentPlayer.volume = 1.0;
+      if (this.isCancelled) return;
 
-      console.log('[FishAudioProvider] 🔊 Created audio player for:', audioUri);
+      // Read the local audio file as base64
+      const base64 = await new File(audioUri).base64();
 
-      this.currentSubscription = this.currentPlayer.addListener(
-        'playbackStatusUpdate',
-        (status) => {
-          if (status.playing && !this.isCurrentlyPlaying) {
-            this.isCurrentlyPlaying = true;
+      if (this.isCancelled) return;
+
+      console.log('[FishAudioProvider] 🔊 Sending to WebView audio player (gain:', AUDIO_GAIN, ')');
+
+      // Play via WebView GainNode — resolves when playback ends
+      await new Promise<void>((resolve, reject) => {
+        amplifiedAudioBridge.play(base64, AUDIO_GAIN, {
+          onStart: () => {
             console.log('[FishAudioProvider] ▶️ Playback started');
             callbacks?.onStart?.();
-          }
-          if (status.didJustFinish) {
+          },
+          onEnd: () => {
             console.log('[FishAudioProvider] ✅ Playback finished');
-            this.isCurrentlyPlaying = false;
-            this.cleanupCurrentPlayer();
             callbacks?.onEnd?.();
-          }
-        }
-      );
-
-      this.currentPlayer.play();
-      console.log('[FishAudioProvider] 🎵 Started playback');
+            resolve();
+          },
+          onError: (error) => {
+            console.error('[FishAudioProvider] ❌ Playback error:', error);
+            callbacks?.onError?.(error);
+            reject(error);
+          },
+        });
+      });
     } catch (error) {
-      this.isCurrentlyPlaying = false;
+      if (this.isCancelled) return;
       console.error('[FishAudioProvider] ❌ Play error:', error);
-      this.cleanupCurrentPlayer();
       const err = error instanceof Error ? error : new Error(String(error));
       callbacks?.onError?.(err);
       throw err;
@@ -82,39 +86,13 @@ export class FishAudioProvider implements TTSProvider {
 
   async stop(): Promise<void> {
     console.log('[FishAudioProvider] 🛑 Stopping playback');
-    if (this.currentPlayer) {
-      try {
-        this.currentPlayer.pause();
-      } catch (e) {
-        console.warn('[FishAudioProvider] ⚠️ Error pausing player:', e);
-      }
-    }
-    this.isCurrentlyPlaying = false;
-    this.cleanupCurrentPlayer();
+    this.isCancelled = true;
+    amplifiedAudioBridge.stop();
   }
 
   async cleanup(): Promise<void> {
     console.log('[FishAudioProvider] 🧹 Cleanup');
-    this.isCurrentlyPlaying = false;
-    this.cleanupCurrentPlayer();
-  }
-
-  private cleanupCurrentPlayer(): void {
-    if (this.currentSubscription) {
-      try {
-        this.currentSubscription.remove();
-      } catch (e) {
-        console.warn('[FishAudioProvider] ⚠️ Error removing subscription:', e);
-      }
-      this.currentSubscription = null;
-    }
-    if (this.currentPlayer) {
-      try {
-        this.currentPlayer.remove();
-      } catch (e) {
-        console.warn('[FishAudioProvider] ⚠️ Error removing player:', e);
-      }
-      this.currentPlayer = null;
-    }
+    this.isCancelled = true;
+    amplifiedAudioBridge.stop();
   }
 }
