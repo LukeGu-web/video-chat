@@ -25,6 +25,11 @@ export class TTSQueue implements ITTSQueue {
   private isCancelled = false;
   private provider: FishAudioProvider;
   private cache: AudioCache;
+  // Event-driven readiness: resolvers are called when synthesis finishes (success or fail)
+  // so playNext() doesn't have to poll every 100ms.
+  private readyResolvers = new Map<string, () => void>();
+  // Track which items came from cache to avoid an extra cache.get() in onEnd.
+  private cachedItemIds = new Set<string>();
 
   constructor(
     config: TTSQueueConfig = {},
@@ -32,7 +37,7 @@ export class TTSQueue implements ITTSQueue {
     cache?: AudioCache
   ) {
     this.config = {
-      maxConcurrentSynthesis: 2, // Reduced to 2 to avoid rate limits
+      maxConcurrentSynthesis: 3, // 3 concurrent allows better look-ahead synthesis
       maxRetries: 3, // Default: max 3 retry attempts
       retryDelay: 1000, // Default: 1s delay between retries
       ...config,
@@ -91,9 +96,14 @@ export class TTSQueue implements ITTSQueue {
       if (cachedEntry) {
         item.audioUri = cachedEntry.uri;
         item.status = 'ready';
+        this.cachedItemIds.add(item.id);
         this.activeSynthesisTasks--;
 
         console.log(`[TTSQueue] ⚡ Using cached audio for ${item.id} (active tasks: ${this.activeSynthesisTasks})`);
+
+        // Notify playNext immediately — no polling needed
+        this.readyResolvers.get(item.id)?.();
+        this.readyResolvers.delete(item.id);
 
         // If this is the first item and playback hasn't started, start now
         if (this.queue[0] === item && !this.isPlaying) {
@@ -116,14 +126,19 @@ export class TTSQueue implements ITTSQueue {
 
       console.log(`[TTSQueue] ✅ Synthesis complete for ${item.id} (active tasks: ${this.activeSynthesisTasks - 1})`);
 
-      // Cache the result for future use (only cache short phrases)
-      if (item.text.length <= 30) {
+      // Cache phrases ≤50 chars (was 30); catches more of 兰兰's common responses
+      if (item.text.length <= 50) {
         try {
           await this.cache.set(item.text, result.audioUri);
+          this.cachedItemIds.add(item.id);
         } catch (e) {
           console.warn('[TTSQueue] Failed to cache audio:', e);
         }
       }
+
+      // Notify playNext immediately — no polling needed
+      this.readyResolvers.get(item.id)?.();
+      this.readyResolvers.delete(item.id);
 
       // If this is the first item and playback hasn't started, start now
       if (this.queue[0] === item && !this.isPlaying) {
@@ -154,7 +169,7 @@ export class TTSQueue implements ITTSQueue {
           `Retrying in ${delay}ms... (${item.retryCount}/${maxRetries})`
         );
 
-        // Reset status to pending for retry
+        // Reset status to pending for retry — resolver stays in place for next attempt
         item.status = 'pending';
         this.activeSynthesisTasks--;
 
@@ -175,6 +190,10 @@ export class TTSQueue implements ITTSQueue {
       item.status = 'failed';
       item.error = errorMessage;
       this.activeSynthesisTasks--;
+
+      // Unblock playNext so it can skip this failed item
+      this.readyResolvers.get(item.id)?.();
+      this.readyResolvers.delete(item.id);
 
       // Notify error callback
       if (this.config.onItemError) {
@@ -232,14 +251,21 @@ export class TTSQueue implements ITTSQueue {
     const item = this.queue[this.currentIndex];
     this.isPlaying = true;
 
-    // Wait for synthesis to complete
-    while (
+    // Wait for synthesis to complete — event-driven instead of 100ms polling
+    if (
       item.status !== 'ready' &&
       item.status !== 'failed' &&
       item.status !== 'completed' &&
       !this.isCancelled
     ) {
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise<void>((resolve) => {
+        this.readyResolvers.set(item.id, resolve);
+      });
+    }
+
+    if (this.isCancelled) {
+      this.isPlaying = false;
+      return;
     }
 
     // Skip failed items
@@ -282,11 +308,11 @@ export class TTSQueue implements ITTSQueue {
 
             this.currentIndex++;
 
-            // Cleanup audio file (only if not cached)
-            const isCached = await this.cache.get(item.text);
-            if (!isCached && item.audioUri) {
+            // Cleanup audio file (only if not cached — tracked during synthesis)
+            if (!this.cachedItemIds.has(item.id) && item.audioUri) {
               await safeDeleteFile(item.audioUri);
             }
+            this.cachedItemIds.delete(item.id);
 
             // Play next
             if (!this.isCancelled) {
@@ -375,6 +401,11 @@ export class TTSQueue implements ITTSQueue {
     this.currentIndex = 0;
     this.activeSynthesisTasks = 0;
 
+    // Unblock any playNext() calls waiting on readyResolvers
+    this.readyResolvers.forEach((resolve) => resolve());
+    this.readyResolvers.clear();
+    this.cachedItemIds.clear();
+
     // Resolve any pending waitForCompletion promises
     if (this.onPlaybackComplete) {
       this.onPlaybackComplete();
@@ -409,5 +440,8 @@ export class TTSQueue implements ITTSQueue {
     this.activeSynthesisTasks = 0;
     this.isPlaying = false;
     this.onPlaybackComplete = undefined;
+    this.readyResolvers.forEach((resolve) => resolve());
+    this.readyResolvers.clear();
+    this.cachedItemIds.clear();
   }
 }
