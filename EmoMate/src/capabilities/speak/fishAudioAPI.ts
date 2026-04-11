@@ -6,6 +6,29 @@ import { safeDeleteFile } from '../../utils/fileSystemHelpers';
 import { TTSSynthesisOptions, TTSSynthesisResult } from '../../types/speak';
 
 /**
+ * Strip action / emotion descriptions enclosed in parentheses.
+ *
+ * The AI uses patterns like "(表现害羞)", "（轻声）", "[思考中]", "【动作】" to
+ * annotate intended animations/expressions for future Live2D integration.
+ * These must be removed from both speech and display text.
+ *
+ * Supports:
+ *   Half-width  ( ... )
+ *   Full-width  （ ... ）
+ *   Square      [ ... ]
+ *   Full-width  【 ... 】
+ */
+export function stripActionDescriptions(text: string): string {
+  return text
+    .replace(/\([^)）]*[)）]/g, '')   // ( ... ) and （...）
+    .replace(/（[^）)]*[）)]/g, '')   // full-width open with either close
+    .replace(/\[[^\]]*\]/g, '')        // [ ... ]
+    .replace(/【[^】]*】/g, '')        // 【 ... 】
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+/**
  * Sanitize text before sending to TTS.
  *
  * Non-standard symbols (~ ... * #) are either read out literally by TTS or cause
@@ -20,7 +43,8 @@ import { TTSSynthesisOptions, TTSSynthesisResult } from '../../types/speak';
  * Leading punctuation is stripped so symbols can never appear at sentence start.
  */
 export function sanitizeTextForTTS(text: string): string {
-  return text
+  // First remove action descriptions (safety net in case they reach this layer)
+  return stripActionDescriptions(text)
     // ~ / ～ → —— (drawn-out / cute trailing sound, e.g. "好的～" → "好的——")
     .replace(/[~～]+/g, '——')
     // ... (2+ dots) → …… (standard Chinese ellipsis for hesitation)

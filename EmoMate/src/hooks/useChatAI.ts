@@ -9,6 +9,7 @@ import {
 } from '../constants/ai';
 import { parseSSEChunk } from '../capabilities/speak/sentenceDetector'; // Phase 2: 句子检测
 import { TTSQueue } from '../capabilities/speak'; // Phase 2: TTS队列管理 - NEW ARCHITECTURE
+import { stripActionDescriptions } from '../capabilities/speak/fishAudioAPI'; // Strip (动作) tags before TTS/display
 // import { SmartSentenceBuffer } from '../capabilities/speak/smartSentenceBuffer'; // Phase 3: 智能句子过滤 - DISABLED (causes incomplete sentences)
 import { useSceneStore } from '../store/sceneStore'; // Scene context
 import { SceneData } from '../types/scene'; // Scene data type
@@ -253,7 +254,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
 
                 // Check if this is a sentence ending
                 if (sentenceEndings.includes(char)) {
-                  const sentence = currentSentence.trim();
+                  const sentence = stripActionDescriptions(currentSentence.trim());
                   if (sentence) {
                     debugLog('ChatAI', 'Playing complete sentence (unfiltered)', {
                       sentence,
@@ -279,12 +280,14 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
             // DISABLED: SmartBuffer flush
             // Now flush remaining partial sentence directly without filtering
             if (partialSentence.trim()) {
-              const finalSentence = partialSentence.trim();
-              debugLog('ChatAI', 'Playing final sentence (unfiltered)', {
-                finalSentence,
-              });
-              onSentence(finalSentence);
-              fullText += finalSentence;
+              const finalSentence = stripActionDescriptions(partialSentence.trim());
+              if (finalSentence) {
+                debugLog('ChatAI', 'Playing final sentence (unfiltered)', {
+                  finalSentence,
+                });
+                onSentence(finalSentence);
+                fullText += finalSentence;
+              }
             }
 
             // Phase 2: Track cache usage from API response
