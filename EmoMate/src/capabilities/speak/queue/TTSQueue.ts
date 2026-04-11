@@ -10,6 +10,7 @@ import {
 import { FishAudioProvider } from '../providers/FishAudioProvider';
 import { AudioCache } from '../cache/AudioCache';
 import { safeDeleteFile } from '../../../utils/fileSystemHelpers';
+import { hasMeaningfulContent } from '../fishAudioAPI';
 
 /**
  * TTS Queue Manager
@@ -53,6 +54,13 @@ export class TTSQueue implements ITTSQueue {
    */
   async enqueue(text: string, options?: TTSSynthesisOptions): Promise<void> {
     if (this.isCancelled || !text.trim()) return;
+
+    // Skip segments that contain no real characters — e.g. a lone "~" or "..."
+    // that the streaming buffer flushed as a standalone chunk.
+    if (!hasMeaningfulContent(text)) {
+      console.log(`[TTSQueue] Skipping symbol-only segment: "${text}"`);
+      return;
+    }
 
     const item: TTSQueueItem = {
       id: `tts_${Date.now()}_${Math.random().toString(36).substring(7)}`,

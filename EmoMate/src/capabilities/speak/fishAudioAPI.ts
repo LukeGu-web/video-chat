@@ -6,6 +6,53 @@ import { safeDeleteFile } from '../../utils/fileSystemHelpers';
 import { TTSSynthesisOptions, TTSSynthesisResult } from '../../types/speak';
 
 /**
+ * Sanitize text before sending to TTS.
+ *
+ * Non-standard symbols (~ ... * #) are either read out literally by TTS or cause
+ * unexpected behavior. We map them to standard Chinese punctuation that Fish Audio's
+ * neural model already knows how to vocalize with the correct prosody:
+ *
+ *   ~  / ～  →  ——   (Chinese em-dash: produces a drawn-out, expressive sound)
+ *   .../ …   →  ……   (Chinese ellipsis: produces natural hesitation / trailing pause)
+ *   ** bold **        → keep inner text, drop asterisks
+ *   # heading         → drop hash
+ *
+ * Leading punctuation is stripped so symbols can never appear at sentence start.
+ */
+export function sanitizeTextForTTS(text: string): string {
+  return text
+    // ~ / ～ → —— (drawn-out / cute trailing sound, e.g. "好的～" → "好的——")
+    .replace(/[~～]+/g, '——')
+    // ... (2+ dots) → …… (standard Chinese ellipsis for hesitation)
+    .replace(/\.{2,}/g, '……')
+    // Normalize multiple ellipsis chars to a single ……
+    .replace(/…+/g, '……')
+    // Remove markdown formatting — keep the text inside
+    .replace(/\*{1,3}([^*]*)\*{1,3}/g, '$1')
+    .replace(/_{1,2}([^_]*)_{1,2}/g, '$1')
+    .replace(/#+\s*/g, '')
+    // Markdown links — keep link text
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    // Collapse repeated dashes or ellipses from multiple replacements
+    .replace(/(——){2,}/g, '——')
+    .replace(/(……){2,}/g, '……')
+    .replace(/\s{2,}/g, ' ')
+    // Strip punctuation from the start — symbols must follow text, not lead it
+    .replace(/^[，。！？……——\s]+/, '')
+    .trim();
+}
+
+/**
+ * Returns true only if text contains at least one real character
+ * (CJK, kana, letter, or digit) after sanitization.
+ * Use this to skip punctuation-only TTS segments.
+ */
+export function hasMeaningfulContent(text: string): boolean {
+  const sanitized = sanitizeTextForTTS(text);
+  return /[\u4e00-\u9fff\u3040-\u30ff\w]/.test(sanitized);
+}
+
+/**
  * Synthesize speech using Fish Audio API
  * Pure function with no side effects except network and file I/O
  */
@@ -24,10 +71,13 @@ export async function synthesizeWithFishAudio(
     FISH_AUDIO_CONFIG.emotionalSettings[emotionKey] ??
     FISH_AUDIO_CONFIG.emotionalSettings.gentle;
 
+  // Sanitize text to remove symbols TTS would read literally
+  const sanitizedText = sanitizeTextForTTS(text);
+
   // Prepend emotion tag to text if required
   const processedText = emotionSettings.textPrefix
-    ? `${emotionSettings.textPrefix} ${text}`
-    : text;
+    ? `${emotionSettings.textPrefix} ${sanitizedText}`
+    : sanitizedText;
 
   const referenceId = options?.voiceId ?? FISH_AUDIO_CONFIG.voices.lanlan;
   const url = `${FISH_AUDIO_CONFIG.baseURL}/tts`;
