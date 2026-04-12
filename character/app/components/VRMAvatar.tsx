@@ -1,6 +1,7 @@
 import {
   useEffect,
   useRef,
+  useState,
   forwardRef,
   useImperativeHandle,
   Suspense,
@@ -8,6 +9,7 @@ import {
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { VRMLoaderPlugin, VRM, VRMUtils } from '@pixiv/three-vrm';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { ExpressionController } from './ExpressionController';
 
 // ─── Bridge message types ────────────────────────────────────────────────────
 
@@ -41,6 +43,7 @@ interface VRMSceneProps {
 
 function VRMScene({ modelPath, onReady, onError }: VRMSceneProps) {
   const vrmRef = useRef<VRM | null>(null);
+  const [loadedVRM, setLoadedVRM] = useState<VRM | null>(null);
   const { scene } = useThree();
 
   useEffect(() => {
@@ -69,6 +72,7 @@ function VRMScene({ modelPath, onReady, onError }: VRMSceneProps) {
 
         scene.add(vrm.scene);
         vrmRef.current = vrm;
+        setLoadedVRM(vrm);
         onReady(vrm);
       },
       undefined,
@@ -89,7 +93,7 @@ function VRMScene({ modelPath, onReady, onError }: VRMSceneProps) {
     vrmRef.current?.update(delta);
   });
 
-  return null;
+  return loadedVRM ? <ExpressionController vrm={loadedVRM} /> : null;
 }
 
 // ─── Camera Setup ─────────────────────────────────────────────────────────────
@@ -133,6 +137,13 @@ const VRMAvatar = forwardRef<VRMAvatarRef, VRMAvatarProps>(
       vrmRef.current = vrm;
       isReadyRef.current = true;
       sendToRN('vrmReady', { modelName: modelPath.split('/').pop() });
+
+      // Start idle animation after ExpressionController mounts
+      setTimeout(() => {
+        window.dispatchEvent(new MessageEvent('message', {
+          data: JSON.stringify({ type: 'playPreset', data: { name: 'idle', loop: true } })
+        }));
+      }, 100);
 
       // Heartbeat every 5s (matches existing bridge protocol)
       heartbeatRef.current = setInterval(() => {
