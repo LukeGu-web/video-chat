@@ -58,9 +58,9 @@ function VRMScene({ modelPath, onReady, onError }: VRMSceneProps) {
         VRMUtils.removeUnnecessaryVertices(vrm.scene);
         VRMUtils.removeUnnecessaryJoints(vrm.scene);
 
-        // Scale and position for upper-body view
+        // Scale and position: model origin is at feet, shift up to center upper body
         vrm.scene.scale.setScalar(1.0);
-        vrm.scene.position.set(0, -1.0, 0);
+        vrm.scene.position.set(0, 0, 0);
 
         scene.add(vrm.scene);
         vrmRef.current = vrm;
@@ -92,8 +92,9 @@ function VRMScene({ modelPath, onReady, onError }: VRMSceneProps) {
 function CameraSetup() {
   const { camera } = useThree();
   useEffect(() => {
-    camera.position.set(0, 0.5, 2.5);
-    camera.lookAt(0, 0.5, 0);
+    // Position camera to show upper body (head + torso)
+    camera.position.set(0, 1.2, 2.0);
+    camera.lookAt(0, 1.2, 0);
   }, [camera]);
   return null;
 }
@@ -151,6 +152,10 @@ const VRMAvatar = forwardRef<VRMAvatarRef, VRMAvatarProps>(
           style={{ width: '100%', height: '100%', background: 'transparent' }}
           gl={{ alpha: true, antialias: true }}
           camera={{ fov: 30, near: 0.1, far: 100 }}
+          onCreated={({ gl }) => {
+            // Ensure fully transparent background for WebView integration
+            gl.setClearColor(0x000000, 0);
+          }}
         >
           <CameraSetup />
           <ambientLight intensity={0.8} />
