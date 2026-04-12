@@ -226,10 +226,11 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
               }
               break;
 
+            case 'vrmReady':
             case 'modelReady':
               debugLog(
                 'HiyoriWebView',
-                'Hiyori model is fully ready!',
+                'Model ready (VRM or Live2D)',
                 message.data
               );
               setState((prev) => ({
