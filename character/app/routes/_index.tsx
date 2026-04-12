@@ -26,7 +26,7 @@ export default function Index() {
         {() => (
           <VRMAvatar
             ref={avatarRef}
-            modelPath='/assets/vrm/girl_c.vrm'
+            modelPath='/assets/vrm/girl_c.vrm?v=2'
             width={500}
             height={700}
           />
