@@ -1,4 +1,10 @@
-import { useEffect, useRef, forwardRef, useImperativeHandle, Suspense } from 'react';
+import {
+  useEffect,
+  useRef,
+  forwardRef,
+  useImperativeHandle,
+  Suspense,
+} from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { VRMLoaderPlugin, VRM, VRMUtils } from '@pixiv/three-vrm';
 import * as THREE from 'three';
@@ -69,7 +75,7 @@ function VRMScene({ modelPath, onReady, onError }: VRMSceneProps) {
       undefined,
       (err) => {
         onError(err instanceof Error ? err.message : 'Failed to load VRM');
-      }
+      },
     );
 
     return () => {
@@ -93,8 +99,8 @@ function CameraSetup() {
   const { camera } = useThree();
   useEffect(() => {
     // Position camera to show upper body (head + torso)
-    camera.position.set(0, 1.2, 2.0);
-    camera.lookAt(0, 1.2, 0);
+    camera.position.set(0, 1.0, 4.0);
+    camera.lookAt(0, 1.0, 0);
   }, [camera]);
   return null;
 }
@@ -170,7 +176,7 @@ const VRMAvatar = forwardRef<VRMAvatarRef, VRMAvatarProps>(
         </Canvas>
       </div>
     );
-  }
+  },
 );
 
 VRMAvatar.displayName = 'VRMAvatar';
