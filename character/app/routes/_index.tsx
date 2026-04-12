@@ -26,6 +26,9 @@ export default function Index() {
         {() => (
           <VRMAvatar
             ref={avatarRef}
+            // Cache-bust query param: Vercel sets Cache-Control: immutable on public/ assets.
+            // If you replace the VRM file with a new version, increment ?v=N to force
+            // browsers to re-fetch instead of serving the stale cached file.
             modelPath='/assets/vrm/girl_c.vrm?v=2'
             width={500}
             height={700}

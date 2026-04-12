@@ -7,7 +7,6 @@ import {
 } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { VRMLoaderPlugin, VRM, VRMUtils } from '@pixiv/three-vrm';
-import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 // ─── Bridge message types ────────────────────────────────────────────────────
@@ -60,9 +59,9 @@ function VRMScene({ modelPath, onReady, onError }: VRMSceneProps) {
         // Rotate model to face camera (VRM models face +Z by default)
         VRMUtils.rotateVRM0(vrm);
 
-        // Remove unnecessary vertices/joints for performance
+        // Optimize skeleton by combining skeletons (replaces deprecated removeUnnecessaryJoints)
         VRMUtils.removeUnnecessaryVertices(vrm.scene);
-        VRMUtils.removeUnnecessaryJoints(vrm.scene);
+        VRMUtils.combineSkeletons(vrm.scene);
 
         // Scale and position: model origin is at feet, shift up to center upper body
         vrm.scene.scale.setScalar(1.0);
