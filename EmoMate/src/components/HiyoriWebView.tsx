@@ -21,6 +21,7 @@ interface HiyoriBridge {
   getAvailableMotions: () => void;
   checkModelStatus: () => void;
   reload: () => void;
+  sendVRMCommand: (cmd: { type: string; data?: any }) => void;
 }
 
 interface PendingMessage {
@@ -532,6 +533,23 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
       },
 
       reload: reload,
+
+      sendVRMCommand: (cmd: { type: string; data?: any }) => {
+        debugLog('HiyoriWebView', `Sending VRM command: ${cmd.type}`);
+        const message = JSON.stringify(cmd);
+        const jsCode = `
+          (function() {
+            try {
+              window.dispatchEvent(new MessageEvent('message', {
+                data: ${JSON.stringify(message)}
+              }));
+            } catch(e) {
+              console.error('[WebView] VRM command dispatch failed:', e);
+            }
+          })();
+        `;
+        executeJavaScript(jsCode);
+      },
     };
 
     // Expose bridge methods via the ref passed from parent
