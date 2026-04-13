@@ -396,3 +396,81 @@ export function getAvailableMotions(): HiyoriMotion[] {
     'Sleepy'
   ];
 }
+
+// ==================== VRM Motion Commands ====================
+
+import { VRMMotionResult } from '../../types/vrm';
+
+/**
+ * Maps a Plutchik emotion to VRM bridge commands.
+ * Returns an expression command + optional preset command.
+ */
+export function emotionToVRMCommands(
+  emotion: EmotionType,
+  intensity: number = 1.0
+): VRMMotionResult {
+  const scale = Math.max(0.1, Math.min(1.0, intensity));
+
+  const map: Record<EmotionType, VRMMotionResult> = {
+    joy: {
+      expressionCommand: {
+        type: 'setExpression',
+        data: { blendShapes: { joy: 0.8 * scale }, duration: 0.5 },
+      },
+      presetCommand: { type: 'playPreset', data: { name: 'happy' } },
+    },
+    sadness: {
+      expressionCommand: {
+        type: 'setExpression',
+        data: { blendShapes: { sorrow: 0.7 * scale }, duration: 0.8 },
+      },
+    },
+    anger: {
+      expressionCommand: {
+        type: 'setExpression',
+        data: { blendShapes: { angry: 0.6 * scale }, duration: 0.5 },
+      },
+    },
+    fear: {
+      expressionCommand: {
+        type: 'setExpression',
+        data: { blendShapes: { surprised: 0.5 * scale, sorrow: 0.3 * scale }, duration: 0.5 },
+      },
+      presetCommand: { type: 'playPreset', data: { name: 'shy' } },
+    },
+    surprise: {
+      expressionCommand: {
+        type: 'setExpression',
+        data: { blendShapes: { surprised: 0.9 * scale }, duration: 0.3 },
+      },
+      presetCommand: { type: 'playPreset', data: { name: 'surprised' } },
+    },
+    disgust: {
+      expressionCommand: {
+        type: 'setExpression',
+        data: { blendShapes: { angry: 0.4 * scale, sorrow: 0.2 * scale }, duration: 0.5 },
+      },
+    },
+    trust: {
+      expressionCommand: {
+        type: 'setExpression',
+        data: { blendShapes: { joy: 0.4 * scale, fun: 0.3 * scale }, duration: 0.5 },
+      },
+    },
+    anticipation: {
+      expressionCommand: {
+        type: 'setExpression',
+        data: { blendShapes: { fun: 0.5 * scale }, duration: 0.5 },
+      },
+      presetCommand: { type: 'playPreset', data: { name: 'thinking' } },
+    },
+    neutral: {
+      expressionCommand: {
+        type: 'setExpression',
+        data: { blendShapes: { neutral: 0 }, duration: 0.5 },
+      },
+    },
+  };
+
+  return map[emotion] ?? map.neutral;
+}
