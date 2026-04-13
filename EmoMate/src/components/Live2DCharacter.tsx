@@ -4,9 +4,12 @@ import HiyoriWebView, { HiyoriBridge } from './HiyoriWebView';
 import { useAIStatus, HiyoriMotion } from '../store';
 import { debugLog, debugError, debugWarn } from '../utils/debug';
 import { useMonitorStore } from '../store/monitorStore';
+import { EmotionType } from '../types/emotion';
+import { emotionToVRMCommands } from '../capabilities/motion/motionMapper';
 
 interface Live2DCharacterProps {
   status?: HiyoriMotion; // 直接使用HiyoriMotion类型
+  emotion?: EmotionType; // VRM emotion for expression control
   size?: number;
   loop?: boolean;
   className?: string;
@@ -50,6 +53,7 @@ const validateHiyoriMotion = (
 
 const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
   status,
+  emotion,
   size = 240,
   loop = true,
   className = '',
@@ -139,8 +143,21 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
 
       console.log(`▶️ [Live2DCharacter] Starting motion: ${motionName}`);
 
-      // 播放动作
-      webViewRef.current.hiyoriBridge.playMotion(motionName);
+      // OLD: Live2D
+      // webViewRef.current.hiyoriBridge.playMotion(motionName);
+
+      // NEW: VRM commands
+      if (emotion && webViewRef.current.hiyoriBridge.sendVRMCommand) {
+        const { expressionCommand, presetCommand } = emotionToVRMCommands(emotion, 1.0);
+        webViewRef.current.hiyoriBridge.sendVRMCommand(expressionCommand);
+        if (presetCommand) {
+          webViewRef.current.hiyoriBridge.sendVRMCommand(presetCommand);
+        }
+      } else {
+        // Fallback: send VRM preset based on motion name
+        const presetName = motionName.toLowerCase();
+        webViewRef.current.hiyoriBridge.sendVRMCommand?.({ type: 'playPreset', data: { name: presetName } });
+      }
 
       // 清除之前的定时器
       if (motionTimeoutRef.current) {
@@ -163,7 +180,11 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
             lastMotionRef.current === motionName
           ) {
             console.log(`🔄 [Live2DCharacter] Loop replay: ${motionName}`);
-            webViewRef.current.hiyoriBridge.playMotion(motionName);
+            // OLD: Live2D
+            // webViewRef.current.hiyoriBridge.playMotion(motionName);
+            // NEW: VRM replay (send preset again)
+            const replayPreset = motionName.toLowerCase();
+            webViewRef.current.hiyoriBridge.sendVRMCommand?.({ type: 'playPreset', data: { name: replayPreset } });
           }
         }, 3000);
       } else {

@@ -182,6 +182,7 @@ export const EmotionAwareCharacter: React.FC<EmotionAwareCharacterProps> = ({
     <View className={`relative ${className}`}>
       <Live2DCharacter
         status={currentMotion}
+        emotion={combinedEmotion}
         size={size}
         loop={loop}
         onMotionComplete={handleMotionComplete}
