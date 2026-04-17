@@ -101,7 +101,7 @@ function CameraSetup() {
   const { camera } = useThree();
   useEffect(() => {
     // Position camera to show upper body (head + torso)
-    camera.position.set(0, 1.0, 4.0);
+    camera.position.set(0, 1.0, 4.6);
     camera.lookAt(0, 1.0, 0);
   }, [camera]);
   return null;
@@ -139,9 +139,14 @@ const VRMAvatar = forwardRef<VRMAvatarRef, VRMAvatarProps>(
 
       // Start idle animation after ExpressionController mounts
       setTimeout(() => {
-        window.dispatchEvent(new MessageEvent('message', {
-          data: JSON.stringify({ type: 'playPreset', data: { name: 'idle', loop: true } })
-        }));
+        window.dispatchEvent(
+          new MessageEvent('message', {
+            data: JSON.stringify({
+              type: 'playPreset',
+              data: { name: 'idle', loop: true },
+            }),
+          }),
+        );
       }, 100);
 
       // Heartbeat every 5s (matches existing bridge protocol)
