@@ -89,9 +89,8 @@ function VRMScene({ modelPath, onReady, onError }: VRMSceneProps) {
     };
   }, [modelPath, scene, onReady, onError]);
 
-  useFrame((_, delta) => {
-    vrmRef.current?.update(delta);
-  });
+  // vrm.update is called in ExpressionController after bones are set,
+  // so spring bones, lookAt, etc. are updated in the correct order.
 
   return loadedVRM ? <ExpressionController vrm={loadedVRM} /> : null;
 }

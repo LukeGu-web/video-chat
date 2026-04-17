@@ -155,7 +155,13 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
         }
       } else {
         // Fallback: send VRM preset based on motion name
-        const presetName = motionName.toLowerCase();
+        // Map Live2D motions that have no direct VRM equivalent
+        const VRM_MOTION_FALLBACK: Record<string, string> = {
+          dance: 'excited',
+          laugh: 'happy',
+        };
+        const lowerName = motionName.toLowerCase();
+        const presetName = VRM_MOTION_FALLBACK[lowerName] ?? lowerName;
         webViewRef.current.hiyoriBridge.sendVRMCommand?.({ type: 'playPreset', data: { name: presetName } });
       }
 
@@ -183,7 +189,12 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
             // OLD: Live2D
             // webViewRef.current.hiyoriBridge.playMotion(motionName);
             // NEW: VRM replay (send preset again)
-            const replayPreset = motionName.toLowerCase();
+            const VRM_MOTION_FALLBACK: Record<string, string> = {
+              dance: 'excited',
+              laugh: 'happy',
+            };
+            const lowerName = motionName.toLowerCase();
+            const replayPreset = VRM_MOTION_FALLBACK[lowerName] ?? lowerName;
             webViewRef.current.hiyoriBridge.sendVRMCommand?.({ type: 'playPreset', data: { name: replayPreset } });
           }
         }, 3000);
@@ -199,7 +210,7 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
         }, 3000);
       }
     },
-    [isModelReady, onMotionComplete, stopMotionLoop]
+    [isModelReady, onMotionComplete, stopMotionLoop, emotion]
   );
 
   // 当动作改变时播放对应动作

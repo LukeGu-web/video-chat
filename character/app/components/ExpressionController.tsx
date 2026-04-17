@@ -243,7 +243,8 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
               const interp = lerpBones(kfs[i].bones ?? {}, kfs[i + 1].bones ?? {}, alpha);
               applyBones(interp);
             }
-            if (kfs[i].blendShapes || kfs[i + 1].blendShapes) {
+            if ((kfs[i].blendShapes || kfs[i + 1].blendShapes) && !state.isAnimating) {
+              // Only apply preset blendShapes when no smooth transition is active
               const interp = lerpBlendShapes(kfs[i].blendShapes ?? {}, kfs[i + 1].blendShapes ?? {}, alpha);
               applyBlendShapes(interp);
             }
@@ -272,6 +273,9 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
         state.isAnimating = false;
       }
     }
+
+    // Propagate normalized bone changes to raw bones (must run after applyBones)
+    vrm.update(delta);
   });
 
   return null;

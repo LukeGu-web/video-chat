@@ -536,12 +536,11 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
 
       sendVRMCommand: (cmd: { type: string; data?: any }) => {
         debugLog('HiyoriWebView', `Sending VRM command: ${cmd.type}`);
-        const message = JSON.stringify(cmd);
         const jsCode = `
           (function() {
             try {
               window.dispatchEvent(new MessageEvent('message', {
-                data: ${JSON.stringify(message)}
+                data: ${JSON.stringify(cmd)}
               }));
             } catch(e) {
               console.error('[WebView] VRM command dispatch failed:', e);
