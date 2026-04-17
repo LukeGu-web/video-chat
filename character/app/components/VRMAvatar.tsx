@@ -101,8 +101,8 @@ function CameraSetup() {
   const { camera } = useThree();
   useEffect(() => {
     // Position camera to show upper body (head + torso)
-    camera.position.set(0, 1.0, 4.6);
-    camera.lookAt(0, 1.0, 0);
+    camera.position.set(0, 0.8, 4.6);
+    camera.lookAt(0, 0.8, 0);
   }, [camera]);
   return null;
 }
