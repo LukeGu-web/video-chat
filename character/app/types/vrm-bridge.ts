@@ -42,7 +42,7 @@ export type EasingType = 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
 // Commands sent from EmoMate → WebView
 export type VRMBridgeCommand =
   | { type: 'playPreset'; data: { name: PresetName; loop?: boolean } }
-  | { type: 'setExpression'; data: { blendShapes: BlendShapeMap; duration?: number } }
+  | { type: 'setExpression'; data: { blendShapes: BlendShapeMap; duration?: number; holdDuration?: number } }
   | { type: 'playPose'; data: { blendShapes?: BlendShapeMap; bones?: BoneMap; duration?: number; easing?: EasingType } }
   | { type: 'stopAll' }
   | { type: 'ping' };

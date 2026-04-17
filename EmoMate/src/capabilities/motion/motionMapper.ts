@@ -415,52 +415,52 @@ export function emotionToVRMCommands(
     joy: {
       expressionCommand: {
         type: 'setExpression',
-        data: { blendShapes: { joy: 0.8 * scale }, duration: 0.5 },
+        data: { blendShapes: { joy: 0.8 * scale }, duration: 0.5, holdDuration: 3 },
       },
       presetCommand: { type: 'playPreset', data: { name: 'happy' } },
     },
     sadness: {
       expressionCommand: {
         type: 'setExpression',
-        data: { blendShapes: { sorrow: 0.7 * scale }, duration: 0.8 },
+        data: { blendShapes: { sorrow: 0.7 * scale }, duration: 0.8, holdDuration: 3 },
       },
     },
     anger: {
       expressionCommand: {
         type: 'setExpression',
-        data: { blendShapes: { angry: 0.6 * scale }, duration: 0.5 },
+        data: { blendShapes: { angry: 0.6 * scale }, duration: 0.5, holdDuration: 3 },
       },
     },
     fear: {
       expressionCommand: {
         type: 'setExpression',
-        data: { blendShapes: { surprised: 0.5 * scale, sorrow: 0.3 * scale }, duration: 0.5 },
+        data: { blendShapes: { surprised: 0.5 * scale, sorrow: 0.3 * scale }, duration: 0.5, holdDuration: 3 },
       },
       presetCommand: { type: 'playPreset', data: { name: 'shy' } },
     },
     surprise: {
       expressionCommand: {
         type: 'setExpression',
-        data: { blendShapes: { surprised: 0.9 * scale }, duration: 0.3 },
+        data: { blendShapes: { surprised: 0.9 * scale }, duration: 0.3, holdDuration: 2 },
       },
       presetCommand: { type: 'playPreset', data: { name: 'surprised' } },
     },
     disgust: {
       expressionCommand: {
         type: 'setExpression',
-        data: { blendShapes: { angry: 0.4 * scale, sorrow: 0.2 * scale }, duration: 0.5 },
+        data: { blendShapes: { angry: 0.4 * scale, sorrow: 0.2 * scale }, duration: 0.5, holdDuration: 3 },
       },
     },
     trust: {
       expressionCommand: {
         type: 'setExpression',
-        data: { blendShapes: { joy: 0.4 * scale, fun: 0.3 * scale }, duration: 0.5 },
+        data: { blendShapes: { joy: 0.4 * scale, fun: 0.3 * scale }, duration: 0.5, holdDuration: 3 },
       },
     },
     anticipation: {
       expressionCommand: {
         type: 'setExpression',
-        data: { blendShapes: { fun: 0.5 * scale }, duration: 0.5 },
+        data: { blendShapes: { fun: 0.5 * scale }, duration: 0.5, holdDuration: 3 },
       },
       presetCommand: { type: 'playPreset', data: { name: 'thinking' } },
     },

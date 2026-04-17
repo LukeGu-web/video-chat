@@ -59,6 +59,9 @@ interface AnimationState {
   transitionElapsed: number;
   easing: EasingType;
   isAnimating: boolean;
+  holdDuration: number;
+  holdElapsed: number;
+  isHolding: boolean;
 }
 
 interface PresetState {
@@ -83,6 +86,9 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
     transitionElapsed: 0,
     easing: 'easeInOut',
     isAnimating: false,
+    holdDuration: 0,
+    holdElapsed: 0,
+    isHolding: false,
   });
 
   const presetState = useRef<PresetState>({ name: 'idle', elapsed: 0, loop: true });
@@ -165,6 +171,9 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
           state.transitionElapsed = 0;
           state.easing = 'easeInOut';
           state.isAnimating = true;
+          state.holdDuration = cmd.data.holdDuration ?? 0;
+          state.holdElapsed = 0;
+          state.isHolding = false;
           break;
 
         case 'playPose':
@@ -214,13 +223,17 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
     const state = animState.current;
     const preset = presetState.current;
 
-    // Auto-blink
+    // Auto-blink — suppress when any expression is active
+    const hasActiveExpression = state.isHolding || state.isAnimating ||
+      Object.values(state.currentBlendShapes).some(v => (v ?? 0) > 0.05);
     blinkTimer.current += delta;
     if (blinkTimer.current >= nextBlinkTime.current) {
       blinkTimer.current = 0;
       nextBlinkTime.current = 0.5 + Math.random() * 3.5;
-      applyBlendShapes({ blink: 1 });
-      setTimeout(() => applyBlendShapes({ blink: 0 }), 120);
+      if (!hasActiveExpression) {
+        applyBlendShapes({ blink: 1 });
+        setTimeout(() => applyBlendShapes({ blink: 0 }), 120);
+      }
     }
 
     // Preset animation
@@ -271,6 +284,27 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
       if (rawT >= 1) {
         state.currentBlendShapes = { ...state.targetBlendShapes };
         state.isAnimating = false;
+        if (state.holdDuration > 0) {
+          state.isHolding = true;
+          state.holdElapsed = 0;
+        }
+      }
+    }
+
+    // Hold phase — count down then fade back to neutral
+    if (state.isHolding) {
+      state.holdElapsed += delta;
+      if (state.holdElapsed >= state.holdDuration) {
+        state.isHolding = false;
+        state.holdDuration = 0;
+        // Explicitly zero out all active shapes so lerpBlendShapes has keys to iterate
+        state.targetBlendShapes = Object.fromEntries(
+          Object.keys(state.currentBlendShapes).map(k => [k, 0])
+        ) as BlendShapeMap;
+        state.transitionDuration = 0.5;
+        state.transitionElapsed = 0;
+        state.easing = 'easeInOut';
+        state.isAnimating = true;
       }
     }
 
