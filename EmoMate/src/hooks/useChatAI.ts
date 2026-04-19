@@ -497,6 +497,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
 
         // Cancel TTS queue on error
         ttsQueue.cancel();
+        lipSyncBridge.sendVRMCommand({ type: 'stopVisemes' });
 
         // Add error message
         const errorMessage: ChatMessage = {
