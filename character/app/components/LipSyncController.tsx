@@ -122,7 +122,7 @@ export function LipSyncController({ vrm }: LipSyncControllerProps) {
       }
     }
 
-    const lerpSpeed = Math.min(delta * 20, 1);
+    const lerpSpeed = Math.min(delta * 40, 1);
     s.currentWeight += (targetWeight - s.currentWeight) * lerpSpeed;
 
     if (s.currentShape && s.currentShape !== targetShape) {

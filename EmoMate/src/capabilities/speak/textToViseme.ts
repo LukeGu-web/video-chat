@@ -1,6 +1,6 @@
 import { VisemeFrame } from '../../types/vrm';
 
-const MS_PER_CHAR = 0.2;
+const MS_PER_CHAR = 0.25;
 const PAUSE_DURATION = 0.15;
 
 const CHAR_TO_SHAPE: Record<string, VisemeFrame['shape']> = {
@@ -47,11 +47,11 @@ export function textToViseme(text: string): { visemes: VisemeFrame[]; totalDurat
     const charDuration = MS_PER_CHAR;
 
     // Open mouth at start of char
-    visemes.push({ shape, time: t, weight: 0.85 });
-    // Start closing halfway through
-    visemes.push({ shape, time: t + charDuration * 0.6, weight: 0.3 });
+    visemes.push({ shape, time: t, weight: 1.0 });
+    // Hold open until 75%, then start closing
+    visemes.push({ shape, time: t + charDuration * 0.75, weight: 1.0 });
     // Close before next char
-    visemes.push({ shape: 'sil', time: t + charDuration * 0.9, weight: 0 });
+    visemes.push({ shape: 'sil', time: t + charDuration * 0.95, weight: 0 });
 
     t += charDuration;
   }

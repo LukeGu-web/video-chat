@@ -177,9 +177,9 @@ const VRMAvatar = forwardRef<VRMAvatarRef, VRMAvatarProps>(
         <Canvas
           style={{ width: '100%', height: '100%', background: 'transparent' }}
           gl={{ alpha: true, antialias: true }}
+          dpr={[1, 2]}
           camera={{ fov: 30, near: 0.1, far: 100 }}
           onCreated={({ gl }) => {
-            // Ensure fully transparent background for WebView integration
             gl.setClearColor(0x000000, 0);
           }}
         >
