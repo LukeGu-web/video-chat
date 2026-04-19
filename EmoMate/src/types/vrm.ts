@@ -34,3 +34,9 @@ export interface VRMMotionResult {
   expressionCommand: VRMCommand;
   presetCommand?: VRMCommand;
 }
+
+export interface VisemeFrame {
+  shape: 'aa' | 'ee' | 'ih' | 'oh' | 'ou' | 'sil';
+  time: number;
+  weight: number;
+}

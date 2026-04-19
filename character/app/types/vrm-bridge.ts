@@ -39,11 +39,20 @@ export interface BoneMap {
 
 export type EasingType = 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
 
+export interface VisemeFrame {
+  shape: 'aa' | 'ee' | 'ih' | 'oh' | 'ou' | 'sil';
+  time: number;   // seconds from playback start
+  weight: number; // 0–1 intensity
+}
+
 // Commands sent from EmoMate → WebView
 export type VRMBridgeCommand =
   | { type: 'playPreset'; data: { name: PresetName; loop?: boolean } }
   | { type: 'setExpression'; data: { blendShapes: BlendShapeMap; duration?: number; holdDuration?: number } }
   | { type: 'playPose'; data: { blendShapes?: BlendShapeMap; bones?: BoneMap; duration?: number; easing?: EasingType } }
+  | { type: 'prepareVisemes'; data: { visemes: VisemeFrame[]; totalDuration: number } }
+  | { type: 'playVisemes'; data: { visemes: VisemeFrame[]; totalDuration: number } }
+  | { type: 'stopVisemes' }
   | { type: 'stopAll' }
   | { type: 'ping' };
 

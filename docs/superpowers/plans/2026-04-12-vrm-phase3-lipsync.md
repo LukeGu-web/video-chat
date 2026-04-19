@@ -2,546 +2,537 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make the character's mouth move in sync with audio. Route TTS audio from EmoMate's TTSQueue through the WebView bridge as base64, play it in the browser, and feed it to wawa-lipsync which drives VRM mouth blend shapes in real time.
+**Goal:** Make the character's mouth move in sync with TTS audio. Uses text-driven viseme timing — no changes to expo-av or TTSQueue internals. EmoMate converts the spoken text to a timed viseme sequence and sends it to the WebView; `LipSyncController` plays the sequence frame-by-frame via `useFrame`.
 
-**Architecture:** TTSQueue reads each synthesized audio file, base64-encodes it, and posts a `playAudio` bridge message instead of calling expo-av. The WebView's new `AudioPlayer` component decodes the base64, plays it via a Web Audio API node, and wawa-lipsync taps the audio node to emit real-time viseme data. `LipSyncController` maps visemes to VRM blend shapes (aa/ee/ih/oh/ou) every frame via `useFrame`. When audio ends, WebView posts `audioComplete` back so TTSQueue can advance the queue.
+**Architecture:**
+1. When TTSQueue starts playing an item (`onItemStart`), EmoMate calls `textToViseme(item.text)` to get `{ shape, time }[]`
+2. `sendVRMCommand({ type: 'playVisemes', data: { visemes, totalDuration } })` is called
+3. WebView's `LipSyncController` receives the sequence and drives VRM mouth blend shapes on a timeline
+4. When TTSQueue finishes the item (`onItemEnd`), `sendVRMCommand({ type: 'stopVisemes' })` closes the mouth
+5. expo-av and TTSQueue are **not modified**
 
-**Tech Stack:** `wawa-lipsync`, Web Audio API, `expo-file-system`, React Three Fiber `useFrame`, `@pixiv/three-vrm` expression manager
+**Tech Stack:** React Three Fiber `useFrame`, `@pixiv/three-vrm` expression manager, pinyin-based Chinese text analysis (no external package needed)
 
 ---
 
-## Task 1: Install wawa-lipsync
+## Task 1: Extend bridge types for viseme commands
 
 **Files:**
-- Modify: `character/package.json`
+- Modify: `character/app/types/vrm-bridge.ts`
+- Modify: `EmoMate/src/types/vrm.ts`
 
-- [ ] **Step 1: Install the package**
+- [ ] **Step 1: Add viseme types to character/app/types/vrm-bridge.ts**
 
-```bash
-cd character
-npm install wawa-lipsync
+Add these types and extend `VRMBridgeCommand`:
+
+```typescript
+export interface VisemeFrame {
+  shape: 'aa' | 'ee' | 'ih' | 'oh' | 'ou' | 'sil';
+  time: number;   // seconds from playback start
+  weight: number; // 0–1 intensity
+}
+
+// In VRMBridgeCommand union, add:
+| { type: 'playVisemes'; data: { visemes: VisemeFrame[]; totalDuration: number } }
+| { type: 'stopVisemes' }
 ```
 
-- [ ] **Step 2: Verify**
+- [ ] **Step 2: Add viseme types to EmoMate/src/types/vrm.ts**
 
-```bash
-cat package.json | grep wawa
+Add matching types (EmoMate side):
+
+```typescript
+export interface VisemeFrame {
+  shape: 'aa' | 'ee' | 'ih' | 'oh' | 'ou' | 'sil';
+  time: number;
+  weight: number;
+}
 ```
-
-Expected: `"wawa-lipsync": "..."`
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add package.json package-lock.json
-git commit -m "chore: add wawa-lipsync dependency"
+git add character/app/types/vrm-bridge.ts EmoMate/src/types/vrm.ts
+git commit -m "feat: add playVisemes/stopVisemes bridge types"
 ```
 
 ---
 
-## Task 2: Create AudioPlayer Component
+## Task 2: Create textToViseme utility in EmoMate
 
 **Files:**
-- Create: `character/app/components/AudioPlayer.tsx`
+- Create: `EmoMate/src/capabilities/speak/textToViseme.ts`
+
+Convert spoken text to a timed viseme sequence without any external package.
 
 - [ ] **Step 1: Create the file**
 
-```tsx
-// character/app/components/AudioPlayer.tsx
+```typescript
+// EmoMate/src/capabilities/speak/textToViseme.ts
 
-import { useEffect, useRef, useCallback } from 'react';
+import { VisemeFrame } from '../../types/vrm';
 
-interface BridgeMessage {
-  type: string;
-  data?: any;
-}
+// Seconds per Chinese character at normal TTS speed
+const MS_PER_CHAR = 0.2;
+// Pause duration for punctuation (seconds)
+const PAUSE_DURATION = 0.15;
 
-const sendToRN = (type: string, data?: any) => {
-  if (typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
-    (window as any).ReactNativeWebView.postMessage(
-      JSON.stringify({ id: `msg_${Date.now()}`, type, timestamp: Date.now(), data })
-    );
-  }
+// Pinyin final → mouth shape mapping
+// Covers the most common Chinese vowel endings
+const FINAL_TO_SHAPE: Record<string, VisemeFrame['shape']> = {
+  a: 'aa', ai: 'aa', ao: 'aa', an: 'aa', ang: 'aa',
+  e: 'ee', ei: 'ee', en: 'ee', eng: 'ee', er: 'ee',
+  i: 'ih', in: 'ih', ing: 'ih',
+  o: 'oh', ou: 'oh', ong: 'oh',
+  u: 'ou', un: 'ou', uan: 'ou',
+  v: 'ih', // ü
 };
 
-interface AudioPlayerProps {
-  onSourceNodeReady: (node: AudioBufferSourceNode, context: AudioContext) => void;
-  onPlaybackEnd: () => void;
+// Common Chinese character → approximate mouth shape (top-frequency chars)
+const CHAR_TO_SHAPE: Record<string, VisemeFrame['shape']> = {
+  '的': 'ee', '了': 'oh', '是': 'sil', '我': 'oh', '不': 'ou',
+  '你': 'ih', '他': 'aa', '她': 'aa', '好': 'aa', '在': 'aa',
+  '有': 'ou', '这': 'ee', '那': 'aa', '很': 'ee', '也': 'ee',
+  '就': 'ou', '都': 'ou', '说': 'oh', '来': 'aa', '去': 'ih',
+  '一': 'ih', '二': 'ee', '三': 'aa', '四': 'sil', '五': 'ou',
+  '啊': 'aa', '嗯': 'ee', '哦': 'oh', '呢': 'ee', '吧': 'aa',
+  '嘿': 'ee', '哇': 'aa', '呀': 'aa', '嘛': 'aa', '哈': 'aa',
+};
+
+const PUNCTUATION = new Set(['。', '，', '！', '？', '、', '.', ',', '!', '?', '…', '~', '·']);
+
+function charToShape(ch: string): VisemeFrame['shape'] {
+  if (CHAR_TO_SHAPE[ch]) return CHAR_TO_SHAPE[ch];
+  // Default: alternate between aa and ee for unknown chars
+  const code = ch.charCodeAt(0);
+  const shapes: VisemeFrame['shape'][] = ['aa', 'ee', 'ih', 'oh'];
+  return shapes[code % shapes.length];
 }
 
-export function AudioPlayer({ onSourceNodeReady, onPlaybackEnd }: AudioPlayerProps) {
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const currentSourceRef = useRef<AudioBufferSourceNode | null>(null);
+/**
+ * Convert spoken text to a timed viseme sequence.
+ * @param text - The text being spoken
+ * @returns Array of viseme frames with time in seconds
+ */
+export function textToViseme(text: string): { visemes: VisemeFrame[]; totalDuration: number } {
+  const visemes: VisemeFrame[] = [];
+  let t = 0;
 
-  const getAudioContext = useCallback((): AudioContext => {
-    if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
-      audioCtxRef.current = new AudioContext();
+  // Opening silence
+  visemes.push({ shape: 'sil', time: 0, weight: 0 });
+
+  for (const ch of text) {
+    if (PUNCTUATION.has(ch)) {
+      // Punctuation: mouth close + pause
+      visemes.push({ shape: 'sil', time: t, weight: 0 });
+      t += PAUSE_DURATION;
+      continue;
     }
-    return audioCtxRef.current;
-  }, []);
 
-  useEffect(() => {
-    const handleMessage = async (event: MessageEvent) => {
-      let msg: BridgeMessage;
-      try {
-        msg = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-      } catch {
-        return;
-      }
+    // Skip non-CJK, non-ASCII printable chars (e.g. emoji, spaces)
+    const isCJK = ch.charCodeAt(0) >= 0x4e00 && ch.charCodeAt(0) <= 0x9fff;
+    const isAscii = ch.charCodeAt(0) >= 0x20 && ch.charCodeAt(0) <= 0x7e;
+    if (!isCJK && !isAscii) continue;
 
-      if (msg.type === 'playAudio' && msg.data?.audioBase64) {
-        // Stop any currently playing audio
-        if (currentSourceRef.current) {
-          try { currentSourceRef.current.stop(); } catch {}
-          currentSourceRef.current = null;
-        }
+    const shape = charToShape(ch);
+    const charDuration = MS_PER_CHAR;
 
-        const { audioBase64, mimeType = 'audio/mpeg', id } = msg.data;
+    // Open mouth at start of char
+    visemes.push({ shape, time: t, weight: 0.85 });
+    // Start closing halfway through
+    visemes.push({ shape, time: t + charDuration * 0.6, weight: 0.3 });
+    // Close before next char
+    visemes.push({ shape: 'sil', time: t + charDuration * 0.9, weight: 0 });
 
-        try {
-          // Decode base64 → ArrayBuffer
-          const binaryStr = atob(audioBase64);
-          const bytes = new Uint8Array(binaryStr.length);
-          for (let i = 0; i < binaryStr.length; i++) {
-            bytes[i] = binaryStr.charCodeAt(i);
-          }
-          const arrayBuffer = bytes.buffer;
+    t += charDuration;
+  }
 
-          // Decode audio data
-          const ctx = getAudioContext();
-          // Resume context if suspended (browser autoplay policy)
-          if (ctx.state === 'suspended') await ctx.resume();
+  // Closing silence
+  visemes.push({ shape: 'sil', time: t, weight: 0 });
 
-          const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
-          const source = ctx.createBufferSource();
-          source.buffer = audioBuffer;
-          source.connect(ctx.destination);
-
-          // Notify LipSyncController
-          onSourceNodeReady(source, ctx);
-
-          source.onended = () => {
-            currentSourceRef.current = null;
-            onPlaybackEnd();
-            sendToRN('audioComplete', { id });
-          };
-
-          source.start(0);
-          currentSourceRef.current = source;
-          sendToRN('lipSyncStart');
-        } catch (err) {
-          console.error('[AudioPlayer] Failed to play audio:', err);
-          sendToRN('audioComplete', { id: msg.data?.id, error: String(err) });
-        }
-      }
-
-      if (msg.type === 'stopAudio') {
-        if (currentSourceRef.current) {
-          try { currentSourceRef.current.stop(); } catch {}
-          currentSourceRef.current = null;
-        }
-        sendToRN('lipSyncEnd');
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [getAudioContext, onSourceNodeReady, onPlaybackEnd]);
-
-  return null;
+  return { visemes, totalDuration: t + 0.1 };
 }
 ```
 
-- [ ] **Step 2: Commit**
+- [ ] **Step 2: TypeScript check**
 
 ```bash
-git add app/components/AudioPlayer.tsx
-git commit -m "feat: add AudioPlayer component for WebView audio playback"
+cd EmoMate
+npx tsc --noEmit 2>&1 | head -20
+```
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add EmoMate/src/capabilities/speak/textToViseme.ts
+git commit -m "feat: add text-to-viseme converter for Chinese TTS lip sync"
 ```
 
 ---
 
-## Task 3: Create LipSyncController Component
+## Task 3: Create LipSyncController in character/
 
 **Files:**
 - Create: `character/app/components/LipSyncController.tsx`
+
+Listens for `playVisemes` / `stopVisemes` bridge messages and drives VRM blend shapes each frame.
 
 - [ ] **Step 1: Create the file**
 
 ```tsx
 // character/app/components/LipSyncController.tsx
 
-import { useRef, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { VRM, VRMExpressionPresetName } from '@pixiv/three-vrm';
-import { createLipSyncAnalyzer } from 'wawa-lipsync';
+import { VisemeFrame, VRMBridgeCommand } from '../types/vrm-bridge';
 
-// Viseme → VRM blend shape preset name mapping
-const VISEME_TO_VRM: Record<string, string | null> = {
-  // Silence
+const SHAPE_TO_VRM: Record<VisemeFrame['shape'], string | null> = {
+  aa:  VRMExpressionPresetName.Aa,
+  ee:  VRMExpressionPresetName.Ee,
+  ih:  VRMExpressionPresetName.Ih,
+  oh:  VRMExpressionPresetName.Oh,
+  ou:  VRMExpressionPresetName.Ou,
   sil: null,
-  // Bilabials
-  PP: VRMExpressionPresetName.Ou,
-  FF: VRMExpressionPresetName.Ou,
-  // Open vowels
-  aa: VRMExpressionPresetName.Aa,
-  E:  VRMExpressionPresetName.Ee,
-  I:  VRMExpressionPresetName.Ih,
-  O:  VRMExpressionPresetName.Oh,
-  U:  VRMExpressionPresetName.Ou,
-  // Consonants — map to nearest vowel shape
-  TH: VRMExpressionPresetName.Ee,
-  DD: VRMExpressionPresetName.Ee,
-  kk: VRMExpressionPresetName.Ee,
-  CH: VRMExpressionPresetName.Ee,
-  SS: VRMExpressionPresetName.Ee,
-  nn: VRMExpressionPresetName.Ih,
-  RR: VRMExpressionPresetName.Ih,
 };
 
-// Intensity scale per viseme
-const VISEME_INTENSITY: Record<string, number> = {
-  aa: 1.0,
-  E: 0.8,
-  I: 0.7,
-  O: 0.8,
-  U: 0.7,
-  PP: 0.4,
-  FF: 0.4,
-  TH: 0.5, DD: 0.5, kk: 0.5, CH: 0.5, SS: 0.5, nn: 0.5, RR: 0.5,
-};
+const ALL_MOUTH_SHAPES = [
+  VRMExpressionPresetName.Aa,
+  VRMExpressionPresetName.Ee,
+  VRMExpressionPresetName.Ih,
+  VRMExpressionPresetName.Oh,
+  VRMExpressionPresetName.Ou,
+];
+
+interface LipSyncState {
+  visemes: VisemeFrame[];
+  startTime: number | null;  // performance.now() when playback started
+  totalDuration: number;
+  active: boolean;
+  currentWeight: number;
+  currentShape: string | null;
+}
 
 interface LipSyncControllerProps {
   vrm: VRM;
 }
 
 export function LipSyncController({ vrm }: LipSyncControllerProps) {
-  const analyzerRef = useRef<ReturnType<typeof createLipSyncAnalyzer> | null>(null);
-  const currentViseme = useRef<string>('sil');
-  const targetWeight = useRef<number>(0);
-  const currentWeight = useRef<number>(0);
-  const currentVRMShape = useRef<string | null>(null);
+  const state = useRef<LipSyncState>({
+    visemes: [],
+    startTime: null,
+    totalDuration: 0,
+    active: false,
+    currentWeight: 0,
+    currentShape: null,
+  });
 
-  // Called by AudioPlayer when a new source node is ready
-  const connectSource = useCallback((source: AudioBufferSourceNode, ctx: AudioContext) => {
-    // Clean up previous analyzer
-    if (analyzerRef.current) {
-      analyzerRef.current.destroy?.();
-    }
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      let cmd: VRMBridgeCommand;
+      try {
+        cmd = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+      } catch {
+        return;
+      }
 
-    analyzerRef.current = createLipSyncAnalyzer(ctx, source, {
-      onViseme: (viseme: string) => {
-        currentViseme.current = viseme;
-        targetWeight.current = VISEME_INTENSITY[viseme] ?? 0;
-      },
-    });
-  }, []);
+      if (cmd.type === 'playVisemes') {
+        state.current.visemes = cmd.data.visemes;
+        state.current.totalDuration = cmd.data.totalDuration;
+        state.current.startTime = performance.now();
+        state.current.active = true;
+      }
 
-  // Called by AudioPlayer when playback ends
-  const onEnd = useCallback(() => {
-    currentViseme.current = 'sil';
-    targetWeight.current = 0;
+      if (cmd.type === 'stopVisemes') {
+        state.current.active = false;
+        state.current.startTime = null;
+        state.current.visemes = [];
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
   }, []);
 
   useFrame((_, delta) => {
     const em = vrm.expressionManager;
     if (!em) return;
 
-    const viseme = currentViseme.current;
-    const vrmShape = VISEME_TO_VRM[viseme] ?? null;
+    const s = state.current;
 
-    // Smooth transition
-    const lerpSpeed = 25 * delta; // fast enough for speech rhythm
-    currentWeight.current = THREE_LERP(currentWeight.current, targetWeight.current, Math.min(lerpSpeed, 1));
-
-    // Clear previous viseme shape
-    if (currentVRMShape.current && currentVRMShape.current !== vrmShape) {
-      em.setValue(currentVRMShape.current, 0);
+    if (!s.active || s.startTime === null) {
+      // Smoothly close mouth when inactive
+      if (s.currentWeight > 0.01) {
+        s.currentWeight = Math.max(0, s.currentWeight - delta * 8);
+        if (s.currentShape) {
+          em.setValue(s.currentShape, s.currentWeight);
+          em.update();
+        }
+      }
+      return;
     }
 
-    // Apply current viseme
-    if (vrmShape) {
-      em.setValue(vrmShape, currentWeight.current);
-    }
-    currentVRMShape.current = vrmShape;
+    const elapsed = (performance.now() - s.startTime) / 1000; // seconds
 
+    // Find current viseme frame
+    const frames = s.visemes;
+    let targetShape: string | null = null;
+    let targetWeight = 0;
+
+    for (let i = frames.length - 1; i >= 0; i--) {
+      if (elapsed >= frames[i].time) {
+        targetShape = SHAPE_TO_VRM[frames[i].shape];
+        targetWeight = frames[i].weight;
+        break;
+      }
+    }
+
+    // Smooth weight toward target
+    const lerpSpeed = Math.min(delta * 20, 1);
+    s.currentWeight += (targetWeight - s.currentWeight) * lerpSpeed;
+
+    // Clear previous shape if changed
+    if (s.currentShape && s.currentShape !== targetShape) {
+      em.setValue(s.currentShape, 0);
+    }
+
+    // Apply current shape
+    if (targetShape) {
+      em.setValue(targetShape, Math.max(0, Math.min(1, s.currentWeight)));
+    }
+    s.currentShape = targetShape;
     em.update();
+
+    // Auto-stop after totalDuration
+    if (elapsed > s.totalDuration + 0.3) {
+      s.active = false;
+      s.startTime = null;
+      // Clear all mouth shapes
+      ALL_MOUTH_SHAPES.forEach(shape => em.setValue(shape, 0));
+      em.update();
+    }
   });
 
-  return { connectSource, onEnd };
-}
-
-// Simple lerp helper (avoid importing THREE for one function)
-function THREE_LERP(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
-}
-```
-
-- [ ] **Step 2: Commit**
-
-```bash
-git add app/components/LipSyncController.tsx
-git commit -m "feat: add LipSyncController with wawa-lipsync viseme mapping"
-```
-
----
-
-## Task 4: Wire AudioPlayer + LipSyncController into VRMAvatar
-
-**Files:**
-- Modify: `character/app/components/VRMAvatar.tsx`
-
-- [ ] **Step 1: Update VRMScene to include both controllers**
-
-In `VRMAvatar.tsx`, update `VRMScene` to render `AudioPlayer` outside the Canvas (it doesn't need 3D context) and `LipSyncController` inside:
-
-```tsx
-// Add imports:
-import { AudioPlayer } from './AudioPlayer';
-import { LipSyncController } from './LipSyncController';
-
-// Modify VRMScene return:
-function VRMScene({ modelPath, onReady, onError }: VRMSceneProps) {
-  const [loadedVRM, setLoadedVRM] = useState<VRM | null>(null);
-  const lipSyncRef = useRef<{ connectSource: Function; onEnd: Function } | null>(null);
-  // ... existing loader code unchanged ...
-
-  return loadedVRM ? (
-    <>
-      <ExpressionController vrm={loadedVRM} />
-      <LipSyncControllerWrapper vrm={loadedVRM} lipSyncRef={lipSyncRef} />
-    </>
-  ) : null;
-}
-
-// Add a wrapper that captures ref:
-function LipSyncControllerWrapper({ vrm, lipSyncRef }: { vrm: VRM; lipSyncRef: React.MutableRefObject<any> }) {
-  const controller = LipSyncController({ vrm });
-  lipSyncRef.current = controller;
   return null;
 }
 ```
 
-- [ ] **Step 2: Add AudioPlayer outside Canvas in VRMAvatar JSX**
-
-In the `VRMAvatar` return JSX, add `AudioPlayer` as a sibling to `Canvas`:
-
-```tsx
-return (
-  <div className={className} style={{ width, height }}>
-    <AudioPlayer
-      onSourceNodeReady={(source, ctx) => {
-        // Forward to LipSyncController via a ref or context
-        // We'll use a window event for simplicity
-        window.dispatchEvent(new CustomEvent('vrm-audio-source', { detail: { source, ctx } }));
-      }}
-      onPlaybackEnd={() => {
-        window.dispatchEvent(new CustomEvent('vrm-audio-end'));
-      }}
-    />
-    <Canvas ...>
-      {/* existing Canvas content */}
-    </Canvas>
-  </div>
-);
-```
-
-- [ ] **Step 3: Update LipSyncController to listen to window events**
-
-Instead of using refs across component boundaries, update `LipSyncController.tsx` to listen for the `vrm-audio-source` custom event:
-
-```tsx
-// In LipSyncController, add to useEffect:
-useEffect(() => {
-  const handleSource = (e: CustomEvent) => {
-    connectSource(e.detail.source, e.detail.ctx);
-  };
-  const handleEnd = () => { onEnd(); };
-
-  window.addEventListener('vrm-audio-source', handleSource as EventListener);
-  window.addEventListener('vrm-audio-end', handleEnd);
-  return () => {
-    window.removeEventListener('vrm-audio-source', handleSource as EventListener);
-    window.removeEventListener('vrm-audio-end', handleEnd);
-  };
-}, [connectSource, onEnd]);
-
-return null;  // Return null, not an object
-```
-
-Update `LipSyncController` to be a proper React component (return `null` instead of object).
-
-- [ ] **Step 4: TypeScript check**
+- [ ] **Step 2: TypeScript check**
 
 ```bash
 cd character
 npx tsc --noEmit 2>&1 | head -20
 ```
 
-- [ ] **Step 5: Commit**
-
-```bash
-git add app/components/VRMAvatar.tsx app/components/LipSyncController.tsx
-git commit -m "feat: wire AudioPlayer and LipSyncController into VRMAvatar"
-```
-
----
-
-## Task 5: Modify TTSQueue in EmoMate
-
-**Files:**
-- Modify: `EmoMate/src/capabilities/speak/queue/TTSQueue.ts`
-
-- [ ] **Step 1: Add WebView ref to TTSQueue**
-
-TTSQueue needs a reference to the WebView to post the `playAudio` message. Add a `setWebViewRef` method:
-
-```typescript
-// Add to TTSQueue class:
-import * as FileSystem from 'expo-file-system';
-
-private webViewPostMessage?: (message: string) => void;
-private pendingAudioResolvers = new Map<string, () => void>();
-
-/**
- * Set the WebView postMessage function for audio routing
- */
-setWebViewPostMessage(fn: (message: string) => void) {
-  this.webViewPostMessage = fn;
-}
-
-/**
- * Called when WebView signals audioComplete
- */
-onAudioComplete(id: string) {
-  const resolver = this.pendingAudioResolvers.get(id);
-  if (resolver) {
-    this.pendingAudioResolvers.delete(id);
-    resolver();
-  }
-}
-```
-
-- [ ] **Step 2: Find the playNext method and modify it**
-
-In `TTSQueue.ts`, find the `playNext` method (where `audioPlayer.playAsync()` or similar is called). Replace the audio playback section:
-
-```typescript
-// Find the section where audio is played (look for Sound.createAsync or similar)
-// Replace it with:
-
-private async playAudioViaWebView(item: TTSQueueItem): Promise<void> {
-  if (!this.webViewPostMessage || !item.audioUri) {
-    throw new Error('WebView not available or no audio URI');
-  }
-
-  const base64 = await FileSystem.readAsStringAsync(item.audioUri, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
-
-  const id = `audio_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-
-  const message = JSON.stringify({
-    type: 'playAudio',
-    data: { audioBase64: base64, mimeType: 'audio/mpeg', id },
-  });
-
-  // Create promise that resolves when audioComplete arrives
-  const completionPromise = new Promise<void>((resolve) => {
-    this.pendingAudioResolvers.set(id, resolve);
-    // Timeout fallback: resolve after estimated duration + buffer
-    setTimeout(() => {
-      this.pendingAudioResolvers.delete(id);
-      resolve();
-    }, 60000); // 60s max timeout
-  });
-
-  this.webViewPostMessage(message);
-  await completionPromise;
-}
-```
-
-- [ ] **Step 3: In playNext, call playAudioViaWebView**
-
-Find where the queue item is played. Replace the existing play call:
-
-```typescript
-// In playNext or equivalent, find the play section:
-// OLD: await someAudioPlayer.play(item.audioUri)
-// NEW:
-await this.playAudioViaWebView(item);
-```
-
-- [ ] **Step 4: TypeScript check**
-
-```bash
-cd EmoMate
-npx tsc --noEmit 2>&1 | head -30
-```
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add EmoMate/src/capabilities/speak/queue/TTSQueue.ts
-git commit -m "feat: route TTS audio through WebView bridge for lip sync"
-```
-
----
-
-## Task 6: Wire audioComplete in HiyoriWebView
-
-**Files:**
-- Modify: `EmoMate/src/components/HiyoriWebView.tsx`
-
-- [ ] **Step 1: Connect TTSQueue to WebView in HiyoriWebView**
-
-In `HiyoriWebView.tsx`, the component holds `webViewRef`. We need to:
-1. Pass `webViewRef.current.postMessage` to TTSQueue when ready
-2. Forward `audioComplete` messages from WebView to TTSQueue
-
-Find where `onMessage` handles bridge messages and add:
-
-```typescript
-// In the onMessage handler switch/if-else, add:
-case 'audioComplete':
-  // Forward to TTSQueue
-  if (message.data?.id) {
-    ttsQueueRef.current?.onAudioComplete(message.data.id);
-  }
-  break;
-
-case 'lipSyncStart':
-  debugLog('HiyoriWebView', 'Lip sync started');
-  break;
-
-case 'lipSyncEnd':
-  debugLog('HiyoriWebView', 'Lip sync ended');
-  break;
-```
-
-- [ ] **Step 2: Pass postMessage to TTSQueue after WebView loads**
-
-In `HiyoriWebView.tsx`, when `isWebViewReady` becomes true, set the WebView post message on TTSQueue:
-
-```typescript
-// In the effect that runs when isWebViewReady changes:
-useEffect(() => {
-  if (state.isWebViewReady && webViewRef.current) {
-    const postFn = (msg: string) => webViewRef.current?.postMessage(msg);
-    // Access TTSQueue instance — this depends on where it's instantiated
-    // If TTSQueue is passed as prop:
-    props.ttsQueue?.setWebViewPostMessage(postFn);
-  }
-}, [state.isWebViewReady]);
-```
-
-Note: The exact wiring depends on how TTSQueue is instantiated in your app. Check `HomeScreen.tsx` or `useChatAI.ts` for where TTSQueue is created, and pass the setter function accordingly.
-
 - [ ] **Step 3: Commit**
 
 ```bash
-git add EmoMate/src/components/HiyoriWebView.tsx
-git commit -m "feat: forward audioComplete to TTSQueue, wire WebView postMessage"
+git add app/components/LipSyncController.tsx
+git commit -m "feat: add LipSyncController for text-driven viseme playback"
+```
+
+---
+
+## Task 4: Wire LipSyncController into VRMAvatar
+
+**Files:**
+- Modify: `character/app/components/VRMAvatar.tsx`
+
+`LipSyncController` runs inside the Canvas alongside `ExpressionController`, requires a loaded `VRM` instance.
+
+- [ ] **Step 1: Read VRMAvatar.tsx first**
+
+Read the full file before making any changes. Understand where `ExpressionController` is currently rendered.
+
+- [ ] **Step 2: Add import and render LipSyncController**
+
+In `VRMAvatar.tsx`, find where `<ExpressionController vrm={loadedVRM} />` is rendered. Add `LipSyncController` as a sibling:
+
+```tsx
+import { LipSyncController } from './LipSyncController';
+
+// In the same JSX block as ExpressionController:
+<ExpressionController vrm={loadedVRM} />
+<LipSyncController vrm={loadedVRM} />
+```
+
+- [ ] **Step 3: TypeScript check**
+
+```bash
+cd character
+npx tsc --noEmit 2>&1 | head -20
+```
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add app/components/VRMAvatar.tsx
+git commit -m "feat: render LipSyncController inside VRMAvatar Canvas"
+```
+
+---
+
+## Task 5: Wire TTSQueue callbacks → sendVRMCommand in EmoMate
+
+**Files:**
+- Modify: `EmoMate/src/components/HiyoriWebView.tsx`
+- Modify: `character/app/components/LipSyncController.tsx`
+- Modify: `character/app/types/vrm-bridge.ts` + `EmoMate/src/types/vrm.ts`
+
+TTSQueue already calls `config.onItemStart(item)` and `config.onItemEnd(item)`. We hook there — zero changes to TTSQueue.ts.
+
+**Timing strategy:** Use two-phase approach to eliminate the WebView bridge latency (~100–300ms) between `onItemStart` and actual audio playback start:
+1. `onItemStart` → send `prepareVisemes` (WebView stores sequence, does NOT start)
+2. WebView's own Web Audio `onstart` event → self-trigger `startTime = performance.now()` and begin playback
+
+This ensures viseme timing origin = audio playback origin.
+
+- [ ] **Step 1: Read HiyoriWebView.tsx first**
+
+Read the full file. Find:
+1. Where `sendVRMCommand` is defined/used
+2. Where TTSQueue config is passed (look for `onItemStart`, `onItemEnd`, or where TTSQueue is instantiated/configured)
+3. How the component receives or references the TTSQueue instance
+
+- [ ] **Step 2: Add prepareVisemes type to bridge types**
+
+In `character/app/types/vrm-bridge.ts` and `EmoMate/src/types/vrm.ts`, add alongside `playVisemes`:
+
+```typescript
+| { type: 'prepareVisemes'; data: { visemes: VisemeFrame[]; totalDuration: number } }
+```
+
+- [ ] **Step 3: Update LipSyncController to handle prepareVisemes**
+
+In `LipSyncController.tsx`, change the `playVisemes` handler to `prepareVisemes` — store the sequence but set `active: false` and `startTime: null`. Then add a new internal trigger that fires when the Web Audio source node's `onstart` fires:
+
+```typescript
+if (cmd.type === 'prepareVisemes') {
+  // Store sequence; timing starts when audio actually begins (onAudioStart below)
+  state.current.visemes = cmd.data.visemes;
+  state.current.totalDuration = cmd.data.totalDuration;
+  state.current.active = false;
+  state.current.startTime = null;
+}
+
+if (cmd.type === 'playVisemes') {
+  // Direct start (kept for browser console testing)
+  state.current.visemes = cmd.data.visemes;
+  state.current.totalDuration = cmd.data.totalDuration;
+  state.current.startTime = performance.now();
+  state.current.active = true;
+}
+```
+
+Also listen for a custom `lipSyncStart` event that `amplifiedAudioBridge` will dispatch when audio decode completes:
+
+```typescript
+const handleAudioStart = () => {
+  if (state.current.visemes.length > 0) {
+    state.current.startTime = performance.now();
+    state.current.active = true;
+  }
+};
+window.addEventListener('lipSyncStart', handleAudioStart);
+return () => {
+  window.removeEventListener('message', handleMessage);
+  window.removeEventListener('lipSyncStart', handleAudioStart);
+};
+```
+
+- [ ] **Step 4: Read amplifiedAudioBridge to understand where to dispatch lipSyncStart**
+
+Read `EmoMate/src/capabilities/speak/providers/amplifiedAudioBridge.ts` in full. Find the WebView HTML/JS that handles audio playback. Locate where the Web Audio source node's `onended` / playback-started callback fires (look for `onstart`, `source.start()`, or equivalent).
+
+- [ ] **Step 5: Dispatch lipSyncStart from amplifiedAudioBridge WebView JS**
+
+In the WebView's inline JS (inside `amplifiedAudioBridge`), immediately after audio decode and `source.start()`, dispatch the custom event:
+
+```javascript
+source.start(0);
+window.dispatchEvent(new Event('lipSyncStart'));
+```
+
+This fires at the exact moment audio begins, giving `LipSyncController` an accurate `startTime`.
+
+- [ ] **Step 6: Import textToViseme and wire onItemStart / onItemEnd**
+
+Add import at top of HiyoriWebView.tsx (or whichever file configures TTSQueue):
+
+```typescript
+import { textToViseme } from '../capabilities/speak/textToViseme';
+```
+
+Find where TTSQueue is instantiated or configured with callbacks. Add:
+
+```typescript
+onItemStart: (item) => {
+  const { visemes, totalDuration } = textToViseme(item.text);
+  sendVRMCommand({ type: 'prepareVisemes', data: { visemes, totalDuration } });
+},
+onItemEnd: (_item) => {
+  sendVRMCommand({ type: 'stopVisemes' });
+},
+```
+
+Note: `sendVRMCommand` may need to be accessed via ref or passed as a prop depending on component structure. Read the code first to determine the right pattern — do not assume.
+
+- [ ] **Step 7: TypeScript check**
+
+```bash
+cd EmoMate && npx tsc --noEmit 2>&1 | head -30
+cd ../character && npx tsc --noEmit 2>&1 | head -30
+```
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add EmoMate/src/components/HiyoriWebView.tsx \
+        EmoMate/src/capabilities/speak/providers/amplifiedAudioBridge.ts \
+        character/app/components/LipSyncController.tsx \
+        character/app/types/vrm-bridge.ts \
+        EmoMate/src/types/vrm.ts
+git commit -m "feat: drive lip sync via prepareVisemes + lipSyncStart for zero-latency sync"
+```
+
+---
+
+## Task 6: Handle cancel case — close mouth on TTS cancel
+
+**Files:**
+- Modify: whichever file(s) call `ttsQueue.cancel()` (find by searching for `.cancel()`)
+
+`TTSQueue.cancel()` marks items as `failed` without calling `onItemEnd`, so the mouth stays open. Fix by sending `stopVisemes` at every cancel call site.
+
+- [ ] **Step 1: Find all cancel call sites**
+
+```bash
+cd EmoMate
+grep -rn "\.cancel()" src/ --include="*.ts" --include="*.tsx"
+```
+
+- [ ] **Step 2: Add stopVisemes after each cancel call**
+
+At each call site where `ttsQueue.cancel()` (or equivalent) is called, add immediately after:
+
+```typescript
+sendVRMCommand({ type: 'stopVisemes' });
+```
+
+Note: `sendVRMCommand` access pattern depends on where the cancel is called. If it's inside HiyoriWebView, it's directly available. If it's in useChatAI or HomeScreen, it may need to be passed via a ref or callback — read the code first, do not assume.
+
+- [ ] **Step 3: TypeScript check**
+
+```bash
+cd EmoMate
+npx tsc --noEmit 2>&1 | head -20
+```
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add -p  # stage only changed cancel call sites
+git commit -m "fix: send stopVisemes on TTS cancel to close mouth immediately"
 ```
 
 ---
@@ -550,11 +541,33 @@ git commit -m "feat: forward audioComplete to TTSQueue, wire WebView postMessage
 
 Test each item after completing all tasks:
 
-- [ ] `npm run dev` in `character/` starts without errors
-- [ ] DevTools Console: run `window.dispatchEvent(new MessageEvent('message', { data: JSON.stringify({ type: 'playAudio', data: { audioBase64: '<base64_of_any_mp3>', mimeType: 'audio/mpeg', id: 'test1' } }) }))` → mouth moves
-- [ ] Mouth closes after audio ends
-- [ ] TTSQueue advances to next item after `audioComplete` is received
-- [ ] Sending a message in EmoMate causes character to speak with mouth sync
-- [ ] No double audio (audio plays only in WebView, not also in RN)
-- [ ] Expressions and lip sync work simultaneously (smile + mouth moving)
+- [ ] `cd character && npm run dev` starts without errors
 - [ ] `npx tsc --noEmit` passes in both `character/` and `EmoMate/`
+- [ ] Browser DevTools Console test — paste and run:
+
+```js
+// Generate a test viseme sequence manually
+const visemes = [
+  { shape: 'sil', time: 0, weight: 0 },
+  { shape: 'aa', time: 0.05, weight: 0.85 },
+  { shape: 'aa', time: 0.15, weight: 0.3 },
+  { shape: 'sil', time: 0.2, weight: 0 },
+  { shape: 'oh', time: 0.25, weight: 0.85 },
+  { shape: 'oh', time: 0.35, weight: 0.3 },
+  { shape: 'sil', time: 0.4, weight: 0 },
+];
+window.dispatchEvent(new MessageEvent('message', {
+  data: JSON.stringify({ type: 'playVisemes', data: { visemes, totalDuration: 0.5 } })
+}));
+// Expected: mouth opens and closes over 0.5s
+setTimeout(() => {
+  window.dispatchEvent(new MessageEvent('message', {
+    data: JSON.stringify({ type: 'stopVisemes' })
+  }));
+}, 600);
+```
+
+- [ ] Mouth closes cleanly after `stopVisemes`
+- [ ] E2E: Send a message in EmoMate → character's mouth moves while audio plays
+- [ ] Lip sync and facial expressions work simultaneously (e.g. joy expression + mouth moving)
+- [ ] Cancelling TTS mid-sentence closes mouth (sendVRMCommand stopVisemes on cancel)
