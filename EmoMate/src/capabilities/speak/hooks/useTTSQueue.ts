@@ -9,6 +9,7 @@ import {
 import { TTSQueue } from '../queue/TTSQueue';
 import { FishAudioProvider } from '../providers/FishAudioProvider';
 import { globalAudioCache } from '../cache/AudioCache';
+import { lipSyncBridge } from '../lipSyncBridge';
 
 /**
  * useTTSQueue Hook return type
@@ -124,6 +125,8 @@ export function useTTSQueue(config?: TTSQueueConfig): UseTTSQueueReturn {
     if (!queueRef.current) return;
 
     await queueRef.current.cancel();
+    // Close VRM mouth immediately since onItemEnd is not called on cancel
+    lipSyncBridge.sendVRMCommand({ type: 'stopVisemes' });
     setIsPlaying(false);
     setIsSynthesizing(false);
     updateStatus();

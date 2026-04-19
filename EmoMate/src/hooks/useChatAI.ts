@@ -546,6 +546,8 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
     if (currentTTSQueue.current) {
       try {
         await currentTTSQueue.current.cancel();
+        // Close VRM mouth immediately since onItemEnd is not called on cancel
+        lipSyncBridge.sendVRMCommand({ type: 'stopVisemes' });
         debugLog('ChatAI', 'Conversation TTS queue cancelled');
       } catch (error) {
         console.error(

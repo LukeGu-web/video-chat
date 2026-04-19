@@ -20,6 +20,7 @@ import {
   FISH_AUDIO_CONFIG,
 } from '../../constants/ai';
 import { TTSQueue } from '../../capabilities/speak';
+import { lipSyncBridge } from '../../capabilities/speak/lipSyncBridge';
 import { ChatMessage } from '../useChatAI';
 import { useTopicSeeds } from './useTopicSeeds';
 
@@ -190,6 +191,8 @@ export const useProactiveConversation = (
     // Also stop any ongoing proactive TTS
     if (proactiveTTSQueue.current) {
       proactiveTTSQueue.current.cancel();
+      // Close VRM mouth immediately since onItemEnd is not called on cancel
+      lipSyncBridge.sendVRMCommand({ type: 'stopVisemes' });
       proactiveTTSQueue.current = null;
     }
   }, [clearTimer]);
