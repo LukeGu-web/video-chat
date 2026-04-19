@@ -2,15 +2,27 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Claude generates VRM animation parameters inside `<action>` tags alongside its conversational response. EmoMate parses these tags during streaming, strips them from displayed/spoken text, and sends the extracted pose commands to the WebView. The character performs natural, contextually appropriate one-off movements.
+**Goal:** Claude generates VRM animation parameters inside `<action>` tags alongside its conversational response. EmoMate strips the tags during streaming (before TTS), dispatches the pose via the existing `lipSyncBridge`, and the character performs the pose then auto-returns to idle.
 
-**Architecture:** (1) A `VRM_PARAMETER_MANUAL` constant in `buildAIContext.ts` teaches Claude the available blend shapes and bones. (2) A `parseVRMAction` utility extracts `<action>` JSON from streaming chunks as they arrive. (3) `useChatAI.ts` calls the parser and fires bridge commands on the WebView ref. (4) `ExpressionController` already handles `playPose` messages — add parameter clamping for safety.
+**Architecture:** (1) `VRM_PARAMETER_MANUAL` constant teaches Claude the available blend shapes/bones. (2) `parseVRMAction.ts` utility extracts+sanitizes `<action>` JSON. (3) `useChatAI.ts` maintains a `rawBuffer` to handle cross-chunk `<action>` tags; clean text goes to TTS and display. (4) `lipSyncBridge.sendVRMCommand({ type: 'playPose', data })` dispatches the action — no new bridge needed. (5) `ExpressionController` adds bone clamping + auto-return-to-idle after pose duration.
 
-**Tech Stack:** Claude streaming SSE, TypeScript, existing bridge protocol, `@pixiv/three-vrm` expression manager
+**Tech Stack:** Claude streaming SSE, TypeScript, existing `lipSyncBridge`, `@pixiv/three-vrm` expression manager
 
 ---
 
-## Task 1: Create VRM Parameter Manual Constant
+## File Map
+
+| Action | File | What changes |
+|--------|------|-------------|
+| Create | `EmoMate/src/constants/vrmSchema.ts` | VRM parameter manual string |
+| Modify | `EmoMate/src/hooks/ai/buildAIContext.ts` | Inject manual as non-cached system block |
+| Create | `EmoMate/src/utils/parseVRMAction.ts` | Extract + sanitize `<action>` from text |
+| Modify | `EmoMate/src/hooks/useChatAI.ts` | rawBuffer approach; strip tags before TTS |
+| Modify | `character/app/components/ExpressionController.tsx` | Bone clamping + auto-return-to-idle |
+
+---
+
+## Task 1: VRM Parameter Manual Constant
 
 **Files:**
 - Create: `EmoMate/src/constants/vrmSchema.ts`
@@ -20,11 +32,6 @@
 ```typescript
 // EmoMate/src/constants/vrmSchema.ts
 
-/**
- * VRM Parameter Manual injected into Claude's system prompt.
- * Teaches Claude which blend shapes and bones are available,
- * their value ranges, and when to use them.
- */
 export const VRM_PARAMETER_MANUAL = `
 ## 角色动作控制
 
@@ -38,7 +45,7 @@ export const VRM_PARAMETER_MANUAL = `
 - fun: 俏皮、调侃、开心玩闹
 - neutral: 回到平静状态（将所有表情归零时使用）
 
-### 可用骨骼旋转（弧度，正值方向如下）
+### 可用骨骼旋转（弧度）
 - head: 头部（x: 点头下+/后仰-，范围±0.3; y: 向左转-/右转+，范围±0.4; z: 向左歪+/右歪-，范围±0.3）
 - neck: 颈部（x: ±0.2; y: ±0.3; z: ±0.2）
 - spine: 脊椎（x: 前倾+/后仰-，范围±0.2; z: 侧倾，范围±0.1）
@@ -49,20 +56,15 @@ export const VRM_PARAMETER_MANUAL = `
 
 ### 指令格式
 <action>
-{
-  "blendShapes": { "joy": 0.8 },
-  "bones": { "head": { "y": 0.1 } },
-  "duration": 1.5,
-  "easing": "easeOut"
-}
+{"blendShapes":{"joy":0.8},"bones":{"head":{"y":0.1}},"duration":1.5,"easing":"easeOut"}
 </action>
 
 duration 单位为秒（0.5~3.0）。easing 可选: "linear" / "easeIn" / "easeOut" / "easeInOut"。
 
 ### 使用原则
 - 只在情绪明显时才附加动作（惊讶、开心、难过、思考中等）
-- 普通问答回复不需要加动作
-- 幅度要自然，head.y 不要超过 0.35，spine.x 不要超过 0.15
+- 普通问答不加动作
+- 幅度要自然，head.y 不超过 0.35，spine.x 不超过 0.15
 - 不需要动作时完全省略 <action> 标签
 `.trim();
 ```
@@ -81,45 +83,35 @@ git commit -m "feat: add VRM parameter manual for Claude system prompt"
 **Files:**
 - Modify: `EmoMate/src/hooks/ai/buildAIContext.ts`
 
-- [ ] **Step 1: Import the manual and add it as a system block**
+- [ ] **Step 1: Add import**
 
-In `buildAIContext.ts`, find the function `buildCacheableAPIRequestConfig` (or equivalent that builds the messages array). Add the VRM manual as a non-cached system block:
+At the top of `buildAIContext.ts`, add:
 
 ```typescript
-// Add import at top:
 import { VRM_PARAMETER_MANUAL } from '../../constants/vrmSchema';
-
-// Inside the function that builds system messages, after the main personality block,
-// add a new non-cached block:
-{
-  type: 'text' as const,
-  text: VRM_PARAMETER_MANUAL,
-  // No cache_control here — we want it fresh every request so updates take effect
-},
 ```
 
-The system messages array should look like:
+- [ ] **Step 2: Add non-cached block inside `buildCacheableSystemPrompt`**
+
+In `buildCacheableSystemPrompt`, find the section that pushes blocks onto `systemBlocks`. After the memory block (the last `if (memoryBlock)` push), add:
+
 ```typescript
-const systemMessages = [
-  // Block 1: personality (cached)
-  { type: 'text', text: personalityPrompt, cache_control: { type: 'ephemeral' } },
-  // Block 2: capability/scene context (may be cached)
-  { type: 'text', text: contextPrompt, cache_control: { type: 'ephemeral' } },
-  // Block 3: memory (not cached, changes each turn)
-  { type: 'text', text: memoryBlock },
-  // Block 4: VRM parameter manual (not cached) ← NEW
-  { type: 'text', text: VRM_PARAMETER_MANUAL },
-];
+  // Block: VRM parameter manual (not cached — updated frequently during development)
+  systemBlocks.push({
+    type: 'text',
+    text: VRM_PARAMETER_MANUAL,
+  });
 ```
 
-- [ ] **Step 2: TypeScript check**
+- [ ] **Step 3: TypeScript check**
 
 ```bash
-cd EmoMate
-npx tsc --noEmit 2>&1 | head -20
+cd EmoMate && npx tsc --noEmit 2>&1 | head -20
 ```
 
-- [ ] **Step 3: Commit**
+Expected: no errors.
+
+- [ ] **Step 4: Commit**
 
 ```bash
 git add EmoMate/src/hooks/ai/buildAIContext.ts
@@ -146,23 +138,26 @@ export interface VRMActionPayload {
 }
 
 export interface ParseActionResult {
+  // Parsed and sanitized action, or null if not found / invalid JSON
   action: VRMActionPayload | null;
-  cleanText: string;  // text with <action>...</action> removed
+  // Input text with ALL <action>...</action> blocks removed
+  cleanText: string;
+  // True if there is an unclosed <action> tag at the end (streaming in progress)
+  hasPartialTag: boolean;
 }
 
-// Safe value bounds for blend shapes and bones
 const BLEND_SHAPE_BOUNDS: Record<string, [number, number]> = {
   joy: [0, 1], angry: [0, 1], sorrow: [0, 1],
   fun: [0, 1], surprised: [0, 1], neutral: [0, 1],
 };
 
-const BONE_BOUNDS: Record<string, { x?: [number, number]; y?: [number, number]; z?: [number, number] }> = {
+const BONE_BOUNDS: Record<string, Partial<Record<'x' | 'y' | 'z', [number, number]>>> = {
   head:          { x: [-0.35, 0.35], y: [-0.45, 0.45], z: [-0.35, 0.35] },
   neck:          { x: [-0.25, 0.25], y: [-0.35, 0.35], z: [-0.25, 0.25] },
   spine:         { x: [-0.25, 0.25], z: [-0.15, 0.15] },
-  rightUpperArm: { x: [-1.6, 0.3], z: [-1.3, 0.3] },
+  rightUpperArm: { x: [-1.6, 0.3],  z: [-1.3, 0.3] },
   rightLowerArm: { x: [0, 1.6] },
-  leftUpperArm:  { x: [-1.6, 0.3], z: [-0.3, 1.3] },
+  leftUpperArm:  { x: [-1.6, 0.3],  z: [-0.3, 1.3] },
   leftLowerArm:  { x: [0, 1.6] },
 };
 
@@ -170,85 +165,94 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-function sanitizePayload(raw: any): VRMActionPayload {
+function sanitizePayload(raw: unknown): VRMActionPayload {
+  if (typeof raw !== 'object' || raw === null) return {};
+  const r = raw as Record<string, unknown>;
   const result: VRMActionPayload = {};
 
-  if (raw.blendShapes && typeof raw.blendShapes === 'object') {
+  if (r.blendShapes && typeof r.blendShapes === 'object') {
     result.blendShapes = {};
-    for (const [key, val] of Object.entries(raw.blendShapes)) {
+    for (const [key, val] of Object.entries(r.blendShapes as Record<string, unknown>)) {
       if (typeof val === 'number' && BLEND_SHAPE_BOUNDS[key]) {
-        const [min, max] = BLEND_SHAPE_BOUNDS[key];
-        result.blendShapes[key] = clamp(val, min, max);
+        const [mn, mx] = BLEND_SHAPE_BOUNDS[key];
+        result.blendShapes[key] = clamp(val, mn, mx);
       }
     }
   }
 
-  if (raw.bones && typeof raw.bones === 'object') {
+  if (r.bones && typeof r.bones === 'object') {
     result.bones = {};
-    for (const [boneName, rotRaw] of Object.entries(raw.bones)) {
-      const rot = rotRaw as any;
+    for (const [boneName, rotRaw] of Object.entries(r.bones as Record<string, unknown>)) {
+      if (typeof rotRaw !== 'object' || rotRaw === null) continue;
+      const rot = rotRaw as Record<string, unknown>;
       const bounds = BONE_BOUNDS[boneName];
-      if (!bounds || typeof rot !== 'object') continue;
-      result.bones[boneName] = {};
+      if (!bounds) continue;
+      const boneResult: { x?: number; y?: number; z?: number } = {};
       for (const axis of ['x', 'y', 'z'] as const) {
         if (typeof rot[axis] === 'number' && bounds[axis]) {
-          const [min, max] = bounds[axis]!;
-          result.bones[boneName]![axis] = clamp(rot[axis], min, max);
+          const [mn, mx] = bounds[axis]!;
+          boneResult[axis] = clamp(rot[axis] as number, mn, mx);
         }
       }
+      result.bones[boneName] = boneResult;
     }
   }
 
-  if (typeof raw.duration === 'number') {
-    result.duration = clamp(raw.duration, 0.2, 5.0);
+  if (typeof r.duration === 'number') {
+    result.duration = clamp(r.duration, 0.2, 5.0);
   }
 
-  const validEasings = ['linear', 'easeIn', 'easeOut', 'easeInOut'];
-  if (typeof raw.easing === 'string' && validEasings.includes(raw.easing)) {
-    result.easing = raw.easing as VRMActionPayload['easing'];
+  const VALID_EASINGS = ['linear', 'easeIn', 'easeOut', 'easeInOut'] as const;
+  if (typeof r.easing === 'string' && (VALID_EASINGS as readonly string[]).includes(r.easing)) {
+    result.easing = r.easing as VRMActionPayload['easing'];
   }
 
   return result;
 }
 
 /**
- * Parses <action>...</action> from a text chunk.
- * Works on both partial (streaming) and complete text.
- * Returns the sanitized action payload and the text with the tag removed.
+ * Processes a raw text buffer (may be partial streaming output).
+ *
+ * - Extracts and sanitizes complete <action>...</action> blocks.
+ * - Returns cleanText with ALL complete action blocks removed.
+ * - Sets hasPartialTag=true when an unclosed <action> is at the end
+ *   (caller should withhold the tail from display until tag closes).
  */
 export function parseVRMAction(text: string): ParseActionResult {
-  const match = text.match(/<action>([\s\S]*?)<\/action>/);
-  if (!match) {
-    return { action: null, cleanText: text };
+  let cleanText = text;
+  let action: VRMActionPayload | null = null;
+
+  // Extract all complete action blocks (use last one if multiple)
+  const completeRegex = /<action>([\s\S]*?)<\/action>/g;
+  let match: RegExpExecArray | null;
+  while ((match = completeRegex.exec(text)) !== null) {
+    try {
+      action = sanitizePayload(JSON.parse(match[1].trim()));
+    } catch {
+      // invalid JSON — discard action but still strip tag
+    }
+  }
+  cleanText = text.replace(/<action>[\s\S]*?<\/action>/g, '').trim();
+
+  // Check for unclosed <action> tag at end
+  const partialStart = cleanText.lastIndexOf('<action>');
+  let hasPartialTag = false;
+  if (partialStart !== -1) {
+    hasPartialTag = true;
+    cleanText = cleanText.slice(0, partialStart).trim();
   }
 
-  const cleanText = text.replace(/<action>[\s\S]*?<\/action>/g, '').trim();
-
-  try {
-    const raw = JSON.parse(match[1].trim());
-    const action = sanitizePayload(raw);
-    return { action, cleanText };
-  } catch {
-    // Invalid JSON inside <action> — strip tag but discard action
-    return { action: null, cleanText };
-  }
-}
-
-/**
- * Strips any <action>...</action> tags from text (for display/TTS use).
- * Safe to call even if no action tag is present.
- */
-export function stripActionTag(text: string): string {
-  return text.replace(/<action>[\s\S]*?<\/action>/g, '').trim();
+  return { action, cleanText, hasPartialTag };
 }
 ```
 
-- [ ] **Step 2: Run TypeScript check**
+- [ ] **Step 2: TypeScript check**
 
 ```bash
-cd EmoMate
-npx tsc --noEmit 2>&1 | head -20
+cd EmoMate && npx tsc --noEmit 2>&1 | head -20
 ```
+
+Expected: no errors.
 
 - [ ] **Step 3: Commit**
 
@@ -259,159 +263,334 @@ git commit -m "feat: add parseVRMAction utility with bounds clamping"
 
 ---
 
-## Task 4: Update useChatAI to Parse and Dispatch Actions
+## Task 4: Wire Action Parsing into Streaming (useChatAI)
 
 **Files:**
 - Modify: `EmoMate/src/hooks/useChatAI.ts`
 
-- [ ] **Step 1: Import parseVRMAction**
+The existing streaming loop accumulates text in `partialSentence` and calls `stripActionDescriptions` (strips `(括号)`) before `onSentence`. We need to also handle `<action>` tags. The key constraint: **`<action>` can span across sentence boundaries**, so we maintain a separate `rawBuffer` that accumulates all raw text.
 
-At the top of `useChatAI.ts`, add:
+- [ ] **Step 1: Add import**
+
+Near the top of `useChatAI.ts`, add:
 
 ```typescript
-import { parseVRMAction, stripActionTag } from '../utils/parseVRMAction';
+import { parseVRMAction } from '../utils/parseVRMAction';
 ```
 
-- [ ] **Step 2: Find the streaming chunk accumulation**
+- [ ] **Step 2: Add `rawBuffer` variable in `callClaudeAPIStreaming`**
 
-In `useChatAI.ts`, find the section that handles streaming SSE chunks. It likely looks like:
+Inside `callClaudeAPIStreaming`, right after the existing declarations (`let fullText = ''`, `let processedLength = 0`, etc.), add:
 
 ```typescript
-// Somewhere in the streaming loop:
-fullText += chunk;
-setCurrentSegment(chunk);
-// ... passes chunk to TTS ...
+let rawBuffer = ''; // accumulates all raw text to detect cross-chunk <action> blocks
 ```
 
-- [ ] **Step 3: Parse action from accumulated full response**
+- [ ] **Step 3: Replace the text processing block in `xhr.onprogress`**
 
-After the streaming loop completes (when the full response is assembled), add action parsing:
+Find this block in `onprogress` (around line 248):
 
 ```typescript
-// After streaming is complete, parse action from the full response:
-const { action, cleanText } = parseVRMAction(fullText);
+if (text) {
+  // DISABLED: SmartSentenceBuffer filtering
+  // Now playing ALL sentences directly without filtering
+  partialSentence += text;
 
-if (action) {
-  // Dispatch to WebView — webViewRef comes from component props or context
-  // The exact ref access depends on your architecture
-  webViewCommandRef.current?.({ type: 'playPose', data: action });
+  // Extract complete sentences
+  let currentSentence = '';
+  for (let i = 0; i < partialSentence.length; i++) {
+```
+
+Replace it with:
+
+```typescript
+if (text) {
+  // Phase 4: Accumulate raw text to detect cross-chunk <action> blocks
+  rawBuffer += text;
+
+  // Extract complete <action> blocks from rawBuffer; dispatch to WebView
+  const { action, cleanText, hasPartialTag } = parseVRMAction(rawBuffer);
+  if (action) {
+    lipSyncBridge.sendVRMCommand({ type: 'playPose', data: action });
+    debugLog('ChatAI', 'Phase 4: AI action dispatched', action);
+  }
+  // cleanText has complete action blocks stripped; partial tag tail is also removed
+  // Update rawBuffer to only the portion after complete actions (preserve partial tag if any)
+  rawBuffer = hasPartialTag
+    ? rawBuffer.slice(rawBuffer.lastIndexOf('<action>'))  // keep partial tag for next chunk
+    : (action ? '' : rawBuffer.replace(/<action>[\s\S]*?<\/action>/g, ''));
+
+  // Feed clean text into existing sentence detection
+  const newClean = cleanText.slice(partialSentence.length); // only the NEW portion
+  partialSentence += newClean.length > 0 ? newClean : cleanText.slice(partialSentence.length);
+  // Simpler: rebuild partialSentence from cleanText minus what was already processed
+  // Actually use cleanText directly as the new source of truth for the sentence buffer:
+  partialSentence = cleanText;
+
+  // Extract complete sentences
+  let currentSentence = '';
+  partialSentence = ''; // will be rebuilt below
+  for (let i = 0; i < cleanText.length; i++) {
+```
+
+Wait — the above is getting tangled because `partialSentence` tracks UNFINISHED text across multiple chunks. The correct approach:
+
+**Replace the entire `if (text) { ... }` block with:**
+
+```typescript
+if (text) {
+  // Phase 4: pipe all raw text through rawBuffer to handle cross-chunk <action> blocks
+  rawBuffer += text;
+
+  // Extract complete <action> blocks and dispatch
+  const { action, cleanText, hasPartialTag } = parseVRMAction(rawBuffer);
+  if (action) {
+    lipSyncBridge.sendVRMCommand({ type: 'playPose', data: action });
+    debugLog('ChatAI', 'Phase 4: AI action dispatched', action);
+  }
+
+  // Update rawBuffer: remove everything that was cleanly processed.
+  // If there's a partial tag at end, preserve from <action> onward for next chunk.
+  rawBuffer = hasPartialTag
+    ? rawBuffer.slice(rawBuffer.lastIndexOf('<action>'))
+    : rawBuffer.replace(/<action>[\s\S]*?<\/action>/g, '');
+
+  // Determine what's new in cleanText vs what partialSentence already has
+  // partialSentence holds the in-progress (unfinished) sentence from prior chunks.
+  // cleanText is the full clean accumulated text so far — we need only the NEW portion.
+  const alreadySentLength = fullText.length;  // chars already fired via onSentence
+  const newCleanChars = cleanText.slice(alreadySentLength + (partialSentence.length > 0 ? partialSentence.length : 0));
+  partialSentence += newCleanChars;
+
+  // Extract complete sentences from partialSentence
+  let currentSentence = '';
+  for (let i = 0; i < partialSentence.length; i++) {
+    const char = partialSentence[i];
+    currentSentence += char;
+
+    if (sentenceEndings.includes(char)) {
+      const sentence = stripActionDescriptions(currentSentence.trim());
+      if (sentence) {
+        debugLog('ChatAI', 'Playing complete sentence (unfiltered)', { sentence });
+        onSentence(sentence);
+        fullText += sentence;
+      }
+      currentSentence = '';
+    }
+  }
+
+  // Update partial sentence with remaining incomplete text
+  partialSentence = currentSentence;
 }
-
-// Use cleanText (without <action> tags) for display and TTS:
-const displayText = cleanText;
-// ... use displayText instead of fullText for chat message and TTS ...
 ```
 
-- [ ] **Step 4: Ensure stripActionTag is applied to TTS text**
+> **Note to implementer:** The logic tracking "what's new" relative to prior chunks can be subtle. The safest implementation: replace `partialSentence += text` with `partialSentence += newClean` where `newClean` is the net-new characters from cleanText. Since `parseVRMAction` returns the ENTIRE accumulated cleanText (not a delta), compute `newClean = cleanText.slice(prevCleanLength)` where `prevCleanLength` is tracked separately.
 
-Find where text is passed to `ttsQueue.enqueue()`. Wrap it:
+**Concrete, simplified implementation of Step 3 — paste this in place of the `if (text) { ... }` block:**
 
 ```typescript
-// Before enqueue, strip any action tags:
-const ttsText = stripActionTag(sentenceChunk);
-if (ttsText.trim()) {
-  ttsQueue.enqueue(ttsText, options);
+if (text) {
+  rawBuffer += text;
+
+  // Strip complete <action> blocks; dispatch last found action
+  const { action, cleanText, hasPartialTag } = parseVRMAction(rawBuffer);
+  if (action) {
+    lipSyncBridge.sendVRMCommand({ type: 'playPose', data: action });
+    debugLog('ChatAI', 'Phase 4: AI action dispatched', action);
+  }
+
+  // Keep only unprocessed raw text in rawBuffer
+  rawBuffer = hasPartialTag
+    ? rawBuffer.slice(rawBuffer.lastIndexOf('<action>'))
+    : '';
+
+  // The new clean characters to add to the sentence buffer
+  // cleanText is everything processed so far (clean). partialSentence holds
+  // the unfinished sentence. Compute delta from total already committed.
+  const totalCommitted = fullText.length + partialSentence.length;
+  const newChars = cleanText.slice(totalCommitted);
+  partialSentence += newChars;
+
+  // Extract complete sentences
+  let currentSentence = '';
+  for (let i = 0; i < partialSentence.length; i++) {
+    const char = partialSentence[i];
+    currentSentence += char;
+
+    if (sentenceEndings.includes(char)) {
+      const sentence = stripActionDescriptions(currentSentence.trim());
+      if (sentence) {
+        debugLog('ChatAI', 'Playing complete sentence (unfiltered)', { sentence });
+        onSentence(sentence);
+        fullText += sentence;
+      }
+      currentSentence = '';
+    }
+  }
+
+  partialSentence = currentSentence;
 }
 ```
 
-Note: The existing `stripActionDescriptions` from `fishAudioAPI` strips `(动作描述)` format. `stripActionTag` strips `<action>...</action>` format — both are needed now.
+- [ ] **Step 4: Update `xhr.onload` final flush**
 
-- [ ] **Step 5: Add webViewCommandRef**
-
-Add a ref that holds the WebView send function, and expose a setter:
+In `xhr.onload`, find:
 
 ```typescript
-// In useChatAI hook, add:
-const webViewCommandRef = useRef<((cmd: { type: string; data?: any }) => void) | null>(null);
-
-// Expose setter in return:
-return {
-  // ... existing returns ...
-  setWebViewCommandFn: (fn: (cmd: { type: string; data?: any }) => void) => {
-    webViewCommandRef.current = fn;
-  },
-};
+if (partialSentence.trim()) {
+  const finalSentence = stripActionDescriptions(partialSentence.trim());
 ```
 
-- [ ] **Step 6: Wire it in HomeScreen or wherever useChatAI is used**
-
-Find where `useChatAI` is called (likely `HomeScreen.tsx`). After `webViewRef` is available:
+Replace with:
 
 ```typescript
-const { setWebViewCommandFn, ...rest } = useChatAIWithLanLan();
+// Flush any remaining rawBuffer (action tag that never closed)
+// Just discard — malformed tag
+rawBuffer = '';
 
-// After HiyoriWebView mounts:
-useEffect(() => {
-  setWebViewCommandFn((cmd) => {
-    webViewRef.current?.sendVRMCommand(cmd);
-  });
-}, []);
+if (partialSentence.trim()) {
+  const { cleanText: cleanFinal } = parseVRMAction(partialSentence.trim());
+  const finalSentence = stripActionDescriptions(cleanFinal);
 ```
 
-- [ ] **Step 7: TypeScript check**
+- [ ] **Step 5: TypeScript check**
 
 ```bash
-cd EmoMate
-npx tsc --noEmit 2>&1 | head -30
+cd EmoMate && npx tsc --noEmit 2>&1 | head -30
 ```
 
-- [ ] **Step 8: Commit**
+Expected: no errors.
+
+- [ ] **Step 6: Commit**
 
 ```bash
 git add EmoMate/src/hooks/useChatAI.ts
-git commit -m "feat: parse VRM action from Claude response, dispatch to WebView"
+git commit -m "feat: parse VRM <action> tags during streaming, dispatch via lipSyncBridge"
 ```
 
 ---
 
-## Task 5: Add Parameter Clamping to ExpressionController
+## Task 5: Bone Clamping + Auto-Return-to-Idle in ExpressionController
 
 **Files:**
 - Modify: `character/app/components/ExpressionController.tsx`
 
-The `playPose` handler already works from Phase 2. This task adds safety clamping for AI-generated values.
+The existing `playPose` handler (line 179) already applies blend shapes and bones, but doesn't clamp bone values and never restores idle after the pose finishes.
 
-- [ ] **Step 1: Add clamp helper and validate incoming playPose data**
+- [ ] **Step 1: Add `BONE_SAFE_RANGES` constant and `clampBone` helper at top of file**
 
-In `ExpressionController.tsx`, find the `case 'playPose':` handler and add validation:
+After the `BONE_NAME_MAP` definition, add:
 
 ```typescript
-// Add clamp helper at top of file:
-function clampBoneVal(boneName: string, axis: 'x' | 'y' | 'z', value: number): number {
-  const SAFE_RANGES: Record<string, Record<string, [number, number]>> = {
-    head:          { x: [-0.35, 0.35], y: [-0.45, 0.45], z: [-0.35, 0.35] },
-    neck:          { x: [-0.25, 0.25], y: [-0.35, 0.35], z: [-0.25, 0.25] },
-    spine:         { x: [-0.25, 0.25], z: [-0.15, 0.15] },
-    rightUpperArm: { x: [-1.6, 0.3], z: [-1.3, 0.3] },
-    rightLowerArm: { x: [0, 1.6] },
-    leftUpperArm:  { x: [-1.6, 0.3], z: [-0.3, 1.3] },
-    leftLowerArm:  { x: [0, 1.6] },
-  };
-  const range = SAFE_RANGES[boneName]?.[axis];
-  if (!range) return value;
-  return Math.max(range[0], Math.min(range[1], value));
-}
+const BONE_SAFE_RANGES: Record<string, Partial<Record<'x' | 'y' | 'z', [number, number]>>> = {
+  head:          { x: [-0.35, 0.35], y: [-0.45, 0.45], z: [-0.35, 0.35] },
+  neck:          { x: [-0.25, 0.25], y: [-0.35, 0.35], z: [-0.25, 0.25] },
+  spine:         { x: [-0.25, 0.25], z: [-0.15, 0.15] },
+  rightUpperArm: { x: [-1.6, 0.3],  z: [-1.3, 0.3] },
+  rightLowerArm: { x: [0, 1.6] },
+  leftUpperArm:  { x: [-1.6, 0.3],  z: [-0.3, 1.3] },
+  leftLowerArm:  { x: [0, 1.6] },
+};
 
-// In the case 'playPose' handler, before applying bones:
-if (cmd.data.bones) {
-  const safeBones: BoneMap = {};
-  for (const [boneName, rot] of Object.entries(cmd.data.bones)) {
-    safeBones[boneName as keyof BoneMap] = {
-      x: rot.x !== undefined ? clampBoneVal(boneName, 'x', rot.x) : undefined,
-      y: rot.y !== undefined ? clampBoneVal(boneName, 'y', rot.y) : undefined,
-      z: rot.z !== undefined ? clampBoneVal(boneName, 'z', rot.z) : undefined,
-    };
+function clampBone(boneName: string, rot: { x?: number; y?: number; z?: number }): { x?: number; y?: number; z?: number } {
+  const ranges = BONE_SAFE_RANGES[boneName];
+  if (!ranges) return rot;
+  const result: { x?: number; y?: number; z?: number } = {};
+  for (const axis of ['x', 'y', 'z'] as const) {
+    if (rot[axis] === undefined) continue;
+    const range = ranges[axis];
+    result[axis] = range
+      ? Math.max(range[0], Math.min(range[1], rot[axis]!))
+      : rot[axis];
   }
-  state.targetBones = safeBones;
+  return result;
 }
 ```
 
-- [ ] **Step 2: Commit**
+- [ ] **Step 2: Add `idleReturnTimer` ref**
+
+Inside `ExpressionController`, alongside the other refs (`animState`, `presetState`, `blinkTimer`), add:
+
+```typescript
+const idleReturnTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+```
+
+- [ ] **Step 3: Replace the `case 'playPose':` block**
+
+Find (line ~179):
+
+```typescript
+        case 'playPose':
+          if (cmd.data.blendShapes) {
+            state.targetBlendShapes = cmd.data.blendShapes;
+          }
+          if (cmd.data.bones) {
+            state.targetBones = cmd.data.bones;
+          }
+          state.transitionDuration = cmd.data.duration ?? 1.0;
+          state.transitionElapsed = 0;
+          state.easing = cmd.data.easing ?? 'easeInOut';
+          state.isAnimating = true;
+          presetState.current = { name: null, elapsed: 0, loop: false };
+          break;
+```
+
+Replace with:
+
+```typescript
+        case 'playPose': {
+          if (cmd.data.blendShapes) {
+            state.targetBlendShapes = cmd.data.blendShapes;
+          }
+          if (cmd.data.bones) {
+            // Clamp each bone's values to safe ranges
+            const safeBones: BoneMap = {};
+            for (const [boneName, rot] of Object.entries(cmd.data.bones as BoneMap)) {
+              if (rot) safeBones[boneName as keyof BoneMap] = clampBone(boneName, rot) as any;
+            }
+            state.targetBones = safeBones;
+          }
+          const poseDuration = cmd.data.duration ?? 1.0;
+          state.transitionDuration = poseDuration;
+          state.transitionElapsed = 0;
+          state.easing = cmd.data.easing ?? 'easeInOut';
+          state.isAnimating = true;
+          // Pause idle loop for this pose
+          presetState.current = { name: null, elapsed: 0, loop: false };
+          // Auto-return to idle after pose finishes
+          if (idleReturnTimer.current) clearTimeout(idleReturnTimer.current);
+          idleReturnTimer.current = setTimeout(() => {
+            presetState.current = { name: 'idle', elapsed: 0, loop: true };
+            idleReturnTimer.current = null;
+          }, (poseDuration + 0.8) * 1000);
+          break;
+        }
+```
+
+- [ ] **Step 4: Clear timer on component unmount**
+
+Inside the `useEffect(() => { ... window.addEventListener('message', handleMessage) ... }, [])` cleanup, add:
+
+```typescript
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      if (idleReturnTimer.current) clearTimeout(idleReturnTimer.current);
+    };
+```
+
+- [ ] **Step 5: TypeScript check**
 
 ```bash
-cd character
-git add app/components/ExpressionController.tsx
-git commit -m "feat: add bone clamping in ExpressionController for AI-generated poses"
+cd character && npx tsc --noEmit 2>&1 | head -20
+```
+
+Expected: no errors.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add character/app/components/ExpressionController.tsx
+git commit -m "feat: bone clamping + auto-return-to-idle after AI playPose"
 ```
 
 ---
@@ -428,56 +607,76 @@ cd character && npm run dev
 cd EmoMate && npx expo start
 ```
 
-- [ ] **Step 2: Send a test message likely to trigger action**
+- [ ] **Step 2: Browser console sanity test**
 
-Send: "哇，真的吗？！这太惊讶了！"
+In the browser (character WebView), manually trigger a `playPose`:
 
-Expected: Claude responds with something like:
+```javascript
+window.dispatchEvent(new MessageEvent('message', {
+  data: JSON.stringify({
+    type: 'playPose',
+    data: {
+      blendShapes: { surprised: 0.9 },
+      bones: { head: { x: -0.1, y: 0.05 } },
+      duration: 1.5,
+      easing: 'easeOut'
+    }
+  })
+}));
 ```
-真的呢～<action>{"blendShapes":{"surprised":0.9},"bones":{"head":{"x":-0.1}},"duration":1.0,"easing":"easeOut"}</action>哇哦～
-```
 
-Character should: show surprised expression + slight head tilt back. Text displayed and spoken should be clean (no `<action>` tag visible).
+Expected: character looks surprised + slight head movement, then returns to idle after ~2.3 seconds.
 
-- [ ] **Step 3: Test with a thinking scenario**
+- [ ] **Step 3: Test strong-emotion message**
+
+Send from app: "哇，真的吗？！这太惊讶了！"
+
+Expected: Claude responds with a `<action>` block containing `surprised`. Character does the expression. Chat bubble and TTS have NO `<action>` text.
+
+- [ ] **Step 4: Test thinking message**
 
 Send: "你觉得人工智能会取代人类吗？"
 
-Expected: Claude uses thinking blend shape or thinking preset, then gives a thoughtful answer.
+Expected: Claude uses `fun` or `sorrow` blend shapes, possibly tilts head. Character poses then auto-returns to idle.
 
-- [ ] **Step 4: Test neutral conversation (no action)**
+- [ ] **Step 5: Test neutral message (no action)**
 
 Send: "今天几号？"
 
-Expected: Claude responds without any `<action>` tag. Character uses Phase 2 rule-based emotion fallback (or stays neutral).
+Expected: Claude responds WITHOUT `<action>`. Character uses Phase 2 rule-based expressions as normal fallback.
 
-- [ ] **Step 5: Verify action tag never appears in chat bubble or TTS**
+- [ ] **Step 6: Verify no tag leaks**
 
-Check the chat bubble text — it should never contain `<action>` literal text. Listen to the TTS — it should never read `action`.
+Check chat bubble text — no `<action>` literal. Listen to TTS — "action" is never read aloud.
 
-- [ ] **Step 6: TypeScript final check**
+- [ ] **Step 7: Verify lip sync and AI action coexist**
+
+While TTS is playing (mouth moving), the AI pose should also be active — they operate on different blend shapes and should not conflict.
+
+- [ ] **Step 8: Final TypeScript check**
 
 ```bash
-cd character && npx tsc --noEmit
 cd EmoMate && npx tsc --noEmit
+cd character && npx tsc --noEmit
 ```
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
 git add -A
-git commit -m "feat: end-to-end VRM AI-driven animation working"
+git commit -m "feat: Phase 4 complete — AI-driven VRM animation via <action> tags"
 ```
 
 ---
 
-## Verification Checklist
+## Verification Checklist (from spec)
 
-- [ ] Claude response containing `<action>` triggers correct VRM pose
-- [ ] `<action>` tag is absent from displayed chat messages
-- [ ] `<action>` tag is absent from TTS audio (not read aloud)
+- [ ] Claude response with `<action>` triggers correct VRM pose
+- [ ] `<action>` absent from displayed chat messages
+- [ ] `<action>` absent from TTS audio
 - [ ] AI-generated bone values stay within safe ranges (no model deformation)
-- [ ] Responses without `<action>` still trigger Phase 2 rule-based expressions
-- [ ] Expressions, poses, and lip sync all work simultaneously
-- [ ] 10-message conversation test: actions appear in emotionally appropriate moments only
+- [ ] Responses without `<action>` still use Phase 2 rule-based expressions as fallback
+- [ ] Lip sync and AI pose work simultaneously without interference
+- [ ] VRM returns to idle after pose duration expires
+- [ ] 10-conversation test: actions appear in emotionally appropriate moments only
 - [ ] `npx tsc --noEmit` passes in both projects
