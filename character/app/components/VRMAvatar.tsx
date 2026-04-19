@@ -10,6 +10,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { VRMLoaderPlugin, VRM, VRMUtils } from '@pixiv/three-vrm';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { ExpressionController } from './ExpressionController';
+import { LipSyncController } from './LipSyncController';
 
 // ─── Bridge message types ────────────────────────────────────────────────────
 
@@ -92,7 +93,12 @@ function VRMScene({ modelPath, onReady, onError }: VRMSceneProps) {
   // vrm.update is called in ExpressionController after bones are set,
   // so spring bones, lookAt, etc. are updated in the correct order.
 
-  return loadedVRM ? <ExpressionController vrm={loadedVRM} /> : null;
+  return loadedVRM ? (
+    <>
+      <ExpressionController vrm={loadedVRM} />
+      <LipSyncController vrm={loadedVRM} />
+    </>
+  ) : null;
 }
 
 // ─── Camera Setup ─────────────────────────────────────────────────────────────
