@@ -536,17 +536,30 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
 
       sendVRMCommand: (cmd: { type: string; data?: any }) => {
         debugLog('HiyoriWebView', `Sending VRM command: ${cmd.type}`);
-        const jsCode = `
-          (function() {
-            try {
-              window.dispatchEvent(new MessageEvent('message', {
-                data: ${JSON.stringify(cmd)}
-              }));
-            } catch(e) {
-              console.error('[WebView] VRM command dispatch failed:', e);
-            }
-          })();
-        `;
+        let jsCode: string;
+        if (cmd.type === 'lipSyncStart') {
+          jsCode = `
+            (function() {
+              try {
+                window.dispatchEvent(new Event('lipSyncStart'));
+              } catch(e) {
+                console.error('[WebView] lipSyncStart dispatch failed:', e);
+              }
+            })(); true;
+          `;
+        } else {
+          jsCode = `
+            (function() {
+              try {
+                window.dispatchEvent(new MessageEvent('message', {
+                  data: ${JSON.stringify(cmd)}
+                }));
+              } catch(e) {
+                console.error('[WebView] VRM command dispatch failed:', e);
+              }
+            })();
+          `;
+        }
         executeJavaScript(jsCode);
       },
     };

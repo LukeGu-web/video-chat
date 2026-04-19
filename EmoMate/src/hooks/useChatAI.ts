@@ -25,6 +25,8 @@ import {
 } from '../utils/cacheMetrics'; // Phase 2: Cache metrics tracking
 import { debugLog } from '../utils/debug'; // Debug logging utilities
 import { executeRAG, type RAGResult } from '../capabilities/retrieval'; // RAG system (Phase 1: Retrieval-Augmented Generation)
+import { textToViseme } from '../capabilities/speak/textToViseme';
+import { lipSyncBridge } from '../capabilities/speak/lipSyncBridge';
 import {
   shouldRequestFeedback,
   submitFeedback,
@@ -406,6 +408,9 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
           if (!isStreamSpeaking) {
             setIsStreamSpeaking(true);
           }
+          // Lip sync: prepare visemes (two-phase: store without starting)
+          const { visemes, totalDuration } = textToViseme(item.text);
+          lipSyncBridge.sendVRMCommand({ type: 'prepareVisemes', data: { visemes, totalDuration } });
         },
         onItemEnd: () => {
           // Check if there are more items in queue
@@ -417,6 +422,8 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
           ) {
             setCurrentStreamSegment('');
           }
+          // Lip sync: close mouth after each item
+          lipSyncBridge.sendVRMCommand({ type: 'stopVisemes' });
         },
       });
 

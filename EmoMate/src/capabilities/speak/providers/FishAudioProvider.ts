@@ -10,6 +10,7 @@ import { synthesizeWithFishAudio } from '../fishAudioAPI';
 import { getFishAudioApiKey } from '../../../constants/ai';
 import { audioModeManager } from '../../../utils/audioModeManager';
 import { amplifiedAudioBridge, AUDIO_GAIN } from './amplifiedAudioBridge';
+import { lipSyncBridge } from '../lipSyncBridge';
 
 /**
  * Fish Audio TTS Provider
@@ -62,6 +63,7 @@ export class FishAudioProvider implements TTSProvider {
           onStart: () => {
             console.log('[FishAudioProvider] ▶️ Playback started');
             callbacks?.onStart?.();
+            lipSyncBridge.sendVRMCommand({ type: 'lipSyncStart' });
           },
           onEnd: () => {
             console.log('[FishAudioProvider] ✅ Playback finished');

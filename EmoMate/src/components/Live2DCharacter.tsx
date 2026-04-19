@@ -6,6 +6,7 @@ import { debugLog, debugError, debugWarn } from '../utils/debug';
 import { useMonitorStore } from '../store/monitorStore';
 import { EmotionType } from '../types/emotion';
 import { emotionToVRMCommands } from '../capabilities/motion/motionMapper';
+import { lipSyncBridge } from '../capabilities/speak/lipSyncBridge';
 
 interface Live2DCharacterProps {
   status?: HiyoriMotion; // 直接使用HiyoriMotion类型
@@ -248,6 +249,11 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
     console.log('✨ [Live2DCharacter] Hiyori model is ready!');
     debugLog('Live2DCharacter', 'Hiyori model is ready!');
     setIsModelReady(true);
+
+    // Register VRM command handler for lip sync
+    lipSyncBridge.register((cmd) => {
+      webViewRef.current?.hiyoriBridge.sendVRMCommand(cmd);
+    });
 
     // 模型准备好后立即播放当前动作
     setTimeout(() => {
