@@ -413,17 +413,16 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
           lipSyncBridge.sendVRMCommand({ type: 'prepareVisemes', data: { visemes, totalDuration } });
         },
         onItemEnd: () => {
-          // Check if there are more items in queue
           const status = ttsQueue.getStatus();
-          if (
+          const isLastItem =
             status.pending === 0 &&
             status.ready === 0 &&
-            status.synthesizing === 0
-          ) {
+            status.synthesizing === 0;
+          if (isLastItem) {
             setCurrentStreamSegment('');
+            // Only close mouth when no more items follow to avoid race with next prepareVisemes
+            lipSyncBridge.sendVRMCommand({ type: 'stopVisemes' });
           }
-          // Lip sync: close mouth after each item
-          lipSyncBridge.sendVRMCommand({ type: 'stopVisemes' });
         },
       });
 

@@ -26,7 +26,7 @@ export interface VRMBoneMap {
 }
 
 export interface VRMCommand {
-  type: 'setExpression' | 'playPreset' | 'playPose' | 'stopAll';
+  type: 'setExpression' | 'playPreset' | 'playPose' | 'stopAll' | 'prepareVisemes' | 'stopVisemes' | 'lipSyncStart';
   data?: any;
 }
 

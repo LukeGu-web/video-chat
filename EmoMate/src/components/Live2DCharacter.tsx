@@ -290,7 +290,7 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
     [currentMotion, onMotionComplete, playLive2DMotion]
   );
 
-  // 清理定时器和循环
+  // 清理定时器、循环和 lip sync bridge
   useEffect(() => {
     return () => {
       if (motionTimeoutRef.current) {
@@ -299,6 +299,7 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
       if (motionLoopIntervalRef.current) {
         clearInterval(motionLoopIntervalRef.current);
       }
+      lipSyncBridge.unregister();
       console.log('🧹 [Live2DCharacter] Cleaned up timers and loops');
     };
   }, []);

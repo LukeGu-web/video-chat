@@ -1,28 +1,14 @@
 import { VisemeFrame } from '../../types/vrm';
 
-// Seconds per Chinese character at normal TTS speed
 const MS_PER_CHAR = 0.2;
-// Pause duration for punctuation (seconds)
 const PAUSE_DURATION = 0.15;
 
-// Pinyin final → mouth shape mapping
-// Covers the most common Chinese vowel endings
-const FINAL_TO_SHAPE: Record<string, VisemeFrame['shape']> = {
-  a: 'aa', ai: 'aa', ao: 'aa', an: 'aa', ang: 'aa',
-  e: 'ee', ei: 'ee', en: 'ee', eng: 'ee', er: 'ee',
-  i: 'ih', in: 'ih', ing: 'ih',
-  o: 'oh', ou: 'oh', ong: 'oh',
-  u: 'ou', un: 'ou', uan: 'ou',
-  v: 'ih', // ü
-};
-
-// Common Chinese character → approximate mouth shape (top-frequency chars)
 const CHAR_TO_SHAPE: Record<string, VisemeFrame['shape']> = {
-  '的': 'ee', '了': 'oh', '是': 'sil', '我': 'oh', '不': 'ou',
+  '的': 'ee', '了': 'oh', '是': 'ih', '我': 'oh', '不': 'ou',
   '你': 'ih', '他': 'aa', '她': 'aa', '好': 'aa', '在': 'aa',
   '有': 'ou', '这': 'ee', '那': 'aa', '很': 'ee', '也': 'ee',
   '就': 'ou', '都': 'ou', '说': 'oh', '来': 'aa', '去': 'ih',
-  '一': 'ih', '二': 'ee', '三': 'aa', '四': 'sil', '五': 'ou',
+  '一': 'ih', '二': 'ee', '三': 'aa', '四': 'ih', '五': 'ou',
   '啊': 'aa', '嗯': 'ee', '哦': 'oh', '呢': 'ee', '吧': 'aa',
   '嘿': 'ee', '哇': 'aa', '呀': 'aa', '嘛': 'aa', '哈': 'aa',
 };

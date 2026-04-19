@@ -21,6 +21,7 @@ import {
 } from '../../constants/ai';
 import { TTSQueue } from '../../capabilities/speak';
 import { lipSyncBridge } from '../../capabilities/speak/lipSyncBridge';
+import { textToViseme } from '../../capabilities/speak/textToViseme';
 import { ChatMessage } from '../useChatAI';
 import { useTopicSeeds } from './useTopicSeeds';
 
@@ -104,9 +105,19 @@ export const useProactiveConversation = (
           const ttsQueue = new TTSQueue({
             onItemStart: (item) => {
               onSpeakingStateChange?.(true, item.text);
+              const { visemes, totalDuration } = textToViseme(item.text);
+              lipSyncBridge.sendVRMCommand({ type: 'prepareVisemes', data: { visemes, totalDuration } });
             },
             onItemEnd: () => {
-              onSpeakingStateChange?.(false, '');
+              const status = ttsQueue.getStatus();
+              const isLastItem =
+                status.pending === 0 &&
+                status.ready === 0 &&
+                status.synthesizing === 0;
+              if (isLastItem) {
+                onSpeakingStateChange?.(false, '');
+                lipSyncBridge.sendVRMCommand({ type: 'stopVisemes' });
+              }
             },
           });
           proactiveTTSQueue.current = ttsQueue;

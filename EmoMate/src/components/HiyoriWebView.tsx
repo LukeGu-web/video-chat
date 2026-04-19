@@ -9,6 +9,7 @@ import {
   DebugTimer,
 } from '../utils/debug';
 import { useMonitorStore } from '../store/monitorStore';
+import { VRMCommand } from '../types/vrm';
 
 interface HiyoriWebViewProps {
   style?: any;
@@ -21,7 +22,7 @@ interface HiyoriBridge {
   getAvailableMotions: () => void;
   checkModelStatus: () => void;
   reload: () => void;
-  sendVRMCommand: (cmd: { type: string; data?: any }) => void;
+  sendVRMCommand: (cmd: VRMCommand) => void;
 }
 
 interface PendingMessage {
