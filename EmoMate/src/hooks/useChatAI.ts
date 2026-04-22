@@ -222,6 +222,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       // Simple sentence buffer for direct streaming (no filtering)
       let partialSentence = '';
       let rawBuffer = ''; // accumulates raw text to handle cross-chunk <action> blocks
+      let prevCleanCommitted = 0; // tracks cleanText length from previous iteration
       const sentenceEndings = ['。', '！', '？', '~', '…', '呢', '哦', '啊', '呀'];
 
       // Track processed lines to avoid duplicates
@@ -261,9 +262,9 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
                 : '';
 
               // Feed clean text into sentence buffer
-              // cleanText is total clean text so far; compute delta relative to what's been processed
-              const totalCommitted = fullText.length + partialSentence.length;
-              const newChars = cleanText.slice(totalCommitted);
+              // cleanText is relative to current rawBuffer — use prevCleanCommitted to compute delta
+              const newChars = cleanText.slice(prevCleanCommitted);
+              prevCleanCommitted = hasPartialTag ? cleanText.length : 0;
               partialSentence += newChars;
 
               // Extract complete sentences
