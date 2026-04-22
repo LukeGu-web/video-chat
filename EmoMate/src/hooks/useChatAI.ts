@@ -27,6 +27,7 @@ import { debugLog } from '../utils/debug'; // Debug logging utilities
 import { executeRAG, type RAGResult } from '../capabilities/retrieval'; // RAG system (Phase 1: Retrieval-Augmented Generation)
 import { textToViseme } from '../capabilities/speak/textToViseme';
 import { lipSyncBridge } from '../capabilities/speak/lipSyncBridge';
+import { parseVRMAction } from '../utils/parseVRMAction';
 import {
   shouldRequestFeedback,
   submitFeedback,
@@ -220,6 +221,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
 
       // Simple sentence buffer for direct streaming (no filtering)
       let partialSentence = '';
+      let rawBuffer = ''; // accumulates raw text to handle cross-chunk <action> blocks
       const sentenceEndings = ['。', '！', '？', '~', '…', '呢', '哦', '啊', '呀'];
 
       // Track processed lines to avoid duplicates
@@ -244,9 +246,25 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
             // Parse SSE chunk
             const text = parseSSEChunk(line);
             if (text) {
-              // DISABLED: SmartSentenceBuffer filtering
-              // Now playing ALL sentences directly without filtering
-              partialSentence += text;
+              rawBuffer += text;
+
+              // Strip complete <action> blocks; dispatch last found action
+              const { action, cleanText, hasPartialTag } = parseVRMAction(rawBuffer);
+              if (action) {
+                lipSyncBridge.sendVRMCommand({ type: 'playPose', data: action });
+                debugLog('ChatAI', 'Phase 4: AI action dispatched', action);
+              }
+
+              // Keep only unprocessed raw text in rawBuffer
+              rawBuffer = hasPartialTag
+                ? rawBuffer.slice(rawBuffer.lastIndexOf('<action>'))
+                : '';
+
+              // Feed clean text into sentence buffer
+              // cleanText is total clean text so far; compute delta relative to what's been processed
+              const totalCommitted = fullText.length + partialSentence.length;
+              const newChars = cleanText.slice(totalCommitted);
+              partialSentence += newChars;
 
               // Extract complete sentences
               let currentSentence = '';
@@ -254,7 +272,6 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
                 const char = partialSentence[i];
                 currentSentence += char;
 
-                // Check if this is a sentence ending
                 if (sentenceEndings.includes(char)) {
                   const sentence = stripActionDescriptions(currentSentence.trim());
                   if (sentence) {
@@ -268,7 +285,6 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
                 }
               }
 
-              // Update partial sentence with remaining incomplete text
               partialSentence = currentSentence;
             }
           }
@@ -281,8 +297,10 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
           try {
             // DISABLED: SmartBuffer flush
             // Now flush remaining partial sentence directly without filtering
+            rawBuffer = '';
             if (partialSentence.trim()) {
-              const finalSentence = stripActionDescriptions(partialSentence.trim());
+              const { cleanText: cleanFinal } = parseVRMAction(partialSentence.trim());
+              const finalSentence = stripActionDescriptions(cleanFinal);
               if (finalSentence) {
                 debugLog('ChatAI', 'Playing final sentence (unfiltered)', {
                   finalSentence,
