@@ -24,6 +24,7 @@ import { SceneData } from '../../types/scene';
 import { ChatMessage, ChatAIConfig } from '../useChatAI';
 import { debugLog, debugWarn } from '../../utils/debug';
 import { getRelativeTime } from '../../utils/timeFormat';
+import { VRM_PARAMETER_MANUAL } from '../../constants/vrmSchema';
 
 /**
  * Scene metadata returned by buildSceneContext
@@ -348,6 +349,12 @@ export function buildCacheableSystemPrompt(
       text: `# Memory\n${memoryBlock}`,
     });
   }
+
+  // VRM parameter manual (not cached — updated frequently during development)
+  systemBlocks.push({
+    type: 'text',
+    text: VRM_PARAMETER_MANUAL,
+  });
 
   debugLog('buildCacheableSystemPrompt', 'Created system blocks', {
     totalBlocks: systemBlocks.length,
