@@ -35,11 +35,11 @@ export const MOTION_PRESETS: Record<PresetName, MotionPreset> = {
     loop: true,
     loopDuration: 4.0,
     keyframes: [
-      { time: 0.0, bones: { rightUpperArm: { z: -1.5 }, leftUpperArm: { z: 1.5 }, spine: { z: 0 },    head: { y: 0 } } },
-      { time: 1.0, bones: { rightUpperArm: { z: -1.5 }, leftUpperArm: { z: 1.5 }, spine: { z: 0.02 }, head: { y: 0.06 } } },
-      { time: 2.0, bones: { rightUpperArm: { z: -1.5 }, leftUpperArm: { z: 1.5 }, spine: { z: 0.03 }, head: { y: 0 } } },
-      { time: 3.0, bones: { rightUpperArm: { z: -1.5 }, leftUpperArm: { z: 1.5 }, spine: { z: 0.02 }, head: { y: -0.06 } } },
-      { time: 4.0, bones: { rightUpperArm: { z: -1.5 }, leftUpperArm: { z: 1.5 }, spine: { z: 0 },    head: { y: 0 } } },
+      { time: 0.0, bones: { rightUpperArm: { z: -1.5 }, leftUpperArm: { z: 1.5 }, spine: { z: 0 },    head: { x: 0, y: 0,     z: 0 } } },
+      { time: 1.0, bones: { rightUpperArm: { z: -1.5 }, leftUpperArm: { z: 1.5 }, spine: { z: 0.02 }, head: { x: 0, y: 0.06,  z: 0 } } },
+      { time: 2.0, bones: { rightUpperArm: { z: -1.5 }, leftUpperArm: { z: 1.5 }, spine: { z: 0.03 }, head: { x: 0, y: 0,     z: 0 } } },
+      { time: 3.0, bones: { rightUpperArm: { z: -1.5 }, leftUpperArm: { z: 1.5 }, spine: { z: 0.02 }, head: { x: 0, y: -0.06, z: 0 } } },
+      { time: 4.0, bones: { rightUpperArm: { z: -1.5 }, leftUpperArm: { z: 1.5 }, spine: { z: 0 },    head: { x: 0, y: 0,     z: 0 } } },
     ],
   },
 

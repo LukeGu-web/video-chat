@@ -81,7 +81,7 @@ interface AnimationState {
   targetBlendShapes: BlendShapeMap;
   currentBlendShapes: BlendShapeMap;
   targetBones: BoneMap;
-  currentBones: BoneMap;
+  currentBones: BoneMap;  // tracks bone state at end of last transition
   transitionDuration: number;
   transitionElapsed: number;
   easing: EasingType;
@@ -108,7 +108,7 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
     targetBlendShapes: {},
     currentBlendShapes: {},
     targetBones: {},
-    currentBones: {},
+    currentBones: {},  // last known bone state (updated on transition complete)
     transitionDuration: 0.5,
     transitionElapsed: 0,
     easing: 'easeInOut',
@@ -226,6 +226,22 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
           if (idleReturnTimer.current) clearTimeout(idleReturnTimer.current);
           idleReturnTimer.current = setTimeout(() => {
             presetState.current = { name: 'idle', elapsed: 0, loop: true };
+            // Clear pose bones so idle preset takes over cleanly
+            state.currentBones = {};
+            state.targetBones = {};
+            // Fade out any blendShapes that were held at pose-peak
+            const activeShapes = Object.fromEntries(
+              Object.entries(state.currentBlendShapes)
+                .filter(([, v]) => (v ?? 0) > 0.01)
+                .map(([k]) => [k, 0])
+            ) as BlendShapeMap;
+            if (Object.keys(activeShapes).length > 0) {
+              state.targetBlendShapes = activeShapes;
+              state.transitionDuration = 0.5;
+              state.transitionElapsed = 0;
+              state.easing = 'easeInOut';
+              state.isAnimating = true;
+            }
             idleReturnTimer.current = null;
           }, (poseDuration + 0.8) * 1000);
           break;
@@ -316,7 +332,7 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
       }
     }
 
-    // Smooth expression transition
+    // Smooth expression transition (blendShapes + optional bones from playPose)
     if (state.isAnimating) {
       state.transitionElapsed += delta;
       const rawT = Math.min(state.transitionElapsed / state.transitionDuration, 1);
@@ -325,8 +341,15 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
       const interpolated = lerpBlendShapes(state.currentBlendShapes, state.targetBlendShapes, t);
       applyBlendShapes(interpolated);
 
+      // Apply bone interpolation when playPose has set target bones
+      if (Object.keys(state.targetBones).length > 0) {
+        const interpolatedBones = lerpBones(state.currentBones, state.targetBones, t);
+        applyBones(interpolatedBones);
+      }
+
       if (rawT >= 1) {
         state.currentBlendShapes = { ...state.targetBlendShapes };
+        state.currentBones = { ...state.targetBones };
         state.isAnimating = false;
         if (state.holdDuration > 0) {
           state.isHolding = true;
