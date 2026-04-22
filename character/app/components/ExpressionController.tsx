@@ -48,6 +48,33 @@ const BONE_NAME_MAP: Record<string, string> = {
   rightHand: 'rightHand',
 };
 
+const BONE_SAFE_RANGES: Record<string, Partial<Record<'x' | 'y' | 'z', [number, number]>>> = {
+  head:          { x: [-0.35, 0.35], y: [-0.45, 0.45], z: [-0.35, 0.35] },
+  neck:          { x: [-0.25, 0.25], y: [-0.35, 0.35], z: [-0.25, 0.25] },
+  spine:         { x: [-0.25, 0.25], z: [-0.15, 0.15] },
+  rightUpperArm: { x: [-1.6, 0.3],  z: [-1.3, 0.3] },
+  rightLowerArm: { x: [0, 1.6] },
+  leftUpperArm:  { x: [-1.6, 0.3],  z: [-0.3, 1.3] },
+  leftLowerArm:  { x: [0, 1.6] },
+};
+
+function clampBone(
+  boneName: string,
+  rot: { x?: number; y?: number; z?: number }
+): { x?: number; y?: number; z?: number } {
+  const ranges = BONE_SAFE_RANGES[boneName];
+  if (!ranges) return rot;
+  const result: { x?: number; y?: number; z?: number } = {};
+  for (const axis of ['x', 'y', 'z'] as const) {
+    if (rot[axis] === undefined) continue;
+    const range = ranges[axis];
+    result[axis] = range
+      ? Math.max(range[0], Math.min(range[1], rot[axis]!))
+      : rot[axis];
+  }
+  return result;
+}
+
 // ─── State types ──────────────────────────────────────────────────────────────
 
 interface AnimationState {
@@ -94,6 +121,7 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
   const presetState = useRef<PresetState>({ name: 'idle', elapsed: 0, loop: true });
   const blinkTimer = useRef(0);
   const nextBlinkTime = useRef(2.0);
+  const idleReturnTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ─── Apply blend shape to VRM ──────────────────────────────────────────────
 
@@ -176,19 +204,32 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
           state.isHolding = false;
           break;
 
-        case 'playPose':
+        case 'playPose': {
           if (cmd.data.blendShapes) {
             state.targetBlendShapes = cmd.data.blendShapes;
           }
           if (cmd.data.bones) {
-            state.targetBones = cmd.data.bones;
+            const safeBones: Record<string, { x?: number; y?: number; z?: number }> = {};
+            for (const [boneName, rot] of Object.entries(
+              cmd.data.bones as Record<string, { x?: number; y?: number; z?: number }>
+            )) {
+              if (rot) safeBones[boneName] = clampBone(boneName, rot);
+            }
+            state.targetBones = safeBones as typeof state.targetBones;
           }
-          state.transitionDuration = cmd.data.duration ?? 1.0;
+          const poseDuration = cmd.data.duration ?? 1.0;
+          state.transitionDuration = poseDuration;
           state.transitionElapsed = 0;
           state.easing = cmd.data.easing ?? 'easeInOut';
           state.isAnimating = true;
           presetState.current = { name: null, elapsed: 0, loop: false };
+          if (idleReturnTimer.current) clearTimeout(idleReturnTimer.current);
+          idleReturnTimer.current = setTimeout(() => {
+            presetState.current = { name: 'idle', elapsed: 0, loop: true };
+            idleReturnTimer.current = null;
+          }, (poseDuration + 0.8) * 1000);
           break;
+        }
 
         case 'playPreset': {
           const preset = MOTION_PRESETS[cmd.data.name];
@@ -214,7 +255,10 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
     };
 
     window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      if (idleReturnTimer.current) clearTimeout(idleReturnTimer.current);
+    };
   }, []);
 
   // ─── Per-frame update ──────────────────────────────────────────────────────
