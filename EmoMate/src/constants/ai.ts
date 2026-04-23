@@ -505,9 +505,9 @@ export const getAICapabilities = (): AICapability[] => {
       id: 'character_animation',
       name: '角色动作表达',
       description:
-        '可以通过Live2D角色进行丰富的动作表达，包括11种动作(Happy, Shy, Dance, Wave, Thinking等)，自动根据情绪做出相应的动作反应',
-      isAvailable: true, // HiyoriWebView + Live2DCharacter
-      provider: 'Live2D Hiyori',
+        '可以通过VRM角色进行丰富的动作表达，包括多种动作(Happy, Shy, Dance, Wave, Thinking等)，自动根据情绪做出相应的动作反应',
+      isAvailable: true, // CharacterWebView + CharacterAvatar
+      provider: 'VRM Avatar',
     },
     {
       id: 'multimodal_understanding',

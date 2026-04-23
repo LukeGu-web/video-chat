@@ -1,5 +1,5 @@
-// Hiyori Live2D动作常量
-export const HIYORI_MOTIONS = [
+// Avatar motion constants
+export const AVATAR_MOTIONS = [
   'Idle', // 默认状态
   'Happy', // 积极情绪
   'Surprised', // 反应
@@ -13,7 +13,7 @@ export const HIYORI_MOTIONS = [
   'Sleepy', // 疲惫状态
 ] as const;
 
-export type HiyoriMotion = (typeof HIYORI_MOTIONS)[number];
+export type AvatarMotion = (typeof AVATAR_MOTIONS)[number];
 
 export const AI_PERSONALITY = {
   // 基础人设
@@ -155,9 +155,9 @@ export const AI_PERSONALITY = {
     },
 
     visual: {
-      animations: true, // Live2D Hiyori动作系统
-      // Hiyori模型支持的11个动作
-      hiyoriMotions: [
+      animations: true, // VRM Avatar动作系统
+      // Avatar支持的动作列表
+      avatarMotions: [
         'Idle', // 默认状态
         'Happy', // 积极情绪
         'Surprised', // 反应
@@ -180,82 +180,82 @@ export const AI_PERSONALITY = {
     },
   },
 
-  // Hiyori Live2D情感表达映射
+  // Avatar情感表达映射
   emotionMapping: {
     // 开心时的表达
     happy: {
       expressions: ['太好了呢！', '真开心！', '好棒哦！'],
-      hiyoriMotion: 'Happy' as HiyoriMotion,
+      avatarMotion: 'Happy' as AvatarMotion,
       tone: 'excited',
     },
 
     // 难过时的表达
     sad: {
       expressions: ['没事吧…', '好担心', '要紧吗'],
-      hiyoriMotion: 'Sleepy' as HiyoriMotion,
+      avatarMotion: 'Sleepy' as AvatarMotion,
       tone: 'concerned',
     },
 
     // 思考时的表达
     thinking: {
       expressions: ['嗯…', '让我想想', '这样啊'],
-      hiyoriMotion: 'Thinking' as HiyoriMotion,
+      avatarMotion: 'Thinking' as AvatarMotion,
       tone: 'thoughtful',
     },
 
     // 害羞时的表达
     shy: {
       expressions: ['诶嘿嘿', '有点不好意思', '那个…'],
-      hiyoriMotion: 'Shy' as HiyoriMotion,
+      avatarMotion: 'Shy' as AvatarMotion,
       tone: 'shy',
     },
 
     // 关心/倾听时的表达
     caring: {
       expressions: ['怎么了？', '要不要紧', '别担心哦'],
-      hiyoriMotion: 'Idle' as HiyoriMotion, // listening状态使用Idle动作
+      avatarMotion: 'Idle' as AvatarMotion, // listening状态使用Idle动作
       tone: 'gentle',
     },
 
     // 新增: 惊讶时的表达
     surprised: {
       expressions: ['诶？', '真的吗！', '好意外！'],
-      hiyoriMotion: 'Surprised' as HiyoriMotion,
+      avatarMotion: 'Surprised' as AvatarMotion,
       tone: 'surprised',
     },
 
     // 新增: 兴奋时的表达
     excited: {
       expressions: ['好棒啊！', '太兴奋了！', '哇哇！'],
-      hiyoriMotion: 'Excited' as HiyoriMotion,
+      avatarMotion: 'Excited' as AvatarMotion,
       tone: 'excited',
     },
 
     // 新增: 欢笑时的表达
     laughing: {
       expressions: ['哈哈哈！', '好好笑！', '太有趣了！'],
-      hiyoriMotion: 'Laugh' as HiyoriMotion,
+      avatarMotion: 'Laugh' as AvatarMotion,
       tone: 'joyful',
     },
 
     // 新增: 打招呼时的表达
     greeting: {
       expressions: ['你好！', '大家好！', '嗨嗨！'],
-      hiyoriMotion: 'Wave' as HiyoriMotion,
+      avatarMotion: 'Wave' as AvatarMotion,
       tone: 'friendly',
     },
 
     // 新增: 庆祝时的表达
     celebrating: {
       expressions: ['太好了！', '我们成功了！', '值得庆祝！'],
-      hiyoriMotion: 'Dance' as HiyoriMotion,
+      avatarMotion: 'Dance' as AvatarMotion,
       tone: 'celebratory',
     },
 
     // 新增: 说话时的表达
     speaking: {
       expressions: ['嗯嗯', '我说呢', '你听我说'],
-      hiyoriMotion: 'Speaking' as HiyoriMotion,
+      avatarMotion: 'Speaking' as AvatarMotion,
       tone: 'conversational',
     },
 
