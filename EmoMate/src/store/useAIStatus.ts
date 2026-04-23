@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
-// Hiyori Live2D motion type definition - Hiyori's actual motion types
-type HiyoriMotion =
+// Avatar motion type — model-agnostic motion names
+type AvatarMotion =
   | 'Idle'        // Idle state
   | 'Speaking'    // Speaking
   | 'Thinking'    // Thinking
@@ -30,7 +30,7 @@ interface AIActivityState {
  * Calculated from activity states
  */
 interface AIDerivedState {
-  currentMotion: HiyoriMotion;  // Current Live2D motion
+  currentMotion: AvatarMotion;  // Current Live2D motion
   currentActivity: string;       // Current activity description (for debugging)
 }
 
@@ -49,8 +49,8 @@ interface AIStatusStore extends AIActivityState, AIDerivedState {
   setBatchStates: (states: Partial<AIActivityState>) => void;
 
   // Legacy API (for backward compatibility)
-  aiStatus: HiyoriMotion; // Alias for currentMotion
-  setAIStatus: (status: HiyoriMotion) => void; // Manual override
+  aiStatus: AvatarMotion; // Alias for currentMotion
+  setAIStatus: (status: AvatarMotion) => void; // Manual override
 
   // Utilities
   reset: () => void; // Reset all states to idle
@@ -62,7 +62,7 @@ interface AIStatusStore extends AIActivityState, AIDerivedState {
  */
 interface PriorityRule {
   condition: (state: AIActivityState) => boolean;
-  motion: HiyoriMotion;
+  motion: AvatarMotion;
   activity: string;
 }
 
@@ -228,7 +228,7 @@ export const useAIStatus = create<AIStatusStore>((set) => ({
   },
 
   // Legacy API - Manual motion override (bypasses automatic calculation)
-  setAIStatus: (status: HiyoriMotion) => {
+  setAIStatus: (status: AvatarMotion) => {
     console.warn(
       '[useAIStatus] setAIStatus is deprecated. Use activity setters instead (setListening, setLooking, setThinking, setSpeaking).'
     );
@@ -251,5 +251,5 @@ export const useAIStatus = create<AIStatusStore>((set) => ({
 }));
 
 // Export types
-export type { HiyoriMotion, AIActivityState, AIDerivedState, AIStatusStore };
+export type { AvatarMotion, AIActivityState, AIDerivedState, AIStatusStore };
 export default useAIStatus;

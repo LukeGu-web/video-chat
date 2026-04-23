@@ -8,7 +8,7 @@ import { immer } from 'zustand/middleware/immer';
 import {
   MonitorData,
   WebViewStatus,
-  Live2DStatus,
+  AvatarStatus,
   EmotionStatus,
   BackgroundSceneInfo,
   SceneUnderstandingStatus,
@@ -24,7 +24,7 @@ interface MonitorState {
 
 interface MonitorActions {
   updateWebViewStatus: (status: Partial<WebViewStatus>) => void;
-  updateLive2DStatus: (status: Partial<Live2DStatus>) => void;
+  updateAvatarStatus: (status: Partial<AvatarStatus>) => void;
   updateEmotionStatus: (status: Partial<EmotionStatus>) => void;
   updateBackgroundScene: (scene: BackgroundSceneInfo | null) => void;
   updateSceneUnderstanding: (status: Partial<SceneUnderstandingStatus>) => void;
@@ -46,7 +46,7 @@ const initialState: MonitorState = {
       error: null,
       pendingMessagesCount: 0,
     },
-    live2d: {
+    avatar: {
       currentMotion: 'Idle',
       isModelReady: false,
       isPlaying: false,
@@ -87,9 +87,9 @@ export const useMonitorStore = create<MonitorStore>()(
       });
     },
 
-    updateLive2DStatus: (status: Partial<Live2DStatus>) => {
+    updateAvatarStatus: (status: Partial<AvatarStatus>) => {
       set((state) => {
-        Object.assign(state.data.live2d, status);
+        Object.assign(state.data.avatar, status);
       });
     },
 

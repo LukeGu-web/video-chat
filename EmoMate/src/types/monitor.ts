@@ -4,10 +4,10 @@
  */
 
 import { EmotionType } from './emotion';
-import { HiyoriMotion } from '../store';
+import { AvatarMotion } from '../store';
 
 // ============================================
-// Live2D System Monitoring
+// Avatar System Monitoring
 // ============================================
 
 /**
@@ -22,10 +22,10 @@ export interface WebViewStatus {
 }
 
 /**
- * Live2D model playback status
+ * Avatar model playback status
  */
-export interface Live2DStatus {
-  currentMotion: HiyoriMotion;
+export interface AvatarStatus {
+  currentMotion: AvatarMotion;
   isModelReady: boolean;
   isPlaying: boolean;
   shouldLoop: boolean;
@@ -42,8 +42,8 @@ export interface EmotionStatus {
   facialEmotion: EmotionType | null;
   textEmotion: EmotionType | null;
   combinedEmotion: EmotionType;
-  aiStatus: HiyoriMotion | null;
-  selectedMotion: HiyoriMotion;
+  aiStatus: AvatarMotion | null;
+  selectedMotion: AvatarMotion;
   motionPriority: number;
   motionReason: string;
   mappingEnabled: boolean;
@@ -84,9 +84,9 @@ export interface SceneUnderstandingStatus {
  * Complete monitoring data for FunctionMonitor
  */
 export interface MonitorData {
-  // Live2D System
+  // Avatar System
   webView: WebViewStatus;
-  live2d: Live2DStatus;
+  avatar: AvatarStatus;
 
   // Emotion System
   emotion: EmotionStatus;
@@ -100,7 +100,7 @@ export interface MonitorData {
  * Section visibility state for collapsible panels
  */
 export interface SectionState {
-  live2dSystem: boolean;
+  avatarSystem: boolean;
   emotionSystem: boolean;
   sceneUnderstanding: boolean;
 }
