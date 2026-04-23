@@ -1,8 +1,8 @@
 import React, { useEffect, useCallback, useRef, useState } from 'react';
 import { View, Text } from 'react-native';
-import Live2DCharacter, { HIYORI_MOTIONS } from './Live2DCharacter';
+import CharacterAvatar, { AVATAR_MOTIONS } from './CharacterAvatar';
 import { EmotionType } from '../types/emotion';
-import { useAIStatus, HiyoriMotion, useEmotionStore, useMonitorStore } from '../store';
+import { useAIStatus, AvatarMotion, useEmotionStore, useMonitorStore } from '../store';
 import { debugLog } from '../utils/debug';
 import {
   selectMotion,
@@ -43,7 +43,7 @@ export const EmotionAwareCharacter: React.FC<EmotionAwareCharacterProps> = ({
   const updateEmotionStatus = useMonitorStore((state) => state.updateEmotionStatus);
 
   // Determine the motion to play based on emotion, AI status, and context
-  const currentMotion = React.useMemo((): HiyoriMotion => {
+  const currentMotion = React.useMemo((): AvatarMotion => {
     if (!enableEmotionMapping) {
       return aiStatus || 'Idle';
     }
@@ -180,7 +180,7 @@ export const EmotionAwareCharacter: React.FC<EmotionAwareCharacterProps> = ({
 
   return (
     <View className={`relative ${className}`}>
-      <Live2DCharacter
+      <CharacterAvatar
         status={currentMotion}
         emotion={combinedEmotion}
         size={size}

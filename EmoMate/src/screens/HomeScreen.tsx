@@ -355,7 +355,7 @@ const HomeScreen: React.FC = () => {
             )}
           </View>
 
-          {/* Live2D Character - Standing at the bottom, extends beyond bottom edge */}
+          {/* Avatar Character - Standing at the bottom, extends beyond bottom edge */}
           <View className='items-center -mb-24'>
             <EmotionAwareCharacter
               size={450}

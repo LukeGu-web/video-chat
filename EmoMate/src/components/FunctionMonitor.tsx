@@ -139,7 +139,7 @@ export const FunctionMonitor: React.FC<FunctionMonitorProps> = ({
 }) => {
   const data = useMonitorStore((state) => state.data);
   const [expandedSections, setExpandedSections] = useState({
-    live2d: true,
+    avatar: true,
     emotion: true,
     scene: false,
   });
@@ -163,8 +163,8 @@ export const FunctionMonitor: React.FC<FunctionMonitorProps> = ({
     }));
   };
 
-  // Determine Live2D system status color
-  const live2dStatusColor = data.live2d.isModelReady
+  // Determine Avatar system status color
+  const avatarStatusColor = data.avatar.isModelReady
     ? 'green'
     : data.webView.isWebViewReady
     ? 'yellow'
@@ -222,12 +222,12 @@ export const FunctionMonitor: React.FC<FunctionMonitorProps> = ({
 
       {/* Scrollable Content */}
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Live2D System Section */}
+        {/* Avatar System Section */}
         <CollapsibleSection
-          title='Live2D System'
-          isExpanded={expandedSections.live2d}
-          onToggle={() => toggleSection('live2d')}
-          statusColor={live2dStatusColor}
+          title='Avatar System'
+          isExpanded={expandedSections.avatar}
+          onToggle={() => toggleSection('avatar')}
+          statusColor={avatarStatusColor}
         >
           <Text className='mb-1 text-xs font-semibold text-gray-300'>
             WebView Status
@@ -260,23 +260,23 @@ export const FunctionMonitor: React.FC<FunctionMonitorProps> = ({
           </Text>
           <InfoRow
             label='Motion'
-            value={data.live2d.currentMotion}
+            value={data.avatar.currentMotion}
             valueColor='yellow'
           />
           <InfoRow
             label='Ready'
-            value={data.live2d.isModelReady}
-            valueColor={data.live2d.isModelReady ? 'green' : 'red'}
+            value={data.avatar.isModelReady}
+            valueColor={data.avatar.isModelReady ? 'green' : 'red'}
           />
           <InfoRow
             label='Playing'
-            value={data.live2d.isPlaying ? '▶' : '⏸'}
-            valueColor={data.live2d.isPlaying ? 'green' : 'gray'}
+            value={data.avatar.isPlaying ? '▶' : '⏸'}
+            valueColor={data.avatar.isPlaying ? 'green' : 'gray'}
           />
           <InfoRow
             label='Loop'
-            value={data.live2d.shouldLoop}
-            valueColor={data.live2d.shouldLoop ? 'blue' : 'gray'}
+            value={data.avatar.shouldLoop}
+            valueColor={data.avatar.shouldLoop ? 'blue' : 'gray'}
           />
         </CollapsibleSection>
 

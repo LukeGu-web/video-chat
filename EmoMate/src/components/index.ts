@@ -4,8 +4,8 @@ export { default as Header } from './Header';
 export { default as ChatList } from './ChatList';
 export { default as VoiceControl } from './VoiceControl';
 export { default as CurrentSpeechBubble } from './CurrentSpeechBubble';
-export { default as HiyoriWebView } from './HiyoriWebView';
-export { default as Live2DCharacter } from './Live2DCharacter';
+export { default as CharacterWebView } from './CharacterWebView';
+export { default as CharacterAvatar } from './CharacterAvatar';
 export { EmotionAwareCharacter } from './EmotionAwareCharacter';
 export {
   ConversationStateIndicator,

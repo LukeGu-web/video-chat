@@ -1,15 +1,15 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { View, Text } from 'react-native';
-import HiyoriWebView, { HiyoriBridge } from './HiyoriWebView';
-import { useAIStatus, HiyoriMotion } from '../store';
+import CharacterWebView, { AvatarBridge } from './CharacterWebView';
+import { useAIStatus, AvatarMotion } from '../store';
 import { debugLog, debugError, debugWarn } from '../utils/debug';
 import { useMonitorStore } from '../store/monitorStore';
 import { EmotionType } from '../types/emotion';
 import { emotionToVRMCommands } from '../capabilities/motion/motionMapper';
 import { lipSyncBridge } from '../capabilities/speak/lipSyncBridge';
 
-interface Live2DCharacterProps {
-  status?: HiyoriMotion; // 直接使用HiyoriMotion类型
+interface CharacterAvatarProps {
+  status?: AvatarMotion;
   emotion?: EmotionType; // VRM emotion for expression control
   size?: number;
   loop?: boolean;
@@ -18,13 +18,13 @@ interface Live2DCharacterProps {
 }
 
 interface WebViewRef {
-  hiyoriBridge: HiyoriBridge;
+  avatarBridge: AvatarBridge;
   reload: () => void;
   webView: any;
 }
 
-// Hiyori可用的所有动作
-const HIYORI_MOTIONS: HiyoriMotion[] = [
+// All available avatar motions
+const AVATAR_MOTIONS: AvatarMotion[] = [
   'Idle',
   'Speaking',
   'Thinking',
@@ -38,13 +38,13 @@ const HIYORI_MOTIONS: HiyoriMotion[] = [
   'Sleepy',
 ];
 
-// 验证动作是否有效
-const validateHiyoriMotion = (
-  motion: HiyoriMotion | undefined
-): HiyoriMotion => {
-  if (!motion || !HIYORI_MOTIONS.includes(motion)) {
+// Validate motion is valid
+const validateAvatarMotion = (
+  motion: AvatarMotion | undefined
+): AvatarMotion => {
+  if (!motion || !AVATAR_MOTIONS.includes(motion)) {
     debugWarn(
-      'Live2DCharacter',
+      'CharacterAvatar',
       `Invalid motion: ${motion}, falling back to Idle`
     );
     return 'Idle';
@@ -52,7 +52,7 @@ const validateHiyoriMotion = (
   return motion;
 };
 
-const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
+const CharacterAvatar: React.FC<CharacterAvatarProps> = ({
   status,
   emotion,
   size = 240,
@@ -69,7 +69,7 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
   const { aiStatus } = useAIStatus();
 
   // 确定要使用的动作：优先使用传入的 status，否则使用全局 aiStatus
-  const currentMotion = validateHiyoriMotion(status || aiStatus);
+  const currentMotion = validateAvatarMotion(status || aiStatus);
 
   // 组件状态
   const [isModelReady, setIsModelReady] = useState(false);
@@ -77,17 +77,17 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
   const [shouldLoop, setShouldLoop] = useState(false);
 
   // Monitor store for debug panel
-  const updateLive2DStatus = useMonitorStore((state) => state.updateLive2DStatus);
+  const updateAvatarStatus = useMonitorStore((state) => state.updateAvatarStatus);
 
   // Sync state to monitor store
   useEffect(() => {
-    updateLive2DStatus({
+    updateAvatarStatus({
       currentMotion,
       isModelReady,
       isPlaying,
       shouldLoop,
     });
-  }, [currentMotion, isModelReady, isPlaying, shouldLoop, updateLive2DStatus]);
+  }, [currentMotion, isModelReady, isPlaying, shouldLoop, updateAvatarStatus]);
 
   // 判断动作是否应该循环播放(在AI说话/思考期间持续播放)
   const shouldLoopMotion = useCallback((motionName: string): boolean => {
@@ -100,26 +100,26 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
     if (motionLoopIntervalRef.current) {
       clearInterval(motionLoopIntervalRef.current);
       motionLoopIntervalRef.current = null;
-      console.log('🔄 [Live2DCharacter] Stopped motion loop');
+      console.log('🔄 [CharacterAvatar] Stopped motion loop');
     }
   }, []);
 
   // 播放Live2D动作(单次)
-  const playLive2DMotion = useCallback(
+  const playAvatarMotion = useCallback(
     (motionName: string, enableLoop: boolean = false) => {
       console.log(
-        `🎭 [Live2DCharacter] Playing motion: ${motionName}${
+        `🎭 [CharacterAvatar] Playing motion: ${motionName}${
           enableLoop ? ' (loop enabled)' : ''
         }`
       );
-      debugLog('Live2DCharacter', `Attempting to play motion: ${motionName}`);
+      debugLog('CharacterAvatar', `Attempting to play motion: ${motionName}`);
 
-      if (!isModelReady || !webViewRef.current?.hiyoriBridge) {
+      if (!isModelReady || !webViewRef.current?.avatarBridge) {
         console.warn(
-          `⚠️ [Live2DCharacter] Cannot play motion ${motionName} - model not ready`
+          `⚠️ [CharacterAvatar] Cannot play motion ${motionName} - model not ready`
         );
         debugWarn(
-          'Live2DCharacter',
+          'CharacterAvatar',
           `Cannot play motion ${motionName} - model not ready`
         );
         onMotionComplete?.(motionName, false);
@@ -133,7 +133,7 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
         motionLoopIntervalRef.current
       ) {
         console.log(
-          `🔄 [Live2DCharacter] Motion ${motionName} already looping, continuing`
+          `🔄 [CharacterAvatar] Motion ${motionName} already looping, continuing`
         );
         return;
       }
@@ -142,17 +142,17 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
       lastMotionRef.current = motionName;
       setShouldLoop(enableLoop);
 
-      console.log(`▶️ [Live2DCharacter] Starting motion: ${motionName}`);
+      console.log(`▶️ [CharacterAvatar] Starting motion: ${motionName}`);
 
       // OLD: Live2D
-      // webViewRef.current.hiyoriBridge.playMotion(motionName);
+      // webViewRef.current.avatarBridge.playMotion(motionName);
 
       // NEW: VRM commands
-      if (emotion && webViewRef.current.hiyoriBridge.sendVRMCommand) {
+      if (emotion && webViewRef.current.avatarBridge.sendVRMCommand) {
         const { expressionCommand, presetCommand } = emotionToVRMCommands(emotion, 1.0);
-        webViewRef.current.hiyoriBridge.sendVRMCommand(expressionCommand);
+        webViewRef.current.avatarBridge.sendVRMCommand(expressionCommand);
         if (presetCommand) {
-          webViewRef.current.hiyoriBridge.sendVRMCommand(presetCommand);
+          webViewRef.current.avatarBridge.sendVRMCommand(presetCommand);
         }
       } else {
         // Fallback: send VRM preset based on motion name
@@ -163,7 +163,7 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
         };
         const lowerName = motionName.toLowerCase();
         const presetName = VRM_MOTION_FALLBACK[lowerName] ?? lowerName;
-        webViewRef.current.hiyoriBridge.sendVRMCommand?.({ type: 'playPreset', data: { name: presetName } });
+        webViewRef.current.avatarBridge.sendVRMCommand?.({ type: 'playPreset', data: { name: presetName } });
       }
 
       // 清除之前的定时器
@@ -174,7 +174,7 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
       // 如果需要循环播放(Speaking/Thinking等持续动作)
       if (enableLoop) {
         console.log(
-          `🔁 [Live2DCharacter] Starting motion loop for: ${motionName}`
+          `🔁 [CharacterAvatar] Starting motion loop for: ${motionName}`
         );
 
         // 停止之前的循环
@@ -183,12 +183,12 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
         // 设置循环播放(每3秒重复播放一次)
         motionLoopIntervalRef.current = setInterval(() => {
           if (
-            webViewRef.current?.hiyoriBridge &&
+            webViewRef.current?.avatarBridge &&
             lastMotionRef.current === motionName
           ) {
-            console.log(`🔄 [Live2DCharacter] Loop replay: ${motionName}`);
+            console.log(`🔄 [CharacterAvatar] Loop replay: ${motionName}`);
             // OLD: Live2D
-            // webViewRef.current.hiyoriBridge.playMotion(motionName);
+            // webViewRef.current.avatarBridge.playMotion(motionName);
             // NEW: VRM replay (send preset again)
             const VRM_MOTION_FALLBACK: Record<string, string> = {
               dance: 'excited',
@@ -196,7 +196,7 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
             };
             const lowerName = motionName.toLowerCase();
             const replayPreset = VRM_MOTION_FALLBACK[lowerName] ?? lowerName;
-            webViewRef.current.hiyoriBridge.sendVRMCommand?.({ type: 'playPreset', data: { name: replayPreset } });
+            webViewRef.current.avatarBridge.sendVRMCommand?.({ type: 'playPreset', data: { name: replayPreset } });
           }
         }, 3000);
       } else {
@@ -205,7 +205,7 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
 
         // 单次播放,设置超时确保动作完成回调
         motionTimeoutRef.current = setTimeout(() => {
-          console.log(`✅ [Live2DCharacter] Motion completed: ${motionName}`);
+          console.log(`✅ [CharacterAvatar] Motion completed: ${motionName}`);
           setIsPlaying(false);
           onMotionComplete?.(motionName, true);
         }, 3000);
@@ -217,15 +217,15 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
   // 当动作改变时播放对应动作
   useEffect(() => {
     if (isModelReady && currentMotion) {
-      console.log(`🔀 [Live2DCharacter] Motion changed to: ${currentMotion}`);
-      debugLog('Live2DCharacter', `Motion changed to: ${currentMotion}`);
+      console.log(`🔀 [CharacterAvatar] Motion changed to: ${currentMotion}`);
+      debugLog('CharacterAvatar', `Motion changed to: ${currentMotion}`);
 
       // 判断是否需要循环播放
       const needsLoop = shouldLoopMotion(currentMotion);
 
       // 延迟一下确保模型完全准备好
       const timer = setTimeout(() => {
-        playLive2DMotion(currentMotion, needsLoop);
+        playAvatarMotion(currentMotion, needsLoop);
       }, 200);
 
       return () => {
@@ -239,34 +239,34 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
   }, [
     currentMotion,
     isModelReady,
-    playLive2DMotion,
+    playAvatarMotion,
     shouldLoopMotion,
     stopMotionLoop,
   ]);
 
   // 处理模型准备就绪
   const handleModelReady = useCallback(() => {
-    console.log('✨ [Live2DCharacter] Hiyori model is ready!');
-    debugLog('Live2DCharacter', 'Hiyori model is ready!');
+    console.log('✨ [CharacterAvatar] Hiyori model is ready!');
+    debugLog('CharacterAvatar', 'Hiyori model is ready!');
     setIsModelReady(true);
 
     // Register VRM command handler for lip sync
     lipSyncBridge.register((cmd) => {
-      webViewRef.current?.hiyoriBridge.sendVRMCommand(cmd);
+      webViewRef.current?.avatarBridge.sendVRMCommand(cmd);
     });
 
     // 模型准备好后立即播放当前动作
     setTimeout(() => {
       const needsLoop = shouldLoopMotion(currentMotion);
-      playLive2DMotion(currentMotion, needsLoop);
+      playAvatarMotion(currentMotion, needsLoop);
     }, 500);
-  }, [currentMotion, playLive2DMotion, shouldLoopMotion]);
+  }, [currentMotion, playAvatarMotion, shouldLoopMotion]);
 
   // 处理动作结果
   const handleMotionResult = useCallback(
     (motion: string, success: boolean, error?: string) => {
       debugLog(
-        'Live2DCharacter',
+        'CharacterAvatar',
         `Motion result - ${motion}: ${success ? 'Success' : `Failed: ${error}`}`
       );
 
@@ -282,12 +282,12 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
       if (success && motion !== 'Idle') {
         setTimeout(() => {
           if (currentMotion === 'Idle') {
-            playLive2DMotion('Idle');
+            playAvatarMotion('Idle');
           }
         }, 1000);
       }
     },
-    [currentMotion, onMotionComplete, playLive2DMotion]
+    [currentMotion, onMotionComplete, playAvatarMotion]
   );
 
   // 清理定时器、循环和 lip sync bridge
@@ -300,7 +300,7 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
         clearInterval(motionLoopIntervalRef.current);
       }
       lipSyncBridge.unregister();
-      console.log('🧹 [Live2DCharacter] Cleaned up timers and loops');
+      console.log('🧹 [CharacterAvatar] Cleaned up timers and loops');
     };
   }, []);
 
@@ -315,7 +315,7 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
       className='relative items-center justify-center'
       style={containerStyle}
     >
-      <HiyoriWebView
+      <CharacterWebView
         ref={webViewRef}
         style={{ width: '100%', height: '100%' }}
         onModelReady={handleModelReady}
@@ -325,8 +325,8 @@ const Live2DCharacter: React.FC<Live2DCharacterProps> = ({
   );
 };
 
-export default Live2DCharacter;
+export default CharacterAvatar;
 
-// 导出类型和常量供外部使用
-export type { Live2DCharacterProps };
-export { HIYORI_MOTIONS, validateHiyoriMotion };
+// Export types and constants for external use
+export type { CharacterAvatarProps };
+export { AVATAR_MOTIONS };

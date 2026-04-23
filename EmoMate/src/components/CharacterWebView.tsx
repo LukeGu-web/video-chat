@@ -11,13 +11,13 @@ import {
 import { useMonitorStore } from '../store/monitorStore';
 import { VRMCommand } from '../types/vrm';
 
-interface HiyoriWebViewProps {
+interface CharacterWebViewProps {
   style?: any;
   onModelReady?: () => void;
   onMotionResult?: (motion: string, success: boolean, error?: string) => void;
 }
 
-interface HiyoriBridge {
+interface AvatarBridge {
   playMotion: (motionName: string) => void;
   getAvailableMotions: () => void;
   checkModelStatus: () => void;
@@ -42,12 +42,12 @@ interface WebViewState {
 const TIMEOUT_MS = 10000; // 10 seconds timeout
 const MAX_LOAD_ATTEMPTS = 3;
 
-// 获取 hiyori view 的 URL
-const getHiyoriViewUrl = (): string | undefined => {
-  return Constants.expoConfig?.extra?.hiyoriViewUrl;
+// Get the character view URL
+const getCharacterViewUrl = (): string | undefined => {
+  return Constants.expoConfig?.extra?.characterViewUrl;
 };
 
-const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
+const CharacterWebView = React.forwardRef<any, CharacterWebViewProps>(
   ({ style, onModelReady, onMotionResult }, ref) => {
     const webViewRef = useRef<WebView>(null);
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -96,7 +96,7 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
     useEffect(() => {
       if (state.isWebViewReady && pendingMessages.current.length > 0) {
         debugLog(
-          'HiyoriWebView',
+          'CharacterWebView',
           `Executing ${pendingMessages.current.length} pending messages`
         );
         const messages = pendingMessages.current.splice(0);
@@ -114,7 +114,7 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
 
       timeoutRef.current = setTimeout(() => {
         if (!state.isModelReady) {
-          debugError('HiyoriWebView', 'Model readiness timeout');
+          debugError('CharacterWebView', 'Model readiness timeout');
           setState((prev) => ({
             ...prev,
             error: '模型加载超时，请检查网络连接',
@@ -133,7 +133,7 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
             .toString(36)
             .substring(2, 9)}`;
           pendingMessages.current.push({ id: messageId, jsCode, callback });
-          debugLog('HiyoriWebView', 'Queuing JavaScript execution:', messageId);
+          debugLog('CharacterWebView', 'Queuing JavaScript execution:', messageId);
           return;
         }
 
@@ -141,7 +141,7 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
           webViewRef.current.injectJavaScript(jsCode);
           callback?.(true);
         } catch (error) {
-          debugError('HiyoriWebView', 'JavaScript execution failed:', error);
+          debugError('CharacterWebView', 'JavaScript execution failed:', error);
           callback?.(false);
         }
       },
@@ -152,7 +152,7 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
     const checkModelLoaded = useCallback(() => {
       if (checkingModel.current) {
         debugLog(
-          'HiyoriWebView',
+          'CharacterWebView',
           'Model check already in progress, skipping...'
         );
         return;
@@ -163,8 +163,8 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
       const jsCode = `
       (function checkModel() {
         try {
-          if (window.HiyoriBridge && typeof window.HiyoriBridge.isModelLoaded === 'function') {
-            const isReady = window.HiyoriBridge.isModelLoaded();
+          if (window.AvatarBridge && typeof window.AvatarBridge.isModelLoaded === 'function') {
+            const isReady = window.AvatarBridge.isModelLoaded();
             window.ReactNativeWebView.postMessage(JSON.stringify({
               type: 'modelStatus',
               ready: isReady,
@@ -200,22 +200,22 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
       (event: any) => {
         try {
           const message = JSON.parse(event.nativeEvent.data);
-          debugLog('HiyoriWebView', 'Received message from WebView:', message);
+          debugLog('CharacterWebView', 'Received message from WebView:', message);
 
           switch (message.type) {
             case 'webViewReady':
-              debugLog('HiyoriWebView', 'WebView is ready for communication');
+              debugLog('CharacterWebView', 'WebView is ready for communication');
               setState((prev) => ({ ...prev, isWebViewReady: true }));
               // No need to check model status - new system will send modelReady when ready
               break;
 
             case 'domReady':
-              debugLog('HiyoriWebView', 'DOM ready in WebView', message.data);
+              debugLog('CharacterWebView', 'DOM ready in WebView', message.data);
               break;
 
             case 'readinessUpdate':
               debugLog(
-                'HiyoriWebView',
+                'CharacterWebView',
                 'Readiness state update:',
                 message.data?.state
               );
@@ -231,8 +231,8 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
             case 'vrmReady':
             case 'modelReady':
               debugLog(
-                'HiyoriWebView',
-                'Model ready (VRM or Live2D)',
+                'CharacterWebView',
+                'Model ready (VRM)',
                 message.data
               );
               setState((prev) => ({
@@ -248,7 +248,7 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
               break;
 
             case 'heartbeat':
-              debugLog('HiyoriWebView', 'Received heartbeat from WebView');
+              debugLog('CharacterWebView', 'Received heartbeat from WebView');
               // Reset timeout on successful heartbeat
               if (timeoutRef.current) {
                 clearTimeout(timeoutRef.current);
@@ -257,12 +257,12 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
               break;
 
             case 'userInteraction':
-              debugLog('HiyoriWebView', 'User interaction:', message.data);
+              debugLog('CharacterWebView', 'User interaction:', message.data);
               break;
 
             case 'initError':
               debugError(
-                'HiyoriWebView',
+                'CharacterWebView',
                 'Initialization error:',
                 message.data?.error
               );
@@ -276,7 +276,7 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
             case 'modelStatus':
               // Legacy modelStatus messages - ignore them in favor of the new system
               debugLog(
-                'HiyoriWebView',
+                'CharacterWebView',
                 'Received legacy modelStatus:',
                 message.ready
               );
@@ -284,16 +284,16 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
 
             case 'bridgeStatus':
               if (message.available) {
-                debugLog('HiyoriWebView', 'HiyoriBridge is available');
+                debugLog('CharacterWebView', 'AvatarBridge is available');
                 // New system will automatically send modelReady when fully initialized
               } else {
-                debugWarn('HiyoriWebView', 'HiyoriBridge not available');
+                debugWarn('CharacterWebView', 'AvatarBridge not available');
               }
               break;
 
             case 'motionResult':
               debugLog(
-                'HiyoriWebView',
+                'CharacterWebView',
                 `Motion ${message.data?.motion}:`,
                 message.data?.success ? 'Success' : message.data?.error
               );
@@ -306,19 +306,19 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
 
             case 'availableMotions':
               debugLog(
-                'HiyoriWebView',
+                'CharacterWebView',
                 'Available motions:',
                 message.data?.motions
               );
               break;
 
             case 'cleanup':
-              debugLog('HiyoriWebView', 'WebView cleanup completed');
+              debugLog('CharacterWebView', 'WebView cleanup completed');
               break;
 
             case 'error':
               debugError(
-                'HiyoriWebView',
+                'CharacterWebView',
                 'WebView reported error:',
                 message.error
               );
@@ -331,13 +331,13 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
 
             default:
               debugLog(
-                'HiyoriWebView',
+                'CharacterWebView',
                 'Unknown message from WebView:',
                 message
               );
           }
         } catch (error) {
-          debugError('HiyoriWebView', 'Error parsing WebView message:', error);
+          debugError('CharacterWebView', 'Error parsing WebView message:', error);
         }
       },
       [state.isModelReady, onModelReady, onMotionResult, checkModelLoaded]
@@ -345,7 +345,7 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
 
     // WebView lifecycle handlers
     const handleLoadStart = useCallback(() => {
-      debugLog('HiyoriWebView', 'WebView load started');
+      debugLog('CharacterWebView', 'WebView load started');
       setState((prev) => ({
         ...prev,
         isLoading: true,
@@ -357,7 +357,7 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
     }, []);
 
     const handleLoadEnd = useCallback(() => {
-      debugLog('HiyoriWebView', 'WebView load completed');
+      debugLog('CharacterWebView', 'WebView load completed');
       setState((prev) => ({ ...prev, isLoading: false }));
 
       // Only inject script if WebView is not already ready (prevent duplicate injection)
@@ -382,7 +382,7 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
         setTimeout(() => {
           if (webViewRef.current && webViewRef.current.injectJavaScript) {
             debugLog(
-              'HiyoriWebView',
+              'CharacterWebView',
               'Injecting readiness detection script...'
             );
             webViewRef.current.injectJavaScript(readinessScript);
@@ -394,7 +394,7 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
 
     const handleError = useCallback((syntheticEvent: any) => {
       const { nativeEvent } = syntheticEvent;
-      debugError('HiyoriWebView', 'WebView error:', nativeEvent);
+      debugError('CharacterWebView', 'WebView error:', nativeEvent);
 
       setState((prev) => ({
         ...prev,
@@ -405,7 +405,7 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
 
     // Reload functionality
     const reload = useCallback(() => {
-      debugLog('HiyoriWebView', 'Reloading WebView...');
+      debugLog('CharacterWebView', 'Reloading WebView...');
       setState({
         isWebViewReady: false,
         isModelReady: false,
@@ -422,13 +422,13 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
     }, []);
 
     // Bridge interface for external use
-    const bridge: HiyoriBridge = {
+    const bridge: AvatarBridge = {
       playMotion: (motionName: string) => {
         debugLog(
-          'HiyoriWebView',
+          'CharacterWebView',
           `🚀 [RN->WebView] Requesting motion: "${motionName}"`
         );
-        debugLog('HiyoriWebView', `🚀 [RN->WebView] Current state:`, {
+        debugLog('CharacterWebView', `🚀 [RN->WebView] Current state:`, {
           isModelReady: state.isModelReady,
           isWebViewReady: state.isWebViewReady,
           isLoading: state.isLoading,
@@ -437,7 +437,7 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
 
         if (!state.isModelReady) {
           debugWarn(
-            'HiyoriWebView',
+            'CharacterWebView',
             `❌ [RN->WebView] Cannot play "${motionName}" - Hiyori model not ready yet`
           );
           onMotionResult?.(motionName, false, 'Model not ready');
@@ -445,7 +445,7 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
         }
 
         debugLog(
-          'HiyoriWebView',
+          'CharacterWebView',
           `📤 [RN->WebView] Injecting JavaScript to play motion: "${motionName}"`
         );
 
@@ -453,14 +453,14 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
         (function() {
           console.log('📨 [WebView] Received motion request for: "${motionName}"');
           try {
-            if (window.HiyoriBridge) {
-              console.log('📨 [WebView] HiyoriBridge exists, checking if model is loaded...');
-              const isLoaded = window.HiyoriBridge.isModelLoaded();
+            if (window.AvatarBridge) {
+              console.log('📨 [WebView] AvatarBridge exists, checking if model is loaded...');
+              const isLoaded = window.AvatarBridge.isModelLoaded();
               console.log('📨 [WebView] Model loaded status:', isLoaded);
               
               if (isLoaded) {
-                console.log('📨 [WebView] Calling HiyoriBridge.playMotion("${motionName}")...');
-                const result = window.HiyoriBridge.playMotion('${motionName}');
+                console.log('📨 [WebView] Calling AvatarBridge.playMotion("${motionName}")...');
+                const result = window.AvatarBridge.playMotion('${motionName}');
                 console.log('📨 [WebView] Motion call result:', result);
                 
                 window.ReactNativeWebView.postMessage(JSON.stringify({
@@ -481,12 +481,12 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
                 }));
               }
             } else {
-              console.error('📨 [WebView] HiyoriBridge not available');
+              console.error('📨 [WebView] AvatarBridge not available');
               window.ReactNativeWebView.postMessage(JSON.stringify({
                 type: 'motionResult',
                 motion: '${motionName}',
                 success: false,
-                error: 'HiyoriBridge not available',
+                error: 'AvatarBridge not available',
                 timestamp: Date.now()
               }));
             }
@@ -509,8 +509,8 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
         const jsCode = `
         (function() {
           try {
-            if (window.HiyoriBridge) {
-              const motions = window.HiyoriBridge.getAvailableMotions();
+            if (window.AvatarBridge) {
+              const motions = window.AvatarBridge.getAvailableMotions();
               window.ReactNativeWebView.postMessage(JSON.stringify({
                 type: 'availableMotions',
                 data: motions,
@@ -536,7 +536,7 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
       reload: reload,
 
       sendVRMCommand: (cmd: { type: string; data?: any }) => {
-        debugLog('HiyoriWebView', `Sending VRM command: ${cmd.type}`);
+        debugLog('CharacterWebView', `Sending VRM command: ${cmd.type}`);
         let jsCode: string;
         if (cmd.type === 'lipSyncStart') {
           jsCode = `
@@ -569,7 +569,7 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
     React.useImperativeHandle(
       ref,
       () => ({
-        hiyoriBridge: bridge,
+        avatarBridge: bridge,
         reload: reload,
         webView: webViewRef.current,
       }),
@@ -626,7 +626,7 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
       <View className='flex-1' style={style}>
         <WebView
           ref={webViewRef}
-          source={{ uri: getHiyoriViewUrl() || 'about:blank' }}
+          source={{ uri: getCharacterViewUrl() || 'about:blank' }}
           onMessage={handleWebViewMessage}
           onLoadStart={handleLoadStart}
           onLoadEnd={handleLoadEnd}
@@ -657,9 +657,9 @@ const HiyoriWebView = React.forwardRef<any, HiyoriWebViewProps>(
   }
 );
 
-HiyoriWebView.displayName = 'HiyoriWebView';
+CharacterWebView.displayName = 'CharacterWebView';
 
-export default HiyoriWebView;
+export default CharacterWebView;
 
 // Export bridge interface for TypeScript
-export type { HiyoriBridge };
+export type { AvatarBridge };
