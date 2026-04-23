@@ -52,9 +52,9 @@ const BONE_SAFE_RANGES: Record<string, Partial<Record<'x' | 'y' | 'z', [number, 
   head:          { x: [-0.35, 0.35], y: [-0.45, 0.45], z: [-0.35, 0.35] },
   neck:          { x: [-0.25, 0.25], y: [-0.35, 0.35], z: [-0.25, 0.25] },
   spine:         { x: [-0.25, 0.25], z: [-0.15, 0.15] },
-  rightUpperArm: { x: [-1.6, 0.3],  z: [-1.3, 0.3] },
+  rightUpperArm: { x: [-1.6, 0.3],  z: [-0.3, 1.6] },
   rightLowerArm: { x: [0, 1.6] },
-  leftUpperArm:  { x: [-1.6, 0.3],  z: [-0.3, 1.3] },
+  leftUpperArm:  { x: [-1.6, 0.3],  z: [-1.6, 0.3] },
   leftLowerArm:  { x: [0, 1.6] },
 };
 

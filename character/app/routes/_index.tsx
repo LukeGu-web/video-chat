@@ -29,7 +29,7 @@ export default function Index() {
             // Cache-bust query param: Vercel sets Cache-Control: immutable on public/ assets.
             // If you replace the VRM file with a new version, increment ?v=N to force
             // browsers to re-fetch instead of serving the stale cached file.
-            modelPath='/assets/vrm/girl_c.vrm?v=2'
+            modelPath='/assets/vrm/lanlan.vrm?v=1'
             width={500}
             height={700}
           />

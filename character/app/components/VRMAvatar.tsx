@@ -60,8 +60,11 @@ function VRMScene({ modelPath, onReady, onError }: VRMSceneProps) {
           return;
         }
 
-        // Rotate model to face camera (VRM models face +Z by default)
-        VRMUtils.rotateVRM0(vrm);
+        // VRM0 faces +Z by default; rotate 180° to face camera.
+        // VRM1 (VRoid Studio) already faces -Z — skip to avoid flipping.
+        if (vrm.meta?.metaVersion === '0') {
+          VRMUtils.rotateVRM0(vrm);
+        }
 
         // Optimize skeleton by combining skeletons (replaces deprecated removeUnnecessaryJoints)
         VRMUtils.removeUnnecessaryVertices(vrm.scene);
@@ -74,6 +77,16 @@ function VRMScene({ modelPath, onReady, onError }: VRMSceneProps) {
         scene.add(vrm.scene);
         vrmRef.current = vrm;
         setLoadedVRM(vrm);
+
+        // Log all available expressions so custom VRoid expressions are visible in devtools
+        const em = vrm.expressionManager;
+        if (em) {
+          const preset = Object.keys(em.expressionMap ?? {});
+          const custom = Object.keys(em.customExpressionMap ?? {});
+          console.log('[VRMAvatar] preset expressions:', preset);
+          if (custom.length) console.log('[VRMAvatar] custom expressions:', custom);
+        }
+
         onReady(vrm);
       },
       undefined,
