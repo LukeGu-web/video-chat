@@ -9,7 +9,7 @@ import { TTSSynthesisOptions, TTSSynthesisResult } from '../../types/speak';
  * Strip action / emotion descriptions enclosed in parentheses.
  *
  * The AI uses patterns like "(表现害羞)", "（轻声）", "[思考中]", "【动作】" to
- * annotate intended animations/expressions for future Live2D integration.
+ * annotate intended animations/expressions for future avatar integration.
  * These must be removed from both speech and display text.
  *
  * Supports:

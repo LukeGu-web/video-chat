@@ -79,7 +79,7 @@ export default ({ config }: ConfigContext): any => ({
     },
     claudeApiKey: process.env.CLAUDE_API_KEY,
     fishAudioApiKey: process.env.FISH_AUDIO_API_KEY,
-    hiyoriViewUrl: process.env.HIYORI_VIEW_URL,
+    characterViewUrl: process.env.HIYORI_VIEW_URL,
     showTestComponents: process.env.SHOW_TEST_COMPONENTS === 'true',
   },
 });
