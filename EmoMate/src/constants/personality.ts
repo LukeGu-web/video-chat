@@ -262,7 +262,7 @@ export const AI_PERSONALITY = {
     // 新增: 待机时的表达
     idle: {
       expressions: ['嗯...', '呼...', '在想什么呢'],
-      hiyoriMotion: 'Idle' as HiyoriMotion,
+      avatarMotion: 'Idle' as AvatarMotion,
       tone: 'calm',
     },
   },
