@@ -81,7 +81,7 @@ interface AnimationState {
   targetBlendShapes: BlendShapeMap;
   currentBlendShapes: BlendShapeMap;
   targetBones: BoneMap;
-  currentBones: BoneMap;  // tracks bone state at end of last transition
+  currentBones: BoneMap;
   transitionDuration: number;
   transitionElapsed: number;
   easing: EasingType;
@@ -108,7 +108,7 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
     targetBlendShapes: {},
     currentBlendShapes: {},
     targetBones: {},
-    currentBones: {},  // last known bone state (updated on transition complete)
+    currentBones: {},
     transitionDuration: 0.5,
     transitionElapsed: 0,
     easing: 'easeInOut',
@@ -119,13 +119,25 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
   });
 
   const presetState = useRef<PresetState>({ name: 'idle', elapsed: 0, loop: true });
+
+  // Blink state machine — replaces setTimeout approach to avoid race conditions
+  // with the smooth-transition system and LipSyncController.
   const blinkTimer = useRef(0);
   const nextBlinkTime = useRef(2.0);
+  const blinkPhase = useRef<'idle' | 'closing' | 'opening'>('idle');
+  const blinkPhaseTimer = useRef(0);
+  const BLINK_CLOSE_DURATION = 0.06;
+  const BLINK_OPEN_DURATION  = 0.08;
+
+  // Tracks whether the preset is currently driving non-trivial blendShapes so
+  // hasActiveExpression stays true and blink is suppressed.
+  const presetBlendShapeActive = useRef(false);
+
   const idleReturnTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ─── Apply blend shape to VRM ──────────────────────────────────────────────
+  // ─── setValue helpers (no em.update — called once at end of frame) ──────────
 
-  const applyBlendShapes = (shapes: BlendShapeMap) => {
+  const setBlendShapeValues = (shapes: BlendShapeMap) => {
     const em = vrm.expressionManager;
     if (!em) return;
     for (const [key, value] of Object.entries(shapes)) {
@@ -134,10 +146,7 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
         em.setValue(vrmName, Math.max(0, Math.min(1, value)));
       }
     }
-    em.update();
   };
-
-  // ─── Apply bone rotations to VRM ───────────────────────────────────────────
 
   const applyBones = (bones: BoneMap) => {
     const humanoid = vrm.humanoid;
@@ -153,7 +162,7 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
     }
   };
 
-  // ─── Interpolate blend shapes ──────────────────────────────────────────────
+  // ─── Interpolation helpers ─────────────────────────────────────────────────
 
   const lerpBlendShapes = (from: BlendShapeMap, to: BlendShapeMap, t: number): BlendShapeMap => {
     const result: BlendShapeMap = { ...from };
@@ -226,10 +235,8 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
           if (idleReturnTimer.current) clearTimeout(idleReturnTimer.current);
           idleReturnTimer.current = setTimeout(() => {
             presetState.current = { name: 'idle', elapsed: 0, loop: true };
-            // Clear pose bones so idle preset takes over cleanly
             state.currentBones = {};
             state.targetBones = {};
-            // Fade out any blendShapes that were held at pose-peak
             const activeShapes = Object.fromEntries(
               Object.entries(state.currentBlendShapes)
                 .filter(([, v]) => (v ?? 0) > 0.01)
@@ -248,13 +255,25 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
         }
 
         case 'playPreset': {
-          const preset = MOTION_PRESETS[cmd.data.name];
-          if (preset) {
-            presetState.current = {
-              name: cmd.data.name,
-              elapsed: 0,
-              loop: cmd.data.loop ?? preset.loop,
-            };
+          const newPresetDef = MOTION_PRESETS[cmd.data.name];
+          if (newPresetDef) {
+            const current = presetState.current;
+            const lastKfTime = newPresetDef.keyframes[newPresetDef.keyframes.length - 1].time;
+            // Don't restart a non-loop preset that is already in progress — rapid
+            // camera emotion re-triggers would otherwise keep resetting elapsed to 0,
+            // preventing the arm from ever completing the return to rest.
+            const alreadyPlaying =
+              !newPresetDef.loop &&
+              current.name === cmd.data.name &&
+              current.elapsed <= lastKfTime + 1.0;
+
+            if (!alreadyPlaying) {
+              presetState.current = {
+                name: cmd.data.name,
+                elapsed: 0,
+                loop: cmd.data.loop ?? newPresetDef.loop,
+              };
+            }
           }
           break;
         }
@@ -282,21 +301,61 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
   useFrame((_, delta) => {
     const state = animState.current;
     const preset = presetState.current;
+    const em = vrm.expressionManager;
 
-    // Auto-blink — suppress when any expression is active
-    const hasActiveExpression = state.isHolding || state.isAnimating ||
+    // ── Expression activity check (used to gate blink) ────────────────────
+    const hasActiveExpression =
+      state.isHolding ||
+      state.isAnimating ||
+      presetBlendShapeActive.current ||
       Object.values(state.currentBlendShapes).some(v => (v ?? 0) > 0.05);
+
+    // ── Frame-based blink state machine ───────────────────────────────────
+    // Abort in-progress blink the moment an expression becomes active so that
+    // closing/opening frames don't fight with an expression transition.
+    if (hasActiveExpression && blinkPhase.current !== 'idle') {
+      blinkPhase.current = 'idle';
+      blinkPhaseTimer.current = 0;
+      setBlendShapeValues({ blink: 0 });
+    }
+
     blinkTimer.current += delta;
     if (blinkTimer.current >= nextBlinkTime.current) {
       blinkTimer.current = 0;
       nextBlinkTime.current = 0.5 + Math.random() * 3.5;
-      if (!hasActiveExpression) {
-        applyBlendShapes({ blink: 1 });
-        setTimeout(() => applyBlendShapes({ blink: 0 }), 120);
+      if (!hasActiveExpression && blinkPhase.current === 'idle') {
+        blinkPhase.current = 'closing';
+        blinkPhaseTimer.current = 0;
       }
     }
 
-    // Preset animation
+    if (blinkPhase.current === 'closing') {
+      blinkPhaseTimer.current += delta;
+      const t = Math.min(blinkPhaseTimer.current / BLINK_CLOSE_DURATION, 1);
+      setBlendShapeValues({ blink: t });
+      if (t >= 1) {
+        blinkPhase.current = 'opening';
+        blinkPhaseTimer.current = 0;
+      }
+    } else if (blinkPhase.current === 'opening') {
+      blinkPhaseTimer.current += delta;
+      const t = Math.min(blinkPhaseTimer.current / BLINK_OPEN_DURATION, 1);
+      setBlendShapeValues({ blink: 1 - t });
+      if (t >= 1) {
+        blinkPhase.current = 'idle';
+        blinkPhaseTimer.current = 0;
+      }
+    }
+
+    // ── Preset animation ──────────────────────────────────────────────────
+    // Reset preset blendShape tracking; will be set true below if active.
+    presetBlendShapeActive.current = false;
+
+    // All presets always run so non-loop presets can complete and return bones
+    // to rest. For the looping idle preset we only suppress head/spine bones
+    // while a setExpression hold is active to prevent the face from wobbling;
+    // the arm bones (constant at rest in idle) are still applied so they can
+    // cleanly reset after any non-loop preset finishes.
     if (preset.name) {
       const presetDef = MOTION_PRESETS[preset.name as keyof typeof MOTION_PRESETS];
       if (presetDef) {
@@ -306,7 +365,6 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
           t = t % presetDef.loopDuration;
         }
 
-        // Interpolate between keyframes
         const kfs = presetDef.keyframes;
         for (let i = 0; i < kfs.length - 1; i++) {
           if (t >= kfs[i].time && t <= kfs[i + 1].time) {
@@ -314,34 +372,55 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
             const alpha = (t - kfs[i].time) / span;
             if (kfs[i].bones || kfs[i + 1].bones) {
               const interp = lerpBones(kfs[i].bones ?? {}, kfs[i + 1].bones ?? {}, alpha);
-              applyBones(interp);
+              if (state.isHolding && preset.name === 'idle') {
+                // Skip head/spine sway from idle during a held expression.
+                const withoutHead: BoneMap = { ...interp };
+                delete withoutHead.head;
+                delete withoutHead.neck;
+                delete withoutHead.spine;
+                applyBones(withoutHead);
+              } else {
+                applyBones(interp);
+              }
             }
             if ((kfs[i].blendShapes || kfs[i + 1].blendShapes) && !state.isAnimating) {
-              // Only apply preset blendShapes when no smooth transition is active
               const interp = lerpBlendShapes(kfs[i].blendShapes ?? {}, kfs[i + 1].blendShapes ?? {}, alpha);
-              applyBlendShapes(interp);
+              setBlendShapeValues(interp);
+              presetBlendShapeActive.current = Object.values(interp).some(v => (v ?? 0) > 0.05);
             }
             break;
           }
         }
 
-        // Non-loop preset finished — return to idle
+        // Non-loop preset finished — fade out any blendShapes it set, then
+        // return to idle.  Without the fade-out the last expression value
+        // (e.g. joy: 0.3 from shy) would persist indefinitely.
         if (!preset.loop && preset.elapsed > kfs[kfs.length - 1].time + 1.0) {
+          const lastKf = kfs[kfs.length - 1];
+          if (lastKf.blendShapes && Object.keys(lastKf.blendShapes).length > 0) {
+            state.currentBlendShapes = { ...lastKf.blendShapes };
+            state.targetBlendShapes = Object.fromEntries(
+              Object.keys(lastKf.blendShapes).map(k => [k, 0])
+            ) as BlendShapeMap;
+            state.transitionDuration = 0.5;
+            state.transitionElapsed = 0;
+            state.easing = 'easeOut';
+            state.isAnimating = true;
+          }
           presetState.current = { name: 'idle', elapsed: 0, loop: true };
         }
       }
     }
 
-    // Smooth expression transition (blendShapes + optional bones from playPose)
+    // ── Smooth expression transition ──────────────────────────────────────
     if (state.isAnimating) {
       state.transitionElapsed += delta;
       const rawT = Math.min(state.transitionElapsed / state.transitionDuration, 1);
       const t = easings[state.easing](rawT);
 
       const interpolated = lerpBlendShapes(state.currentBlendShapes, state.targetBlendShapes, t);
-      applyBlendShapes(interpolated);
+      setBlendShapeValues(interpolated);
 
-      // Apply bone interpolation when playPose has set target bones
       if (Object.keys(state.targetBones).length > 0) {
         const interpolatedBones = lerpBones(state.currentBones, state.targetBones, t);
         applyBones(interpolatedBones);
@@ -358,13 +437,12 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
       }
     }
 
-    // Hold phase — count down then fade back to neutral
+    // ── Hold phase ────────────────────────────────────────────────────────
     if (state.isHolding) {
       state.holdElapsed += delta;
       if (state.holdElapsed >= state.holdDuration) {
         state.isHolding = false;
         state.holdDuration = 0;
-        // Explicitly zero out all active shapes so lerpBlendShapes has keys to iterate
         state.targetBlendShapes = Object.fromEntries(
           Object.keys(state.currentBlendShapes).map(k => [k, 0])
         ) as BlendShapeMap;
@@ -375,7 +453,10 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
       }
     }
 
-    // Propagate normalized bone changes to raw bones (must run after applyBones)
+    // ── Single em.update() + vrm.update() at end of frame ─────────────────
+    // All em.setValue calls (including those from LipSyncController which runs
+    // before this component in the render tree) are compiled here in one shot.
+    if (em) em.update();
     vrm.update(delta);
   });
 

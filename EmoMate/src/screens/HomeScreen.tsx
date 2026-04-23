@@ -40,7 +40,7 @@ import {
 
 // Emotion detector configuration constants (avoid re-creating on each render)
 const EMOTION_DETECTOR_CONFIG = {
-  detectionInterval: 3000,
+  detectionInterval: 30000,
   frameCaptureInterval: 5000, // 5 seconds - faster initial capture for scene understanding
 } as const;
 

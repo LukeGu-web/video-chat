@@ -102,7 +102,8 @@ export function LipSyncController({ vrm }: LipSyncControllerProps) {
         s.currentWeight = Math.max(0, s.currentWeight - delta * 8);
         if (s.currentShape) {
           em.setValue(s.currentShape, s.currentWeight);
-          em.update();
+          // em.update() is intentionally omitted — ExpressionController calls
+          // em.update() once per frame after all setValue calls complete.
         }
       }
       return;
@@ -133,14 +134,15 @@ export function LipSyncController({ vrm }: LipSyncControllerProps) {
       em.setValue(targetShape, Math.max(0, Math.min(1, s.currentWeight)));
     }
     s.currentShape = targetShape;
-    em.update();
+    // em.update() is intentionally omitted — ExpressionController calls
+    // em.update() once per frame after all setValue calls complete.
 
     // Auto-stop after totalDuration
     if (elapsed > s.totalDuration + 0.3) {
       s.active = false;
       s.startTime = null;
       ALL_MOUTH_SHAPES.forEach(shape => em.setValue(shape, 0));
-      em.update();
+      // em.update() omitted — handled by ExpressionController.
     }
   });
 

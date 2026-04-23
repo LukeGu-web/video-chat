@@ -108,8 +108,11 @@ function VRMScene({ modelPath, onReady, onError }: VRMSceneProps) {
 
   return loadedVRM ? (
     <>
-      <ExpressionController vrm={loadedVRM} />
+      {/* LipSyncController must mount before ExpressionController so its
+          em.setValue calls happen first; ExpressionController then calls
+          em.update() once at the end of the frame to compile all values. */}
       <LipSyncController vrm={loadedVRM} />
+      <ExpressionController vrm={loadedVRM} />
     </>
   ) : null;
 }
