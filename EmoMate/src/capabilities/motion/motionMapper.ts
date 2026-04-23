@@ -1,5 +1,5 @@
 /**
- * Motion Mapper - Advanced Hiyori Live2D Motion Selection
+ * Motion Mapper - Context-Aware Avatar Motion Selection
  *
  * Features:
  * - Context-aware motion selection based on conversation content
@@ -9,7 +9,7 @@
  */
 
 import { EmotionType } from '../../types/emotion';
-import { HiyoriMotion } from '../../store';
+import { AvatarMotion } from '../../store';
 import { debugLog } from '../../utils/debug';
 
 // ==================== Type Definitions ====================
@@ -27,7 +27,7 @@ export interface ConversationContext {
 }
 
 export interface MotionSelection {
-  motion: HiyoriMotion;
+  motion: AvatarMotion;
   priority: number;           // Higher = more important
   reason: string;             // Why this motion was selected
   duration?: number;          // Suggested duration (ms)
@@ -49,7 +49,7 @@ enum MotionPriority {
 /**
  * Enhanced emotion mapping with Plutchik's 8 basic emotions
  */
-const emotionMotionMap: Record<EmotionType, HiyoriMotion> = {
+const emotionMotionMap: Record<EmotionType, AvatarMotion> = {
   joy: 'Happy',                 // Joy → Happy
   sadness: 'Sleepy',            // Sadness → Sleepy
   anger: 'Surprised',           // Anger → Surprised (no angry motion available)
@@ -64,7 +64,7 @@ const emotionMotionMap: Record<EmotionType, HiyoriMotion> = {
 /**
  * Context-specific motion overrides for emotions
  */
-const contextualEmotionMotions: Partial<Record<EmotionType, Partial<Record<string, HiyoriMotion>>>> = {
+const contextualEmotionMotions: Partial<Record<EmotionType, Partial<Record<string, AvatarMotion>>>> = {
   joy: {
     celebration: 'Dance',      // Celebrating → Dance
     laugh: 'Laugh',           // Laughing → Laugh
@@ -155,7 +155,7 @@ export function analyzeConversationContext(
  * Select the most appropriate motion based on context and emotion
  */
 export function selectMotion(context: ConversationContext): MotionSelection {
-  let selectedMotion: HiyoriMotion = 'Idle';
+  let selectedMotion: AvatarMotion = 'Idle';
   let priority = MotionPriority.IDLE;
   let reason = 'Default idle state';
   let duration: number | undefined;
@@ -228,7 +228,7 @@ export function selectMotion(context: ConversationContext): MotionSelection {
   if (context.emotion && priority < MotionPriority.EMOTION) {
     // Check for contextual emotion motions
     const emotionOverrides = contextualEmotionMotions[context.emotion];
-    let contextMotion: HiyoriMotion | undefined;
+    let contextMotion: AvatarMotion | undefined;
 
     if (emotionOverrides) {
       // Check specific contexts
@@ -292,15 +292,15 @@ export function selectMotionFromText(
 /**
  * Map emotion directly to motion (simple mapping without context)
  */
-export function emotionToHiyoriMotion(emotion: EmotionType): HiyoriMotion {
+export function emotionToAvatarMotion(emotion: EmotionType): AvatarMotion {
   return emotionMotionMap[emotion];
 }
 
 // ==================== Motion Transition Management ====================
 
 export interface MotionTransition {
-  from: HiyoriMotion;
-  to: HiyoriMotion;
+  from: AvatarMotion;
+  to: AvatarMotion;
   delay: number;  // Delay before transition (ms)
 }
 
@@ -308,8 +308,8 @@ export interface MotionTransition {
  * Calculate smooth transition between motions
  */
 export function calculateMotionTransition(
-  currentMotion: HiyoriMotion,
-  targetMotion: HiyoriMotion
+  currentMotion: AvatarMotion,
+  targetMotion: AvatarMotion
 ): MotionTransition {
   // Immediate transitions (no delay)
   const immediateTransitions = [
@@ -344,8 +344,8 @@ export function calculateMotionTransition(
 /**
  * Check if motion is a temporary action (should return to Idle)
  */
-export function isTemporaryMotion(motion: HiyoriMotion): boolean {
-  const temporaryMotions: HiyoriMotion[] = [
+export function isTemporaryMotion(motion: AvatarMotion): boolean {
+  const temporaryMotions: AvatarMotion[] = [
     'Wave',
     'Dance',
     'Laugh',
@@ -360,8 +360,8 @@ export function isTemporaryMotion(motion: HiyoriMotion): boolean {
 /**
  * Get suggested duration for motion
  */
-export function getMotionDuration(motion: HiyoriMotion): number {
-  const durations: Partial<Record<HiyoriMotion, number>> = {
+export function getMotionDuration(motion: AvatarMotion): number {
+  const durations: Partial<Record<AvatarMotion, number>> = {
     'Wave': 3000,
     'Dance': 5000,
     'Laugh': 3000,
@@ -379,9 +379,9 @@ export function getMotionDuration(motion: HiyoriMotion): number {
 }
 
 /**
- * Get all available Hiyori motions
+ * Get all available avatar motions
  */
-export function getAvailableMotions(): HiyoriMotion[] {
+export function getAvailableMotions(): AvatarMotion[] {
   return [
     'Idle',
     'Speaking',
