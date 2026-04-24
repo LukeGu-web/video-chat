@@ -8,18 +8,18 @@ EmoMate is a React Native mobile application built with Expo that serves as an e
 
 ### Current Development Status: 🚀 **Production-Ready (85% Complete)**
 
-- **Core Features**: ✅ Complete (Voice chat, AI integration, emotion detection, Live2D)
+- **Core Features**: ✅ Complete (Voice chat, AI integration, emotion detection, VRM)
 - **Architecture**: ✅ Production-ready with TypeScript and modern patterns
 - **AI Integration**: ✅ Advanced multi-provider system (Claude + ElevenLabs)
 - **Emotion Detection**: ✅ Multi-modal system (facial + text analysis, 5 emotions)
-- **Live2D Integration**: ✅ Hiyori character with 11 motions + emotion mapping
+- **VRM Integration**: ✅ VRM avatar with motions + emotion mapping
 - **Testing & Deployment**: 🔄 Ready for implementation
 
 ### Key Achievements
 
 - **Voice-First Design**: Complete speech recognition + synthesis pipeline
 - **Multi-Modal Emotion Detection**: MLKit facial recognition + text analysis (5 emotions, 60fps)
-- **Live2D Character Integration**: Hiyori VTuber with 11 motions + automatic emotion mapping
+- **VRM Character Integration**: VRM avatar with automatic emotion + motion mapping
 - **AI Capability Management**: Dynamic multi-service integration system
 - **Hybrid TTS**: ElevenLabs premium quality with Expo Speech fallback
 - **Modern Architecture**: TypeScript, Zustand + Immer, component-driven design
@@ -51,7 +51,7 @@ Note: No testing or linting commands are currently configured in the project.
 ## Debug Mode System
 
 ### Overview
-EmoMate implements a comprehensive debug mode system that provides detailed logging, status indicators, and debugging panels for Hiyori Live2D integration while maintaining a clean production interface.
+EmoMate implements a comprehensive debug mode system that provides detailed logging, status indicators, and debugging panels for VRM avatar integration while maintaining a clean production interface.
 
 ### Environment Variable Configuration
 Debug mode is controlled via the `SHOW_TEST_COMPONENTS` environment variable:
@@ -67,29 +67,28 @@ SHOW_TEST_COMPONENTS=true npm start
 ### Configuration Files
 - **`app.config.ts`**: Defines environment variables for Expo configuration
 - **`src/utils/debug.ts`**: Central debug utilities and logging functions
-- **Hiyori Components**: HiyoriWebView, Live2DCharacter, HiyoriScreen, etc.
+- **Avatar Components**: CharacterWebView, CharacterAvatar, etc.
 
 ### Debug Features
 
 #### 1. Debug Logging System
 Comprehensive logging with component-specific prefixes:
-- **[HiyoriWebView]**: WebView lifecycle, bridge communication, connection status
-- **[Live2DCharacter]**: Motion mapping, state transitions, model readiness
-- **[HiyoriScreen]**: User interactions, motion requests, model status
+- **[CharacterWebView]**: WebView lifecycle, bridge communication, connection status
+- **[CharacterAvatar]**: Motion mapping, state transitions, model readiness
 - **[AnimatedCharacter]**: Status forwarding and integration
 
 #### 2. Visual Status Indicators
 Enhanced status panels showing:
 - **Connection Status**: WebView ↔ Character server connection
-- **Model Readiness**: Live2D model loading progress
+- **Model Readiness**: VRM model loading progress
 - **Motion Queue**: Pending motion commands
 - **Bridge Status**: JavaScript bridge availability
 - **Performance Metrics**: Load times and response latency
 
 #### 3. Debug Panels
 Multiple debug overlays:
-- **HiyoriWebView Status Panel**: Connection, model ready, queue status
-- **Live2DCharacter Debug Overlay**: Current status, motion, ready state, playing indicator
+- **CharacterWebView Status Panel**: Connection, model ready, queue status
+- **CharacterAvatar Debug Overlay**: Current status, motion, ready state, playing indicator
 - **Motion History**: Recent motion executions with success/failure tracking
 
 #### 4. Performance Monitoring
@@ -130,11 +129,11 @@ export const debugLog = (component: string, message: string, data?: any) => {
 
 #### Component Debug Integration
 ```typescript
-// Example: HiyoriWebView.tsx
+// Example: CharacterWebView.tsx
 import { isDebugMode, debugLog, debugError } from '../utils/debug';
 
 // Replace console.log with debugLog
-debugLog('HiyoriWebView', 'Model ready for interaction');
+debugLog('CharacterWebView', 'Model ready for interaction');
 
 // Conditional UI rendering
 {isDebugMode() && (
@@ -146,23 +145,21 @@ debugLog('HiyoriWebView', 'Model ready for interaction');
 
 ### Debug Components Coverage
 
-#### Core Hiyori Components
-1. **HiyoriWebView.tsx**: Main WebView component with full debug integration
-2. **Live2DCharacter.tsx**: Motion mapping and state management debugging
+#### Core Avatar Components
+1. **CharacterWebView.tsx**: Main WebView component with full debug integration
+2. **CharacterAvatar.tsx**: Motion mapping and state management debugging
 3. **AnimatedCharacter.tsx**: Status forwarding debug information
-4. **HiyoriScreen.tsx**: Testing interface with motion controls
 
 #### Debug Features per Component
-- **HiyoriWebView**: Connection status, message logging, performance metrics
-- **Live2DCharacter**: Motion mapping, state transitions, model readiness
-- **HiyoriScreen**: Motion request debugging, model status tracking
+- **CharacterWebView**: Connection status, message logging, performance metrics
+- **CharacterAvatar**: Motion mapping, state transitions, model readiness
 
 ### Usage Guidelines
 
 #### For Development
 1. **Regular Development**: Use `npm start` for normal app development
 2. **Debug Mode**: Use `SHOW_TEST_COMPONENTS=true npm start` when:
-   - Debugging Hiyori integration issues
+   - Debugging VRM avatar integration issues
    - Monitoring WebView communication
    - Testing motion execution
    - Investigating performance problems
@@ -217,7 +214,7 @@ Performance metrics show:
 
 1. **Development Workflow**:
    - Use regular mode for normal development
-   - Enable debug mode for Live2D integration work
+   - Enable debug mode for VRM integration work
    - Monitor logs for detailed operation information
 
 2. **Cross-Project Debugging**:
@@ -547,7 +544,7 @@ EmoMate/docs/
 ├── EMOTION_DETECTION_ARCHITECTURE.md     # 技术架构设计文档
 ├── EMOTION_DETECTION_TROUBLESHOOTING.md  # 故障排除指南
 ├── EMOTION_DETECTION_STATUS.md           # 情绪检测系统状态报告
-├── HIYORI_INTEGRATION.md                 # Hiyori Live2D集成文档
+├── VRM_INTEGRATION.md                    # VRM avatar集成文档
 └── [更多功能文档...]                       # 其他特性文档
 
 Root Level Documentation:
@@ -588,7 +585,7 @@ Root Level Documentation:
 - ✅ **技术架构**: 详细设计文档 (`EMOTION_DETECTION_ARCHITECTURE.md`)
 - ✅ **故障排除**: 全面问题解决指南 (`EMOTION_DETECTION_TROUBLESHOOTING.md`)
 - ✅ **情绪检测状态**: 系统状态报告 (`EMOTION_DETECTION_STATUS.md`)
-- ✅ **Hiyori集成**: Live2D集成文档 (`HIYORI_INTEGRATION.md`)
+- ✅ **VRM集成**: VRM avatar集成文档 (`VRM_INTEGRATION.md`)
 
 **项目级文档** (root level):
 - ✅ **项目进度**: 完整进度报告和路线图 (`../PROGRESS.md`)
@@ -606,7 +603,7 @@ Root Level Documentation:
 **已完成的核心功能** (12/12):
 1. ✅ 语音对话系统 (`useChatAI.ts`, 410 lines)
 2. ✅ 表情识别系统 (`BasicEmotionDetector.tsx`, 17 KB, 5 emotions)
-3. ✅ 动画交互系统 (`HiyoriWebView.tsx`, 21 KB, 11 motions)
+3. ✅ 动画交互系统 (`CharacterWebView.tsx`, 11 motions)
 4. ✅ 语音合成系统 (`useHybridTTS.ts`, ElevenLabs + Expo)
 5. ✅ 语音识别系统 (`useSpeechToText.ts`, 145 lines)
 6. ✅ 人格系统 (`personality.ts`, 兰兰角色)

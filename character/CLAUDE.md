@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-The **Character** project is a Remix-based web application that displays Live2D models, specifically designed to work with the Hiyori VTuber character. It serves as the WebView content for the EmoMate React Native application, providing an interactive Live2D character display with JavaScript Bridge communication.
+The **Character** project is a Remix-based web application that displays VRM models for the AI companion character (兰兰). It serves as the WebView content for the EmoMate React Native application, providing an interactive VRM character display with JavaScript Bridge communication.
 
 ### Current Development Status: 🚀 **Production-Ready**
 
-- **Live2D Integration**: ✅ Complete with Hiyori model support
+- **VRM Integration**: ✅ Complete with VRM avatar support
 - **JavaScript Bridge**: ✅ Full React Native communication system
 - **Motion Control**: ✅ Comprehensive animation system
 - **Performance**: ✅ Optimized loading and rendering
@@ -53,14 +53,14 @@ SHOW_TEST_COMPONENTS=true npm run dev
 
 ### Configuration Files
 - **`vite.config.ts`**: Defines environment variables and injects them into the build
-- **`app/components/HiyoriLive2D.tsx`**: Main component with debug logic
+- **`app/components/VRMAvatar.tsx`**: Main component with debug logic
 
 ### Debug Features
 
 #### 1. Debug Status Panel
 Visual status panel showing initialization progress:
 - **DOM Ready**: ✓/⧗
-- **Live2D Ready**: ✓/⧗  
+- **VRM Ready**: ✓/⧗  
 - **Model Ready**: ✓/⧗
 - **Bridge Ready**: ✓/⧗
 - **All Ready**: ✓/⧗
@@ -68,16 +68,16 @@ Visual status panel showing initialization progress:
 
 #### 2. Console Logging
 Comprehensive logging system with component prefixes:
-- **🌟 [HiyoriBridge]**: Bridge initialization and API calls
-- **🎭 [HiyoriBridge]**: Motion execution and results
+- **🌟 [AvatarBridge]**: Bridge initialization and API calls
+- **🎭 [AvatarBridge]**: Motion execution and results
 - **💓 [Heartbeat]**: Connection health monitoring
-- **📋 [HiyoriBridge]**: Status checks and information
-- **🔍 [HiyoriBridge]**: Detailed debugging information
+- **📋 [AvatarBridge]**: Status checks and information
+- **🔍 [AvatarBridge]**: Detailed debugging information
 
 #### 3. Performance Monitoring
 Detailed timing metrics:
 - DOM load time
-- Live2D core load time
+- VRM core load time
 - Model load time
 - Total initialization time
 - Motion execution response time
@@ -105,13 +105,13 @@ export default defineConfig({
 
 #### Component Debug Logic
 ```typescript
-// HiyoriLive2D.tsx
+// VRMAvatar.tsx
 const isDebugMode = process.env.SHOW_TEST_COMPONENTS === 'true';
 
 const debugLog = (stage: string, message: string, data?: any) => {
   if (!isDebugMode) return;
   const timestamp = Date.now() - startTime.current;
-  console.log(`[Hiyori ${stage}][${timestamp}ms] ${message}`, data || '');
+  console.log(`[Avatar ${stage}][${timestamp}ms] ${message}`, data || '');
 };
 
 // Debug panel rendering
@@ -175,15 +175,15 @@ Debug logs will show:
 - **Vite 6.0.0** for fast development and building
 - **Tailwind CSS 3.4.4** for styling
 - **PIXI.js 7.4.3** for WebGL rendering
-- **pixi-live2d-display-mulmotion 0.5.0-mm-5** for Live2D model support
+- **@pixiv/three-vrm** for VRM model support
 
 ### Key Features
-- **Live2D Model Display**: Hiyori VTuber character with full animation support
+- **VRM Model Display**: VRM avatar character with full animation support
 - **React Native Bridge**: Bi-directional communication with mobile app
 - **Motion System**: 11+ predefined motions with real-time control
 - **Interactive Controls**: Click/touch interaction with the character
 - **Performance Monitoring**: Load time tracking and debugging support
-- **Multi-stage Initialization**: DOM → Live2D → Model → Bridge → Ready
+- **Multi-stage Initialization**: DOM → VRM → Model → Bridge → Ready
 
 ## Project Structure
 
@@ -191,21 +191,21 @@ Debug logs will show:
 character/
 ├── app/
 │   ├── components/
-│   │   ├── HiyoriLive2D.tsx     # Main Live2D component
-│   │   └── ShizukuLive2D.tsx    # Alternative character (legacy)
+│   │   ├── VRMAvatar.tsx        # Main VRM avatar component
+│   │   └── LipSyncController.tsx    # Lip sync control
 │   ├── routes/
-│   │   ├── _index.tsx           # Main route with HiyoriLive2D
+│   │   ├── _index.tsx           # Main route with VRMAvatar
 │   │   ├── test.tsx            # Test routes for development
 │   │   └── test2.tsx
 │   ├── types/
-│   │   └── live2d.d.ts         # Live2D type definitions
+│   │   └── vrm.d.ts            # VRM type definitions
 │   ├── entry.client.tsx        # Client-side entry point
 │   ├── entry.server.tsx        # Server-side entry point
 │   └── root.tsx                # Root layout component
 ├── public/
 │   └── assets/
-│       └── live2d/
-│           └── hiyori_vts/     # Hiyori model files and animations
+│       └── vrm/
+│           └── avatar/         # VRM model files and animations
 ├── vite.config.ts              # Vite configuration with network settings
 ├── package.json                # Dependencies and scripts
 └── tailwind.config.ts          # Tailwind CSS configuration
@@ -213,12 +213,12 @@ character/
 
 ## Core Components
 
-### HiyoriLive2D.tsx - Main Character Component
+### VRMAvatar.tsx - Main Character Component
 
-**Purpose**: Displays and controls the Hiyori Live2D model with full React Native communication.
+**Purpose**: Displays and controls the VRM avatar with full React Native communication.
 
 #### Key Features:
-- **Multi-stage Initialization**: DOM → Live2D Core → Model → Bridge → Ready
+- **Multi-stage Initialization**: DOM → VRM Core → Model → Bridge → Ready
 - **JavaScript Bridge**: Full bi-directional communication with React Native WebView
 - **Motion Control**: 11 predefined motions (Idle, Happy, Surprised, Shy, Wave, Dance, Laugh, Thinking, Speaking, Excited, Sleepy)
 - **Heart Beat System**: 5-second status updates to React Native
@@ -230,8 +230,8 @@ character/
 ```typescript
 interface ReadinessState {
   domReady: boolean;         // DOM loaded
-  live2dReady: boolean;      // Live2D core loaded
-  modelReady: boolean;       // Hiyori model loaded
+  vrmReady: boolean;         // VRM core loaded
+  modelReady: boolean;       // VRM avatar model loaded
   bridgeReady: boolean;      // JavaScript Bridge initialized
   allReady: boolean;         // All systems ready
 }
@@ -239,7 +239,7 @@ interface ReadinessState {
 
 #### JavaScript Bridge API:
 ```typescript
-window.HiyoriBridge = {
+window.AvatarBridge = {
   playMotion: (motionName: string) => any;
   getAvailableMotions: () => string[];
   isModelLoaded: () => boolean;
@@ -271,11 +271,11 @@ interface BridgeMessage {
 - `initError`: Initialization errors
 - `cleanup`: Component cleanup complete
 
-## Live2D Integration
+## VRM Integration
 
 ### Model Configuration
-- **Character**: Hiyori VTuber
-- **File**: `/assets/live2d/hiyori_vts/hiyori.model3.json`
+- **Character**: VRM avatar (兰兰)
+- **File**: `/assets/vrm/avatar/avatar.vrm`
 - **Scaling**: 0.12x (optimized for mobile display)
 - **Position**: Centered with slight vertical offset
 - **Parts Management**: Automatic arm visibility control
@@ -330,16 +330,16 @@ server: {
 
 ### Console Logging
 Comprehensive logging system with emoji prefixes:
-- `🌟 [HiyoriBridge]`: Bridge initialization
-- `🎭 [HiyoriBridge]`: Motion execution
+- `🌟 [AvatarBridge]`: Bridge initialization
+- `🎭 [AvatarBridge]`: Motion execution
 - `💓 [Heartbeat]`: Status updates
-- `📋 [HiyoriBridge]`: API calls
-- `🔍 [HiyoriBridge]`: Status checks
+- `📋 [AvatarBridge]`: API calls
+- `🔍 [AvatarBridge]`: Status checks
 
 ### Visual Debug Panel
 Development-only status panel showing:
 - DOM Ready: ✓/⧗
-- Live2D Ready: ✓/⧗  
+- VRM Ready: ✓/⧗  
 - Model Ready: ✓/⧗
 - Bridge Ready: ✓/⧗
 - All Ready: ✓/⧗
@@ -349,7 +349,7 @@ Development-only status panel showing:
 ```typescript
 interface PerformanceMetrics {
   domLoadTime: number;      // DOM ready time
-  live2dLoadTime: number;   // Live2D core load time
+  vrmLoadTime: number;      // VRM core load time
   modelLoadTime: number;    // Model load time
   totalLoadTime: number;    // Total initialization time
 }
@@ -358,7 +358,7 @@ interface PerformanceMetrics {
 ## Error Handling
 
 ### Initialization Errors
-- **Timeout Protection**: 10-second maximum wait for Live2D libraries
+- **Timeout Protection**: 10-second maximum wait for VRM libraries
 - **Graceful Degradation**: Error UI with retry options
 - **Detailed Reporting**: Specific error messages for debugging
 
@@ -390,7 +390,7 @@ npm start           # Start production server
 ## Recent Achievements
 
 ### 🎯 Completed Features
-- **Full Live2D Integration**: Hiyori model with 11 motion types
+- **Full VRM Integration**: VRM avatar with 11 motion types
 - **React Native Bridge**: Bi-directional communication system
 - **Multi-stage Initialization**: Robust loading sequence
 - **Performance Monitoring**: Detailed metrics and debugging
@@ -399,7 +399,7 @@ npm start           # Start production server
 - **Interactive Controls**: Click/touch response system
 
 ### 🔧 Technical Improvements
-- **TypeScript Integration**: Full type safety with Live2D types
+- **TypeScript Integration**: Full type safety with VRM types
 - **Modern Build System**: Vite 6.0 with optimized bundling
 - **Network Configuration**: Mobile-friendly development setup
 - **Debug Infrastructure**: Comprehensive logging and status reporting
@@ -430,12 +430,12 @@ npm start           # Start production server
 
 ### Adding New Motions
 1. Add motion name to `availableMotions` array
-2. Ensure motion exists in Hiyori model files
+2. Ensure motion exists in VRM avatar model files
 3. Test motion execution via React Native interface
 4. Update documentation with new motion
 
 ### Modifying Bridge API
-1. Update `HiyoriBridge` interface definition
+1. Update `AvatarBridge` interface definition
 2. Implement new methods in `setupJavaScriptBridge()`
 3. Add corresponding message handlers
 4. Update React Native side to handle new messages
@@ -452,4 +452,4 @@ npm start           # Start production server
 3. Use debug status panel for visual state confirmation
 4. Test network connectivity between devices
 
-The character project is currently in a production-ready state with full Live2D integration, robust React Native communication, and comprehensive debugging support.
+The character project is currently in a production-ready state with full VRM integration, robust React Native communication, and comprehensive debugging support.

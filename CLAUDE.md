@@ -4,14 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with th
 
 ## Repository Overview
 
-The **Video Chat** repository contains a multi-project ecosystem for Live2D character interaction and video chat functionality. It demonstrates the integration between React Native mobile applications and web-based Live2D character displays.
+The **Video Chat** repository contains a multi-project ecosystem for VRM character interaction and video chat functionality. It demonstrates the integration between React Native mobile applications and web-based VRM character display.
 
 ### Current Development Status: 🚀 **Production-Ready Multi-Modal AI Companion**
 
 - **Multi-Project Architecture**: ✅ Complete with EmoMate + Character integration
 - **Voice Conversation System**: ✅ Claude AI + ElevenLabs TTS + Speech Recognition
 - **Emotion Detection System**: ✅ MLKit face detection + text analysis (5 emotions)
-- **Live2D Character System**: ✅ Full Hiyori VTuber model support (11 motions)
+- **VRM Character System**: ✅ VRM avatar (兰兰) with motion + lip sync support
 - **React Native WebView Bridge**: ✅ Bi-directional communication
 - **Four-Layer Memory System**: ✅ MMKV + SQLite persistent memory across sessions
 - **Vision & Environment Awareness**: ✅ Scene understanding + Object recognition (Claude Vision)
@@ -29,14 +29,14 @@ video-chat/
 │   │   ├── capabilities/       # Core capability modules (NEW architecture)
 │   │   │   ├── emotion/        # Emotion state management
 │   │   │   ├── listen/         # Speech recognition
-│   │   │   ├── motion/         # Live2D motion mapper
+│   │   │   ├── motion/         # Avatar motion mapper
 │   │   │   ├── retrieval/      # RAG pipeline (query → retrieve → generate)
 │   │   │   ├── speak/          # TTS system (TTSQueue, providers, cache)
 │   │   │   └── vision/         # Camera, face detection, scene understanding, object recognition
 │   │   ├── components/
 │   │   │   ├── vision/         # Camera and emotion detector UI
 │   │   │   ├── scene-history/  # Scene history cards and tags
-│   │   │   ├── HiyoriWebView.tsx # WebView wrapper for character
+│   │   │   ├── CharacterWebView.tsx # WebView wrapper for character
 │   │   │   └── FunctionMonitor.tsx # Debug function monitor
 │   │   ├── hooks/
 │   │   │   ├── ai/             # AI-specific hooks
@@ -75,13 +75,13 @@ video-chat/
 │   │       └── speak.ts / vision.ts
 │   ├── App.tsx                 # Root: audio config + TTS warmup + memory hydration
 │   └── package.json
-├── character/                  # Web application for Live2D display
+├── character/                  # Web application for VRM display
 │   ├── app/
 │   │   ├── components/
-│   │   │   └── HiyoriLive2D.tsx
+│   │   │   └── VRMAvatar.tsx
 │   │   └── routes/
 │   │       └── _index.tsx
-│   ├── public/assets/live2d/
+│   ├── public/assets/vrm/
 │   ├── vite.config.ts
 │   └── package.json
 └── CLAUDE.md                   # This file
@@ -91,7 +91,7 @@ video-chat/
 
 ### EmoMate (React Native Mobile App)
 
-**Purpose**: Mobile application providing user interface for Live2D character interaction
+**Purpose**: Mobile application providing user interface for VRM character interaction
 
 **Technology Stack**:
 - React Native 0.81.5 with Expo SDK 54
@@ -106,7 +106,7 @@ video-chat/
 **Technology Stack**:
 - Remix 2.16.8 with React 18
 - PIXI.js 7.4.3 for WebGL rendering
-- pixi-live2d-display-mulmotion for Live2D
+- @pixiv/three-vrm for VRM rendering
 - Vite 6.0.0
 
 ## Feature Overview
@@ -155,10 +155,10 @@ video-chat/
 - Memory-based topic seeds as fallback (via `useTopicSeeds`)
 - Context-aware topic selection from conversation history
 
-#### Live2D / Motion System
+#### VRM / Motion System
 - **Motion Mapper** (`capabilities/motion/motionMapper.ts`, 398 lines): context-aware motion selection
-- Plutchik 8-emotion model → Hiyori motion mapping
-- 11 motions: Idle, Happy, Surprised, Shy, Wave, Dance, Laugh, Thinking, Speaking, Excited, Sleepy
+- Plutchik 8-emotion model → VRM avatar motion mapping
+- Motions: Idle, Happy, Surprised, Shy, Wave, Dance, Laugh, Thinking, Speaking, Excited, Sleepy
 - WebView bridge for EmoMate ↔ Character communication
 
 #### Emotion Detection
@@ -173,7 +173,7 @@ video-chat/
 
 ### In Development / Planned
 - ⏳ Testing framework (Jest + React Native Testing Library)
-- ⏳ Lip sync for Live2D
+- ⏳ Lip sync improvements
 - ⏳ Expand emotions (5 → 10+ types)
 - ⏳ Cloud sync for memory
 
@@ -269,7 +269,7 @@ The video-chat repository is a **multi-modal AI companion** with:
 - **Four-layer persistent memory** (MMKV + SQLite, extraction via Claude Haiku)
 - **Visual intelligence** (Claude Vision scene analysis + MLKit face detection)
 - **RAG system** (context-aware retrieval for richer responses)
-- **Live2D character animation** (emotion-responsive, 11 motions)
+- **VRM character animation** (emotion-responsive)
 - **~24,000 lines** of TypeScript, capabilities-based architecture
 
 **Current Status**: Production-ready core, 92% complete.
