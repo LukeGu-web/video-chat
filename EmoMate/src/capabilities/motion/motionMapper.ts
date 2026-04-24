@@ -255,7 +255,12 @@ export function selectMotion(context: ConversationContext): MotionSelection {
       reason = `Emotion-based motion: ${context.emotion}`;
     }
     priority = MotionPriority.EMOTION;
-    returnToIdle = selectedMotion !== 'Idle';
+    if (selectedMotion !== 'Idle') {
+      // Always set a bounded duration so the character auto-returns to Idle.
+      // Use per-motion natural duration rather than a blanket value.
+      duration = getMotionDuration(selectedMotion);
+      returnToIdle = true;
+    }
   }
 
   const selection: MotionSelection = {

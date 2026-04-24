@@ -1,16 +1,13 @@
 import React, { useEffect, useCallback, useRef, useState } from 'react';
-import { View, Text } from 'react-native';
-import CharacterAvatar, { AVATAR_MOTIONS } from './CharacterAvatar';
+import { View } from 'react-native';
+import CharacterAvatar from './CharacterAvatar';
 import { EmotionType } from '../types/emotion';
 import { useAIStatus, AvatarMotion, useEmotionStore, useMonitorStore } from '../store';
 import { debugLog } from '../utils/debug';
 import {
   selectMotion,
-  analyzeConversationContext,
   ConversationContext,
   MotionSelection,
-  calculateMotionTransition,
-  isTemporaryMotion,
 } from '../capabilities/motion/motionMapper';
 
 interface EmotionAwareCharacterProps {
@@ -19,7 +16,7 @@ interface EmotionAwareCharacterProps {
   className?: string;
   onMotionComplete?: (motion: string, success: boolean) => void;
   enableEmotionMapping?: boolean;
-  currentText?: string; // Current AI response text for context analysis
+  currentText?: string;
 }
 
 export const EmotionAwareCharacter: React.FC<EmotionAwareCharacterProps> = ({
@@ -35,79 +32,61 @@ export const EmotionAwareCharacter: React.FC<EmotionAwareCharacterProps> = ({
   const textEmotion = useEmotionStore((state) => state.textEmotion);
   const { aiStatus } = useAIStatus();
   const lastEmotionRef = useRef<EmotionType>('neutral');
-  const [motionSelection, setMotionSelection] =
-    useState<MotionSelection | null>(null);
+  const [motionSelection, setMotionSelection] = useState<MotionSelection | null>(null);
   const returnToIdleTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Monitor store for debug panel
   const updateEmotionStatus = useMonitorStore((state) => state.updateEmotionStatus);
 
-  // Determine the motion to play based on emotion, AI status, and context
-  const currentMotion = React.useMemo((): AvatarMotion => {
-    if (!enableEmotionMapping) {
-      return aiStatus || 'Idle';
-    }
+  // Derive currentMotion from state so the return-to-idle timer can trigger a
+  // re-render and actually change what CharacterAvatar receives.
+  const currentMotion: AvatarMotion = motionSelection?.motion ?? (aiStatus || 'Idle');
 
-    // Build conversation context
-    const context: ConversationContext = {
-      text: currentText || '',
-      emotion: combinedEmotion,
-      aiSpeaking: aiStatus === 'Speaking',
-      aiThinking: aiStatus === 'Thinking',
-    };
-
-    // Use advanced motion mapper
-    const selection = selectMotion(context);
-
-    console.log(
-      `🎯 [EmotionAwareCharacter] Motion selected: ${selection.motion}`
-    );
-    console.log(`   📝 Reason: ${selection.reason}`);
-    console.log(`   ⭐ Priority: ${selection.priority}`);
-    console.log(
-      `   🎭 Emotion: ${combinedEmotion} | AI Status: ${aiStatus || 'none'}`
-    );
-
-    debugLog('EmotionAwareCharacter', `Motion selection`, {
-      context,
-      selection,
-      aiStatus,
-    });
-
-    return selection.motion;
-  }, [combinedEmotion, aiStatus, enableEmotionMapping, currentText]);
-
-  // Update motion selection state in useEffect to avoid render loop
+  // Recompute motion selection whenever any relevant signal changes.
   useEffect(() => {
     if (!enableEmotionMapping) {
       setMotionSelection(null);
       return;
     }
 
+    // Suppress facial-emotion-driven motions when not in active conversation so
+    // the character stays in Idle while the user is quietly watching.
+    const isInActiveConversation =
+      (aiStatus !== null && aiStatus !== 'Idle') || textEmotion !== null;
+    const effectiveEmotion: typeof combinedEmotion = isInActiveConversation
+      ? combinedEmotion
+      : 'neutral';
+
     const context: ConversationContext = {
       text: currentText || '',
-      emotion: combinedEmotion,
+      emotion: effectiveEmotion,
       aiSpeaking: aiStatus === 'Speaking',
       aiThinking: aiStatus === 'Thinking',
     };
 
     const selection = selectMotion(context);
+
+    debugLog('EmotionAwareCharacter', `Motion selected: ${selection.motion}`, {
+      reason: selection.reason,
+      priority: selection.priority,
+      emotion: combinedEmotion,
+      aiStatus,
+    });
+
     setMotionSelection(selection);
 
-    // Handle return to Idle after temporary motions
     if (selection.returnToIdle && selection.duration) {
       if (returnToIdleTimerRef.current) {
         clearTimeout(returnToIdleTimerRef.current);
       }
 
       returnToIdleTimerRef.current = setTimeout(() => {
-        // Only return to Idle if no new AI status
         if (!aiStatus || aiStatus === 'Idle') {
-          debugLog(
-            'EmotionAwareCharacter',
-            `Returning to Idle after ${selection.motion}`
-          );
-          // Don't set motion selection here, just let it naturally go to Idle
+          debugLog('EmotionAwareCharacter', `Returning to Idle after ${selection.motion}`);
+          setMotionSelection({
+            motion: 'Idle',
+            priority: 0,
+            reason: `Return to idle after ${selection.motion}`,
+          });
         }
       }, selection.duration);
     }
@@ -117,9 +96,9 @@ export const EmotionAwareCharacter: React.FC<EmotionAwareCharacterProps> = ({
         clearTimeout(returnToIdleTimerRef.current);
       }
     };
-  }, [combinedEmotion, aiStatus, enableEmotionMapping, currentText]);
+  }, [combinedEmotion, textEmotion, aiStatus, enableEmotionMapping, currentText]);
 
-  // Handle emotion changes
+  // Debug-only: log when the combined emotion changes.
   useEffect(() => {
     if (combinedEmotion !== lastEmotionRef.current) {
       debugLog(
@@ -135,16 +114,9 @@ export const EmotionAwareCharacter: React.FC<EmotionAwareCharacterProps> = ({
       );
       lastEmotionRef.current = combinedEmotion;
     }
-  }, [
-    combinedEmotion,
-    facialEmotion,
-    textEmotion,
-    aiStatus,
-    currentMotion,
-    motionSelection,
-  ]);
+  }, [combinedEmotion, facialEmotion, textEmotion, aiStatus, currentMotion, motionSelection]);
 
-  // Sync emotion status to monitor context
+  // Sync emotion status to debug monitor.
   useEffect(() => {
     updateEmotionStatus({
       facialEmotion,
@@ -169,10 +141,7 @@ export const EmotionAwareCharacter: React.FC<EmotionAwareCharacterProps> = ({
 
   const handleMotionComplete = useCallback(
     (motion: string, success: boolean) => {
-      debugLog(
-        'EmotionAwareCharacter',
-        `Motion ${motion} completed: ${success ? 'success' : 'failed'}`
-      );
+      debugLog('EmotionAwareCharacter', `Motion ${motion} completed: ${success ? 'success' : 'failed'}`);
       onMotionComplete?.(motion, success);
     },
     [onMotionComplete]

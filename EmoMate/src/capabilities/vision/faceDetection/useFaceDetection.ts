@@ -79,6 +79,11 @@ export function useFaceDetection(
   const lastMLKitDetection = useRef(0);
   const faceDetectedTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Stability tracking: only fire onEmotionDetected after EMOTION_STABILITY_COUNT
+  // consecutive detections of the same emotion to filter out micro-expression noise.
+  const pendingEmotionRef = useRef<EmotionType>('neutral');
+  const consecutiveCountRef = useRef(0);
+
   // MLKit face detection options - Full power mode with landmarks and contours
   const faceDetectionOptions = useMemo<FaceDetectionOptions>(
     () =>
@@ -99,10 +104,28 @@ export function useFaceDetection(
   // Callback to update emotion on JS thread
   const updateEmotionCallback = useCallback(
     (emotion: EmotionType, confidence: number) => {
+      // Stability gate: require EMOTION_STABILITY_COUNT consecutive detections of the
+      // same emotion before propagating. Resets counter when emotion flips so that
+      // single-frame micro-expressions never drive avatar motions.
+      if (emotion === pendingEmotionRef.current) {
+        consecutiveCountRef.current += 1;
+      } else {
+        pendingEmotionRef.current = emotion;
+        consecutiveCountRef.current = 1;
+      }
+
+      if (consecutiveCountRef.current < TIMEOUT_CONSTANTS.EMOTION_STABILITY_COUNT) {
+        debugLog('useFaceDetection', `Emotion ${emotion} not yet stable (${consecutiveCountRef.current}/${TIMEOUT_CONSTANTS.EMOTION_STABILITY_COUNT})`, { confidence });
+        return;
+      }
+
+      // Reset so the next change must also pass stability check
+      consecutiveCountRef.current = 0;
+
       setCurrentEmotion(emotion);
       setFaceDetected(true);
       onEmotionDetected(emotion);
-      debugLog('useFaceDetection', `MLKit detected emotion: ${emotion}`, {
+      debugLog('useFaceDetection', `MLKit stable emotion: ${emotion}`, {
         confidence,
       });
 

@@ -48,6 +48,9 @@ export const TIMEOUT_CONSTANTS = {
   NEUTRAL_RESET_TIMEOUT: 5000,
   /** Default emotion detection interval (ms) */
   DEFAULT_DETECTION_INTERVAL: 1000,
+  /** Number of consecutive same-emotion detections required before triggering a change.
+   *  Prevents single micro-expression frames from driving avatar motions. */
+  EMOTION_STABILITY_COUNT: 3,
 } as const;
 
 /**
