@@ -94,6 +94,7 @@ video-chat/
 **Purpose**: Mobile application providing user interface for VRM character interaction
 
 **Technology Stack**:
+
 - React Native 0.81.5 with Expo SDK 54
 - React 19.1.0 / TypeScript 5.9.2
 - Zustand + Immer (state management)
@@ -104,6 +105,7 @@ video-chat/
 ### Character (Web Application)
 
 **Technology Stack**:
+
 - Remix 2.16.8 with React 18
 - PIXI.js 7.4.3 for WebGL rendering
 - @pixiv/three-vrm for VRM rendering
@@ -114,6 +116,7 @@ video-chat/
 ### Completed Features (92%)
 
 #### Voice Conversation System
+
 - **File**: `src/hooks/useChatAI.ts` (658 lines)
 - Claude Haiku/Sonnet with streaming SSE
 - Prompt caching (`cache_control`) for cost optimization
@@ -121,6 +124,7 @@ video-chat/
 - Context: last 10 messages
 
 #### TTS System (capabilities/speak/)
+
 - **Architecture**: `TTSQueue` class — parallel synthesis + sequential playback
 - **Providers**: ElevenLabsProvider + ExpoSpeechProvider (fallback)
 - **Cache**: `AudioCache` — local file caching to avoid re-synthesis
@@ -128,6 +132,7 @@ video-chat/
 - App startup: TTS warmup in `App.tsx`
 
 #### Four-Layer Memory System (NEW)
+
 - **Layer 1 (MMKV)**: `UserProfile` + `UserPreferences` — always in RAM
 - **Layer 2 (MMKV)**: Extraction trigger state + unprocessed messages
 - **Layer 3 (SQLite)**: `episodes` table — conversation summaries (max 100 chars each)
@@ -138,6 +143,7 @@ video-chat/
 - **Key files**: `memoryDatabase.ts`, `memoryStore.ts`, `useMemoryExtraction.ts`, `useMemoryTriggers.ts`, `buildMemoryContext.ts`, `useTopicSeeds.ts`
 
 #### Vision & Environment Awareness (capabilities/vision/)
+
 - **Scene Understanding**: `useSceneUnderstanding.ts` (816 lines) — Claude Vision analyzes camera frames
 - **Object Recognition**: `useObjectRecognition.ts` — identifies objects and injects context into AI
 - **Face Detection**: `useFaceDetection.ts` — MLKit 1.9.0 at 60fps, 5 emotions
@@ -145,33 +151,39 @@ video-chat/
 - **Background Scenes**: 721-line library of dynamic conversation backgrounds
 
 #### RAG System (capabilities/retrieval/)
+
 - **Pipeline**: query analysis → multi-source retrieval → context building → generation
 - **Modules**: `queryAnalyzer`, `multiSourceRetriever`, `contextBuilder`, `relevanceScoring`
 - **Phase 3**: Conversation summarization + user feedback + performance monitoring
 - **Key file**: `ragPipeline.ts`
 
 #### Proactive Conversation System
+
 - 3-stage silence detection: 1min / 2min / 3min
 - Memory-based topic seeds as fallback (via `useTopicSeeds`)
 - Context-aware topic selection from conversation history
 
 #### VRM / Motion System
+
 - **Motion Mapper** (`capabilities/motion/motionMapper.ts`, 398 lines): context-aware motion selection
 - Plutchik 8-emotion model → VRM avatar motion mapping
 - Motions: Idle, Happy, Surprised, Shy, Wave, Dance, Laugh, Thinking, Speaking, Excited, Sleepy
 - WebView bridge for EmoMate ↔ Character communication
 
 #### Emotion Detection
+
 - **Facial**: MLKit via `useFaceDetection` — smilingProbability + eyeOpenProbability
 - **Text**: keyword matching + Claude semantic analysis
 - **Fusion**: text emotion takes priority over facial
 - **Types** (Plutchik 8): joy, sadness, anger, fear, surprise, disgust, trust, anticipation
 
 #### Bilingual Support
+
 - Language detection: `src/utils/languageDetection.ts`
 - Dynamic conversation system adapts to Chinese/English
 
 ### In Development / Planned
+
 - ⏳ Testing framework (Jest + React Native Testing Library)
 - ⏳ Lip sync improvements
 - ⏳ Expand emotions (5 → 10+ types)
@@ -199,6 +211,7 @@ video-chat/
 ### Starting Development Environment
 
 1. **Character Web App**:
+
    ```bash
    cd character
    npm install
@@ -206,6 +219,7 @@ video-chat/
    ```
 
 2. **EmoMate Mobile App**:
+
    ```bash
    cd EmoMate
    npm install
@@ -213,12 +227,14 @@ video-chat/
    ```
 
 ### TypeScript Check
+
 ```bash
 cd EmoMate
 npx tsc --noEmit
 ```
 
 ### Debug Mode
+
 ```bash
 # EmoMate - shows debug overlays
 SHOW_TEST_COMPONENTS=true npm start
@@ -233,10 +249,13 @@ SHOW_TEST_COMPONENTS=true npm start
 ## Architecture Notes
 
 ### Capabilities Module Pattern
+
 `src/capabilities/` groups functionality by capability domain. Each capability has its own `index.ts` barrel export. This replaces the old flat `utils/` structure for domain-specific logic.
 
 ### Store Architecture
+
 Zustand stores are organized by domain:
+
 - `chatStore` — persisted conversation history
 - `memoryStore` — MMKV-backed user profile/preferences
 - `memoryDatabase` — SQLite operations (episodes + facts)
@@ -247,14 +266,17 @@ Zustand stores are organized by domain:
 - `monitorStore` — debug function monitor
 
 ### Prompt Caching Strategy
+
 `buildAIContext.ts` uses `cache_control: { type: 'ephemeral' }` on stable system prompt blocks (personality, emotional context) to reduce Claude API costs.
 
 ### Memory Injection
+
 `buildMemoryContext()` assembles a memory block from MMKV (profile + preferences) and SQLite (recent episodes + high-importance facts). This block is injected as a non-cached system prompt block, so it reflects the latest state on each conversation.
 
 ## Project Documentation
 
 ### Core Docs
+
 - **CLAUDE.md** (this file): Multi-project overview
 - **EmoMate/CLAUDE.md**: Detailed EmoMate guide
 - **EmoMate/docs/MEMORY_SYSTEM_DESIGN.md**: Memory system design
@@ -265,6 +287,7 @@ Zustand stores are organized by domain:
 ## Summary
 
 The video-chat repository is a **multi-modal AI companion** with:
+
 - **Voice conversation** (Claude AI + ElevenLabs TTS)
 - **Four-layer persistent memory** (MMKV + SQLite, extraction via Claude Haiku)
 - **Visual intelligence** (Claude Vision scene analysis + MLKit face detection)

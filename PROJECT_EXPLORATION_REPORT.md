@@ -156,18 +156,21 @@ capabilities/
 **文件**: `src/hooks/useChatAI.ts`（658 行）
 
 ✅ **Claude AI 集成（含 Prompt Caching）**
+
 - 模型: claude-haiku-4-5 / claude-sonnet-4-6
 - 流式 SSE 响应
 - `cache_control: { type: 'ephemeral' }` 应用于稳定的系统提示块（人格 + 情绪响应块），降低 API 成本
 - `buildCacheableAPIRequestConfig()` 统一构建带缓存控制的请求配置
 
 ✅ **RAG 集成**
+
 ```typescript
 const ragResult = await executeRAG(userMessage, chatHistory, { enableRetrieval: true });
 // ragResult.context 注入到系统提示
 ```
 
 ✅ **智能对话类型检测**
+
 | 类型 | 字符数 | Max Tokens | 触发条件 |
 |------|--------|------------|----------|
 | simple | 20-50 | 80 | 问候、确认 |
@@ -191,16 +194,19 @@ const ragResult = await executeRAG(userMessage, chatHistory, { enableRetrieval: 
 ```
 
 ✅ **TTSQueue 特性**（`queue/TTSQueue.ts`, 413 行）
+
 - 最多 2 个并发合成任务（避免 rate limit）
 - 最多 3 次重试
 - 支持 `cancel()`、`waitForCompletion()`
 - 完成回调和状态追踪
 
 ✅ **AudioCache**（`cache/AudioCache.ts`）
+
 - 本地文件缓存避免重复合成
 - App 启动时预热 TTS（`App.tsx`）
 
 ✅ **语音配置**
+
 - Voice ID: `hkfHEbBvdQFNX4uWHqRF`
 - 情绪感知语音参数:
 
@@ -292,12 +298,14 @@ Layer 4 (SQLite) ─ facts ────────────── 知识事�
 ```
 
 ✅ **提取触发器**（`useMemoryTriggers.ts`）
+
 - 消息计数：每 20 条提取一次
 - 沉默：5 分钟无新消息
 - 后台：App 进入 background 时标记 pending
 - 启动：App 重启时处理上次未完成的 pending extraction
 
 ✅ **提取流程**（`useMemoryExtraction.ts`）
+
 ```
 对话片段 → Claude Haiku（1024 max_tokens）→ ExtractionResult JSON
                                                     ↓
@@ -306,18 +314,21 @@ Layer 4 (SQLite) ─ facts ────────────── 知识事�
 ```
 
 ✅ **注入流程**（`buildMemoryContext.ts` → `buildAIContext.ts`）
+
 ```typescript
 const { memoryBlock } = buildMemoryContext(profile, preferences);
 // memoryBlock 注入系统提示（非缓存块，每次对话都更新）
 ```
 
 ✅ **话题种子**（`useTopicSeeds.ts`）
+
 - 3 天内即将过期的高重要度 facts → 提问话题
 - 1 天前情绪低落的 episode → 关怀话题
 - 最新 episode 的 keyEvents → 后续跟进话题
 - 仅在 `messages.length === 0` 时作为 proactive message 的备用兜底
 
 ✅ **App.tsx 集成**
+
 ```typescript
 const loadFromStorage = useMemoryStore((s) => s.loadFromStorage);
 useEffect(() => { loadFromStorage(); }, [loadFromStorage]);
@@ -333,6 +344,7 @@ useEffect(() => { loadFromStorage(); }, [loadFromStorage]);
 #### 场景理解（useSceneUnderstanding.ts, 816 行）
 
 ✅ **工作流程**
+
 ```
 相机帧捕获 → 图像压缩 → 变化检测（imageComparison）
     ↓ 有足够变化时
@@ -344,18 +356,21 @@ sceneStore + AI 系统提示注入
 ```
 
 ✅ **触发机制**
+
 - 定时分析（可配置间隔）
 - 关键词触发（用户提到场景相关词汇）
 - 场景变化触发（图像差异超过阈值）
 - 对话活跃期降低分析频率
 
 ✅ **场景缓存**（`sceneCache.ts`）
+
 - 持久化到 MMKV，跨 session 保留
 - 语义去重（相似场景不重复分析）
 
 #### 物体识别（useObjectRecognition.ts）
 
 ✅ **高优先级注入**
+
 ```typescript
 // 物体识别结果以强调标记注入 AI 上下文
 objectRecognitionContext: `[USER IS SHOWING YOU: ${result}]`
@@ -364,6 +379,7 @@ objectRecognitionContext: `[USER IS SHOWING YOU: ${result}]`
 #### 面部情绪检测（faceDetection/）
 
 ✅ **MLKit 1.9.0 集成**
+
 - `useFaceDetection` + Reanimated worklet 处理帧
 - 60fps 实时检测
 - 情绪算法（`emotionAlgorithm.ts`）:
@@ -379,6 +395,7 @@ smile < 0.1 && eyeOpen > 0.5            → anger (生气)
 #### 动态背景系统
 
 ✅ **Background Scenes**（`constants/backgroundScenes.ts`, 721 行）
+
 - 基于对话内容和场景分析动态切换背景图
 - `useBackgroundSceneManager` 整合多个触发条件
 
@@ -407,6 +424,7 @@ performanceMonitor.ts ── 记录 RAG 性能指标
 ```
 
 ✅ **集成方式**（在 `useChatAI.ts`）
+
 ```typescript
 const ragResult = await executeRAG(userMessage, chatHistory, options);
 // ragResult.context 作为额外上下文注入系统提示
@@ -428,6 +446,7 @@ const ragResult = await executeRAG(userMessage, chatHistory, options);
 joy, sadness, anger, fear, surprise, disgust, trust, anticipation
 
 ✅ **UI 组件**:
+
 - `components/vision/EmotionDetector.tsx` — 可拖拽浮动检测窗口
 - `components/vision/DraggableCameraView.tsx`
 
@@ -438,11 +457,13 @@ joy, sadness, anger, fear, surprise, disgust, trust, anticipation
 **文件**: `hooks/ai/useProactiveConversation.ts`（224 行）
 
 ✅ **3 阶段沉默检测**:
+
 - Short pause → 轻柔的话题引出（可使用记忆话题种子）
 - Medium pause → 基于对话上下文的跟进问题
 - Long pause → 深度互动尝试
 
 ✅ **话题种子集成**:
+
 ```typescript
 const topicSeeds = useTopicSeeds();
 // messages.length === 0 时优先使用记忆话题
@@ -498,12 +519,14 @@ Idle, Happy, Surprised, Shy, Wave, Dance, Laugh, Thinking, Speaking, Excited, Sl
 **文件**: `src/constants/personality.ts`（271 行）
 
 ✅ **兰兰（LanLan）完整人设**:
+
 - 名字: 兰兰（17 岁日本女高中生风格）
 - 灵感: 毛利兰（《名侦探柯南》）
 - 说话特点: 短句、温柔、偶尔害羞
 - 惯用表达: "诶？"、"嗯…"、"欸嘿嘿"
 
 ✅ **记忆连续性指令**（Task 5 新增）:
+
 ```
 # Conversation continuity
 If the user sends a simple greeting, naturally bring up ONE thing you remember —
@@ -602,6 +625,7 @@ Do this only when it feels natural. One reference per opening.
 ### 启动开发环境
 
 **EmoMate（移动应用）**:
+
 ```bash
 cd EmoMate
 npm install
@@ -610,6 +634,7 @@ SHOW_TEST_COMPONENTS=true npm start  # 调试模式
 ```
 
 **Character（Web 应用）**:
+
 ```bash
 cd character
 npm install
@@ -617,6 +642,7 @@ npm run dev           # http://192.168.31.28:5174/
 ```
 
 ### TypeScript 全量检查
+
 ```bash
 cd EmoMate
 npx tsc --noEmit
@@ -626,6 +652,7 @@ npx tsc --noEmit
 ### 常见开发任务
 
 **添加新能力模块**:
+
 ```
 1. 在 src/capabilities/<capability>/ 创建目录
 2. 实现功能文件
@@ -634,12 +661,14 @@ npx tsc --noEmit
 ```
 
 **添加新 Zustand store**:
+
 ```
 1. 创建 src/store/<name>Store.ts
 2. 在 src/store/index.ts 添加 export
 ```
 
 **添加新 Hiyori 动作**:
+
 ```
 1. character/ 项目确保模型文件有对应动作
 2. src/store/useAIStatus.ts 更新 HiyoriMotion 类型

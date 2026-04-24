@@ -26,12 +26,14 @@
 ### 依赖变更
 
 **移除：**
+
 ```
 pixi.js
 pixi-live2d-display-mulmotion
 ```
 
 **新增：**
+
 ```
 three
 @react-three/fiber
@@ -59,6 +61,7 @@ interface VRMAvatarRef {
 ```
 
 **初始化流程：**
+
 ```
 1. React Three Fiber Canvas 挂载
 2. useLoader(GLTFLoader) 加载 .vrm 文件，使用 VRMLoaderPlugin 解析
@@ -68,6 +71,7 @@ interface VRMAvatarRef {
 ```
 
 **渲染设置：**
+
 - Canvas 背景透明（alpha: true）
 - 抗锯齿开启
 - 相机位置：正面视角，显示上半身
@@ -76,12 +80,14 @@ interface VRMAvatarRef {
 ### Bridge 消息（本阶段新增）
 
 **WebView → EmoMate：**
+
 ```typescript
 { type: 'vrmReady', data: { modelName: string } }
 { type: 'initError', data: { error: string } }
 ```
 
 **EmoMate → WebView（本阶段支持）：**
+
 ```typescript
 { type: 'ping' }  // 检查连接
 ```

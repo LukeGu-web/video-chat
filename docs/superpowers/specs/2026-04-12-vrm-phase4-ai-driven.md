@@ -122,6 +122,7 @@ Phase 4 完成后，motionMapper 支持两种触发模式：
 以下是 Claude 在不同场景下应生成的动作示例（用于 prompt 工程测试）：
 
 **场景：用户说了一个笑话**
+
 ```json
 {
   "blendShapes": { "joy": 0.9, "fun": 0.4 },
@@ -132,6 +133,7 @@ Phase 4 完成后，motionMapper 支持两种触发模式：
 ```
 
 **场景：听到令人难过的消息**
+
 ```json
 {
   "blendShapes": { "sorrow": 0.7 },
@@ -145,6 +147,7 @@ Phase 4 完成后，motionMapper 支持两种触发模式：
 ```
 
 **场景：被问到难题，思考中**
+
 ```json
 {
   "blendShapes": { "fun": 0.2 },

@@ -38,9 +38,11 @@ npm run lint
 ## Debug Mode System
 
 ### Overview
+
 The character project implements a comprehensive debug mode system that allows developers to view detailed logs, performance metrics, and status panels during development while keeping the production build clean.
 
 ### Environment Variable Configuration
+
 Debug mode is controlled via the `SHOW_TEST_COMPONENTS` environment variable:
 
 ```bash
@@ -52,13 +54,16 @@ SHOW_TEST_COMPONENTS=true npm run dev
 ```
 
 ### Configuration Files
+
 - **`vite.config.ts`**: Defines environment variables and injects them into the build
 - **`app/components/VRMAvatar.tsx`**: Main component with debug logic
 
 ### Debug Features
 
 #### 1. Debug Status Panel
+
 Visual status panel showing initialization progress:
+
 - **DOM Ready**: ✓/⧗
 - **VRM Ready**: ✓/⧗  
 - **Model Ready**: ✓/⧗
@@ -67,7 +72,9 @@ Visual status panel showing initialization progress:
 - **Load Times**: Performance metrics in milliseconds
 
 #### 2. Console Logging
+
 Comprehensive logging system with component prefixes:
+
 - **🌟 [AvatarBridge]**: Bridge initialization and API calls
 - **🎭 [AvatarBridge]**: Motion execution and results
 - **💓 [Heartbeat]**: Connection health monitoring
@@ -75,7 +82,9 @@ Comprehensive logging system with component prefixes:
 - **🔍 [AvatarBridge]**: Detailed debugging information
 
 #### 3. Performance Monitoring
+
 Detailed timing metrics:
+
 - DOM load time
 - VRM core load time
 - Model load time
@@ -83,7 +92,9 @@ Detailed timing metrics:
 - Motion execution response time
 
 #### 4. Error Reporting
+
 Enhanced error reporting with:
+
 - Detailed error messages
 - Component stack traces
 - Initialization stage identification
@@ -92,6 +103,7 @@ Enhanced error reporting with:
 ### Debug Mode Implementation
 
 #### Environment Variable Setup
+
 ```typescript
 // vite.config.ts
 export default defineConfig({
@@ -104,6 +116,7 @@ export default defineConfig({
 ```
 
 #### Component Debug Logic
+
 ```typescript
 // VRMAvatar.tsx
 const isDebugMode = process.env.SHOW_TEST_COMPONENTS === 'true';
@@ -125,6 +138,7 @@ const debugLog = (stage: string, message: string, data?: any) => {
 ### Usage Guidelines
 
 #### For Development
+
 1. **Regular Development**: Use `npm run dev` for normal development
 2. **Debug Mode**: Use `SHOW_TEST_COMPONENTS=true npm run dev` when:
    - Debugging initialization issues
@@ -133,18 +147,22 @@ const debugLog = (stage: string, message: string, data?: any) => {
    - Testing motion execution
 
 #### For Production
+
 - Production builds automatically exclude all debug code
 - Environment variables are not included in production bundles
 - Clean user interface without debug elements
 
 ### Network Configuration with Debug
+
 When debugging network issues:
+
 ```bash
 # Start with debug mode and check console for connection details
 SHOW_TEST_COMPONENTS=true npm run dev
 ```
 
 Debug logs will show:
+
 - Server binding status (0.0.0.0:5174)
 - WebView connection attempts
 - Bridge initialization progress
@@ -170,6 +188,7 @@ Debug logs will show:
 ## Architecture Overview
 
 ### Tech Stack
+
 - **Remix 2.16.8** with React 18.2.0
 - **TypeScript** in strict mode for type safety
 - **Vite 6.0.0** for fast development and building
@@ -178,6 +197,7 @@ Debug logs will show:
 - **@pixiv/three-vrm** for VRM model support
 
 ### Key Features
+
 - **VRM Model Display**: VRM avatar character with full animation support
 - **React Native Bridge**: Bi-directional communication with mobile app
 - **Motion System**: 11+ predefined motions with real-time control
@@ -217,7 +237,8 @@ character/
 
 **Purpose**: Displays and controls the VRM avatar with full React Native communication.
 
-#### Key Features:
+#### Key Features
+
 - **Multi-stage Initialization**: DOM → VRM Core → Model → Bridge → Ready
 - **JavaScript Bridge**: Full bi-directional communication with React Native WebView
 - **Motion Control**: 11 predefined motions (Idle, Happy, Surprised, Shy, Wave, Dance, Laugh, Thinking, Speaking, Excited, Sleepy)
@@ -226,7 +247,8 @@ character/
 - **Debug Support**: Console logging and visual status panel
 - **Error Handling**: Comprehensive error reporting and recovery
 
-#### State Management:
+#### State Management
+
 ```typescript
 interface ReadinessState {
   domReady: boolean;         // DOM loaded
@@ -237,7 +259,8 @@ interface ReadinessState {
 }
 ```
 
-#### JavaScript Bridge API:
+#### JavaScript Bridge API
+
 ```typescript
 window.AvatarBridge = {
   playMotion: (motionName: string) => any;
@@ -249,8 +272,10 @@ window.AvatarBridge = {
 }
 ```
 
-#### Message Protocol:
+#### Message Protocol
+
 All communication uses structured JSON messages:
+
 ```typescript
 interface BridgeMessage {
   id: string;           // Unique message ID
@@ -261,7 +286,8 @@ interface BridgeMessage {
 }
 ```
 
-#### Supported Message Types:
+#### Supported Message Types
+
 - `domReady`: DOM initialization complete
 - `readinessUpdate`: Incremental state updates
 - `modelReady`: Full system ready
@@ -274,6 +300,7 @@ interface BridgeMessage {
 ## VRM Integration
 
 ### Model Configuration
+
 - **Character**: VRM avatar (兰兰)
 - **File**: `/assets/vrm/avatar/avatar.vrm`
 - **Scaling**: 0.12x (optimized for mobile display)
@@ -281,7 +308,9 @@ interface BridgeMessage {
 - **Parts Management**: Automatic arm visibility control
 
 ### Motion System
+
 Available motions mapped to emotions and actions:
+
 ```typescript
 const availableMotions = [
   'Idle',      // Default state
@@ -299,6 +328,7 @@ const availableMotions = [
 ```
 
 ### Performance Optimization
+
 - **Async Loading**: Non-blocking initialization
 - **Resource Management**: Proper cleanup on unmount
 - **Memory Efficiency**: Optimized PIXI application settings
@@ -307,12 +337,14 @@ const availableMotions = [
 ## React Native Integration
 
 ### Communication Flow
+
 1. **Initialization**: React Native WebView loads character app
 2. **Handshake**: WebView signals readiness to React Native
 3. **Bi-directional**: Both sides can send commands and receive responses
 4. **Heartbeat**: Regular status updates maintain connection health
 
 ### Network Configuration
+
 ```typescript
 // vite.config.ts
 server: {
@@ -322,6 +354,7 @@ server: {
 ```
 
 ### Development Setup
+
 - Server runs on `http://192.168.31.28:5174/` for mobile access
 - CORS enabled for cross-origin requests
 - Hot reload supported for development
@@ -329,7 +362,9 @@ server: {
 ## Debugging and Monitoring
 
 ### Console Logging
+
 Comprehensive logging system with emoji prefixes:
+
 - `🌟 [AvatarBridge]`: Bridge initialization
 - `🎭 [AvatarBridge]`: Motion execution
 - `💓 [Heartbeat]`: Status updates
@@ -337,7 +372,9 @@ Comprehensive logging system with emoji prefixes:
 - `🔍 [AvatarBridge]`: Status checks
 
 ### Visual Debug Panel
+
 Development-only status panel showing:
+
 - DOM Ready: ✓/⧗
 - VRM Ready: ✓/⧗  
 - Model Ready: ✓/⧗
@@ -346,6 +383,7 @@ Development-only status panel showing:
 - Load Times: XXXms
 
 ### Performance Metrics
+
 ```typescript
 interface PerformanceMetrics {
   domLoadTime: number;      // DOM ready time
@@ -358,11 +396,13 @@ interface PerformanceMetrics {
 ## Error Handling
 
 ### Initialization Errors
+
 - **Timeout Protection**: 10-second maximum wait for VRM libraries
 - **Graceful Degradation**: Error UI with retry options
 - **Detailed Reporting**: Specific error messages for debugging
 
 ### Runtime Errors
+
 - **Motion Failures**: Logged and reported to React Native
 - **Bridge Errors**: Automatic error reporting via message system
 - **Resource Cleanup**: Proper disposal of PIXI resources
@@ -370,18 +410,21 @@ interface PerformanceMetrics {
 ## Development Workflow
 
 ### Hot Reload Development
+
 1. Start development server: `npm run dev`
 2. Server accessible at `http://localhost:5174/` and `http://192.168.31.28:5174/`
 3. React Native WebView connects to network IP for testing
 4. Changes automatically reload in both browser and mobile app
 
 ### Testing
+
 - **Browser Testing**: Direct access via localhost for quick iteration
 - **Mobile Testing**: React Native WebView integration
 - **Debug Console**: All logs visible in browser developer tools
 - **Network Testing**: Verify mobile device connectivity
 
 ### Production Build
+
 ```bash
 npm run build        # Build optimized bundle
 npm start           # Start production server
@@ -390,6 +433,7 @@ npm start           # Start production server
 ## Recent Achievements
 
 ### 🎯 Completed Features
+
 - **Full VRM Integration**: VRM avatar with 11 motion types
 - **React Native Bridge**: Bi-directional communication system
 - **Multi-stage Initialization**: Robust loading sequence
@@ -399,6 +443,7 @@ npm start           # Start production server
 - **Interactive Controls**: Click/touch response system
 
 ### 🔧 Technical Improvements
+
 - **TypeScript Integration**: Full type safety with VRM types
 - **Modern Build System**: Vite 6.0 with optimized bundling
 - **Network Configuration**: Mobile-friendly development setup
@@ -406,6 +451,7 @@ npm start           # Start production server
 - **Memory Management**: Proper resource cleanup and disposal
 
 ### 📱 Mobile Optimization
+
 - **Network Accessibility**: Server binds to 0.0.0.0 for mobile access
 - **Touch Interaction**: Optimized for mobile touch events
 - **Performance**: Smooth 60fps rendering on mobile devices
@@ -414,6 +460,7 @@ npm start           # Start production server
 ## Integration Status
 
 ### EmoMate Integration: ✅ **Fully Functional**
+
 - React Native WebView successfully loads character app
 - Motion commands execute correctly
 - Status updates work reliably
@@ -421,6 +468,7 @@ npm start           # Start production server
 - Performance is smooth on mobile devices
 
 ### Communication Protocol: ✅ **Stable**
+
 - Message format standardized and tested
 - Bi-directional communication working
 - Error recovery mechanisms in place
@@ -429,24 +477,28 @@ npm start           # Start production server
 ## Development Guidelines
 
 ### Adding New Motions
+
 1. Add motion name to `availableMotions` array
 2. Ensure motion exists in VRM avatar model files
 3. Test motion execution via React Native interface
 4. Update documentation with new motion
 
 ### Modifying Bridge API
+
 1. Update `AvatarBridge` interface definition
 2. Implement new methods in `setupJavaScriptBridge()`
 3. Add corresponding message handlers
 4. Update React Native side to handle new messages
 
 ### Performance Optimization
+
 1. Monitor `performanceMetrics` for initialization times
 2. Use browser developer tools for runtime profiling
 3. Test on actual mobile devices for real-world performance
 4. Optimize PIXI application settings as needed
 
 ### Debugging Issues
+
 1. Check browser console for detailed logs
 2. Verify React Native logs for communication issues
 3. Use debug status panel for visual state confirmation

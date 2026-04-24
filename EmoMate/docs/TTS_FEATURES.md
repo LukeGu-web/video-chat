@@ -18,6 +18,7 @@ EmoMate 的 TTS 系统实现了**并行合成 + 顺序播放**的流水线：AI 
 **类型层**（`src/types/speak/`）：集中管理所有 TTS 相关的 TypeScript 类型，包含通用类型、Provider 接口、缓存接口、队列接口。
 
 **Provider 层**：两个实现：
+
 - `ElevenLabsProvider` — 主用，高质量网络 TTS
 - `ExpoSpeechProvider` — 后备，设备本地 TTS
 
@@ -32,6 +33,7 @@ EmoMate 的 TTS 系统实现了**并行合成 + 顺序播放**的流水线：AI 
 流程：AI 流式响应 → `sentenceDetector` 实时切句 → `TTSQueue.enqueue()` 入队 → 最多 2 个并发合成任务 → 音频文件就绪后顺序播放。
 
 关键参数：
+
 - 最多 2 个并发合成（避免触发 ElevenLabs rate limit）
 - 失败自动重试，最多 3 次，间隔 1 秒
 - 支持 `cancel()`（用户打断时立即停止）
@@ -65,6 +67,7 @@ EmoMate 的 TTS 系统实现了**并行合成 + 顺序播放**的流水线：AI 
 ## 音频会话配置
 
 启动时通过 `expo-audio` 的 `setAudioModeAsync` 配置：
+
 - `playsInSilentMode: true` — 静音模式下仍可播放
 - `allowsRecording: false` — 初始关闭录音以确保扬声器输出
 - `shouldPlayInBackground: true` — 后台可继续播放

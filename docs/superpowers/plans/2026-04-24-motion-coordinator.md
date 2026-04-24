@@ -32,6 +32,7 @@
 ## Task 1: Extend Types
 
 **Files:**
+
 - Modify: `EmoMate/src/types/speak/common.ts`
 - Modify: `EmoMate/src/types/vrm.ts`
 
@@ -89,6 +90,7 @@ git commit -m "feat: extend types for MotionCoordinator (animationHint, playVRMA
 ## Task 2: Create MotionCoordinator
 
 **Files:**
+
 - Create: `EmoMate/src/capabilities/motion/MotionCoordinator.ts`
 - Modify: `EmoMate/src/capabilities/motion/index.ts`
 
@@ -374,6 +376,7 @@ git commit -m "feat: add MotionCoordinator state machine"
 ## Task 3: Update `parseVRMAction` to High-Level Format
 
 **Files:**
+
 - Modify: `EmoMate/src/utils/parseVRMAction.ts`
 
 The current function returns `{ action: VRMActionPayload | null, cleanText, hasPartialTag }`. We replace `action` with `intent: ActionIntent | null`.
@@ -461,9 +464,11 @@ void intent;
 ```
 
 Also update the `xhr.onload` section. Find:
+
 ```typescript
 const { cleanText: cleanFinal } = parseVRMAction(partialSentence.trim());
 ```
+
 This destructuring is already compatible with the new return type — no change needed.
 
 - [ ] **Step 3: Verify TypeScript**
@@ -486,6 +491,7 @@ git commit -m "feat: parseVRMAction now returns high-level ActionIntent"
 ## Task 4: Wire CharacterAvatar to MotionCoordinator
 
 **Files:**
+
 - Modify: `EmoMate/src/components/CharacterAvatar.tsx`
 
 Replace the `lipSyncBridge.register` call and all motion-dispatching logic with a single `motionCoordinator.register` call. The coordinator now owns all command decisions.
@@ -585,6 +591,7 @@ git commit -m "feat: CharacterAvatar registers motionCoordinator handler"
 ## Task 5: Refactor EmotionAwareCharacter
 
 **Files:**
+
 - Modify: `EmoMate/src/components/EmotionAwareCharacter.tsx`
 
 Remove all `selectMotion` / `returnToIdleTimer` logic. Route camera emotion and AI thinking state directly to the coordinator.
@@ -667,6 +674,7 @@ git commit -m "refactor: EmotionAwareCharacter routes signals to motionCoordinat
 ## Task 6: Wire `useChatAI` to Coordinator
 
 **Files:**
+
 - Modify: `EmoMate/src/hooks/useChatAI.ts`
 
 Replace the `lipSyncBridge` calls with `motionCoordinator` calls. Add `pendingHint` logic to attach `animationHint` to the next TTS sentence. Fix the broken `setTextEmotion` link.
@@ -753,6 +761,7 @@ onSentence: (sentence: string, options?: TTSSynthesisOptions) => void
 ```
 
 Add the import at the top of `useChatAI.ts` if not already present:
+
 ```typescript
 import { TTSSynthesisOptions } from '../types/speak';
 ```
@@ -815,6 +824,7 @@ git commit -m "feat: useChatAI dispatches to motionCoordinator, passes animation
 ## Task 7: Wire TTSQueue Callbacks to Coordinator
 
 **Files:**
+
 - Modify: `EmoMate/src/capabilities/speak/hooks/useTTSQueue.ts`
 
 - [ ] **Step 1: Add coordinator import**
@@ -909,6 +919,7 @@ git commit -m "feat: useTTSQueue notifies motionCoordinator on item start/end/ca
 ## Task 8: Update AI Prompt
 
 **Files:**
+
 - Modify: `EmoMate/src/constants/ai.ts`
 
 - [ ] **Step 1: Find the action format instruction block**
@@ -954,6 +965,7 @@ git commit -m "feat: update AI prompt to use high-level emotion <action> format"
 ## Task 9: ExpressionController Priority Guard + VRMA Stub
 
 **Files:**
+
 - Modify: `character/app/components/ExpressionController.tsx`
 
 - [ ] **Step 1: Add priority constants and state ref**
@@ -1034,6 +1046,7 @@ git commit -m "feat: ExpressionController priority guard + playVRMA stub"
 ## Task 10: Remove `lipSyncBridge`
 
 **Files:**
+
 - Delete: `EmoMate/src/capabilities/speak/lipSyncBridge.ts`
 - Modify: any file still importing it
 
@@ -1079,6 +1092,7 @@ Start character server (`cd character && npm run dev`) and EmoMate (`cd EmoMate 
 Say: "你好"
 
 Expected sequence in character WebView:
+
 1. AI thinking → Thinking animation
 2. TTS starts → Speaking animation
 3. TTS ends → Idle
@@ -1088,6 +1102,7 @@ Expected sequence in character WebView:
 Say: "哈哈，你也笑一下"
 
 Expected:
+
 1. AI thinking → Thinking
 2. TTS plays "哈哈哈！" → Laugh animation (NOT Speaking)
 3. TTS plays remainder → Speaking animation
@@ -1099,6 +1114,7 @@ Expected:
 Keep app silent for 10 seconds (character should be in Idle). Smile visibly at camera.
 
 Expected:
+
 1. Camera detects joy → Happy preset plays briefly
 2. Returns to Idle after ~4s
 3. If you then speak, Happy is ignored (non-idle state)
@@ -1106,6 +1122,7 @@ Expected:
 - [ ] **Scenario D — Thinking interrupts emotion**
 
 Ask a long question. Observe:
+
 1. AI starts thinking → Thinking animation fires immediately, regardless of prior state
 
 - [ ] **Commit final status**

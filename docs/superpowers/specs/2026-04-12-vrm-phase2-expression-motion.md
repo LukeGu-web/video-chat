@@ -11,6 +11,7 @@
 VRM 模型内置两类可编程参数：
 
 ### Blend Shapes（表情权重，0.0 ~ 1.0）
+
 | 名称 | 含义 |
 |------|------|
 | `joy` | 开心 |
@@ -24,6 +25,7 @@ VRM 模型内置两类可编程参数：
 | `a` `e` `i` `o` `u` | 口型（Phase 3 使用） |
 
 ### 骨骼（VRM HumanoidBone 标准名）
+
 ```
 头部：  head, neck, spine, chest, upperChest
 手臂：  leftUpperArm, leftLowerArm, leftHand
@@ -62,6 +64,7 @@ VRM 模型内置两类可编程参数：
 ### EmoMate → WebView
 
 **1. 播放预设动作**
+
 ```typescript
 {
   type: 'playPreset',
@@ -73,6 +76,7 @@ VRM 模型内置两类可编程参数：
 ```
 
 **2. 设置表情（Blend Shapes）**
+
 ```typescript
 {
   type: 'setExpression',
@@ -91,6 +95,7 @@ VRM 模型内置两类可编程参数：
 ```
 
 **3. 执行一次性骨骼姿态**
+
 ```typescript
 {
   type: 'playPose',
@@ -106,6 +111,7 @@ VRM 模型内置两类可编程参数：
 ```
 
 **4. 停止所有动作，回到 idle**
+
 ```typescript
 { type: 'stopAll' }
 ```
@@ -117,6 +123,7 @@ VRM 模型内置两类可编程参数：
 ### ExpressionController.tsx
 
 React Three Fiber 内的控制组件，职责：
+
 - 接收 bridge 消息，解析动作指令
 - 管理当前表情状态，带过渡插值（lerp）
 - 管理骨骼旋转状态，带 easing 动画
@@ -126,6 +133,7 @@ React Three Fiber 内的控制组件，职责：
 ### 过渡动画
 
 所有表情/姿态变化使用线性插值（lerp），避免突变：
+
 ```
 当前值 → 目标值，在 duration 时间内平滑过渡
 ```

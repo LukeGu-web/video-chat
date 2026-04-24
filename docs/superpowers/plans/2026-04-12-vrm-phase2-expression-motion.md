@@ -13,6 +13,7 @@
 ## Task 1: Create Shared VRM Types
 
 **Files:**
+
 - Create: `character/app/types/vrm-bridge.ts`
 
 - [ ] **Step 1: Create the types file**
@@ -92,6 +93,7 @@ git commit -m "feat: add VRM bridge type definitions"
 ## Task 2: Create Motion Presets
 
 **Files:**
+
 - Create: `character/app/components/motionPresets.ts`
 
 - [ ] **Step 1: Create the presets file**
@@ -256,6 +258,7 @@ git commit -m "feat: add VRM motion presets (idle, wave, thinking, etc.)"
 ## Task 3: Create ExpressionController Component
 
 **Files:**
+
 - Create: `character/app/components/ExpressionController.tsx`
 
 - [ ] **Step 1: Create the controller**
@@ -560,6 +563,7 @@ git commit -m "feat: add ExpressionController with blend shapes, bones, presets"
 ## Task 4: Wire ExpressionController into VRMAvatar
 
 **Files:**
+
 - Modify: `character/app/components/VRMAvatar.tsx`
 
 - [ ] **Step 1: Add ExpressionController to VRMScene**
@@ -593,6 +597,7 @@ function VRMScene({ modelPath, onReady, onError }: VRMSceneProps) {
 ```
 
 Also add `useState` to imports:
+
 ```tsx
 import { useEffect, useRef, useState } from 'react';
 ```
@@ -602,6 +607,7 @@ import { useEffect, useRef, useState } from 'react';
 In `VRMAvatar.tsx`, after `ExpressionController` is rendered, it will automatically start idle from the message in its own `useEffect`. But we need to post the initial `playPreset idle` message after VRM is ready.
 
 In `handleReady` inside `VRMAvatar`, add:
+
 ```tsx
 const handleReady = (vrm: VRM) => {
   vrmRef.current = vrm;
@@ -641,6 +647,7 @@ git commit -m "feat: wire ExpressionController into VRMAvatar, start idle on rea
 ## Task 5: Update motionMapper in EmoMate
 
 **Files:**
+
 - Modify: `EmoMate/src/capabilities/motion/motionMapper.ts`
 
 - [ ] **Step 1: Add VRM command types to EmoMate**
@@ -787,6 +794,7 @@ git commit -m "feat: add emotionToVRMCommands to motionMapper"
 ## Task 6: Update HiyoriWebView Bridge
 
 **Files:**
+
 - Modify: `EmoMate/src/components/HiyoriWebView.tsx`
 
 - [ ] **Step 1: Add helper to send VRM commands**
@@ -811,6 +819,7 @@ React.useImperativeHandle(ref, () => ({
 - [ ] **Step 2: Export sendVRMCommand in the ref interface**
 
 Find the `HiyoriBridge` interface and add:
+
 ```typescript
 interface HiyoriBridge {
   playMotion: (motionName: string) => void;
@@ -833,6 +842,7 @@ git commit -m "feat: add sendVRMCommand to HiyoriWebView bridge"
 ## Task 7: Connect Emotion Detection to VRM Commands
 
 **Files:**
+
 - Modify: `EmoMate/src/screens/HomeScreen.tsx` (or wherever `motionMapper` is called)
 
 - [ ] **Step 1: Find where Live2D motions are triggered**

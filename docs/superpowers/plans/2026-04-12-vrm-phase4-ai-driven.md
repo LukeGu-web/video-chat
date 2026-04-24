@@ -25,6 +25,7 @@
 ## Task 1: VRM Parameter Manual Constant
 
 **Files:**
+
 - Create: `EmoMate/src/constants/vrmSchema.ts`
 
 - [ ] **Step 1: Create the file**
@@ -81,6 +82,7 @@ git commit -m "feat: add VRM parameter manual for Claude system prompt"
 ## Task 2: Inject Manual into buildAIContext
 
 **Files:**
+
 - Modify: `EmoMate/src/hooks/ai/buildAIContext.ts`
 
 - [ ] **Step 1: Add import**
@@ -123,6 +125,7 @@ git commit -m "feat: inject VRM parameter manual into Claude system prompt"
 ## Task 3: Create parseVRMAction Utility
 
 **Files:**
+
 - Create: `EmoMate/src/utils/parseVRMAction.ts`
 
 - [ ] **Step 1: Create the file**
@@ -266,6 +269,7 @@ git commit -m "feat: add parseVRMAction utility with bounds clamping"
 ## Task 4: Wire Action Parsing into Streaming (useChatAI)
 
 **Files:**
+
 - Modify: `EmoMate/src/hooks/useChatAI.ts`
 
 The existing streaming loop accumulates text in `partialSentence` and calls `stripActionDescriptions` (strips `(括号)`) before `onSentence`. We need to also handle `<action>` tags. The key constraint: **`<action>` can span across sentence boundaries**, so we maintain a separate `rawBuffer` that accumulates all raw text.
@@ -473,6 +477,7 @@ git commit -m "feat: parse VRM <action> tags during streaming, dispatch via lipS
 ## Task 5: Bone Clamping + Auto-Return-to-Idle in ExpressionController
 
 **Files:**
+
 - Modify: `character/app/components/ExpressionController.tsx`
 
 The existing `playPose` handler (line 179) already applies blend shapes and bones, but doesn't clamp bone values and never restores idle after the pose finishes.

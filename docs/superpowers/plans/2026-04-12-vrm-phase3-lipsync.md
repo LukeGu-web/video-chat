@@ -5,6 +5,7 @@
 **Goal:** Make the character's mouth move in sync with TTS audio. Uses text-driven viseme timing — no changes to expo-av or TTSQueue internals. EmoMate converts the spoken text to a timed viseme sequence and sends it to the WebView; `LipSyncController` plays the sequence frame-by-frame via `useFrame`.
 
 **Architecture:**
+
 1. When TTSQueue starts playing an item (`onItemStart`), EmoMate calls `textToViseme(item.text)` to get `{ shape, time }[]`
 2. `sendVRMCommand({ type: 'playVisemes', data: { visemes, totalDuration } })` is called
 3. WebView's `LipSyncController` receives the sequence and drives VRM mouth blend shapes on a timeline
@@ -18,6 +19,7 @@
 ## Task 1: Extend bridge types for viseme commands
 
 **Files:**
+
 - Modify: `character/app/types/vrm-bridge.ts`
 - Modify: `EmoMate/src/types/vrm.ts`
 
@@ -61,6 +63,7 @@ git commit -m "feat: add playVisemes/stopVisemes bridge types"
 ## Task 2: Create textToViseme utility in EmoMate
 
 **Files:**
+
 - Create: `EmoMate/src/capabilities/speak/textToViseme.ts`
 
 Convert spoken text to a timed viseme sequence without any external package.
@@ -173,6 +176,7 @@ git commit -m "feat: add text-to-viseme converter for Chinese TTS lip sync"
 ## Task 3: Create LipSyncController in character/
 
 **Files:**
+
 - Create: `character/app/components/LipSyncController.tsx`
 
 Listens for `playVisemes` / `stopVisemes` bridge messages and drives VRM blend shapes each frame.
@@ -336,6 +340,7 @@ git commit -m "feat: add LipSyncController for text-driven viseme playback"
 ## Task 4: Wire LipSyncController into VRMAvatar
 
 **Files:**
+
 - Modify: `character/app/components/VRMAvatar.tsx`
 
 `LipSyncController` runs inside the Canvas alongside `ExpressionController`, requires a loaded `VRM` instance.
@@ -375,6 +380,7 @@ git commit -m "feat: render LipSyncController inside VRMAvatar Canvas"
 ## Task 5: Wire TTSQueue callbacks → sendVRMCommand in EmoMate
 
 **Files:**
+
 - Modify: `EmoMate/src/components/HiyoriWebView.tsx`
 - Modify: `character/app/components/LipSyncController.tsx`
 - Modify: `character/app/types/vrm-bridge.ts` + `EmoMate/src/types/vrm.ts`
@@ -382,6 +388,7 @@ git commit -m "feat: render LipSyncController inside VRMAvatar Canvas"
 TTSQueue already calls `config.onItemStart(item)` and `config.onItemEnd(item)`. We hook there — zero changes to TTSQueue.ts.
 
 **Timing strategy:** Use two-phase approach to eliminate the WebView bridge latency (~100–300ms) between `onItemStart` and actual audio playback start:
+
 1. `onItemStart` → send `prepareVisemes` (WebView stores sequence, does NOT start)
 2. WebView's own Web Audio `onstart` event → self-trigger `startTime = performance.now()` and begin playback
 
@@ -390,6 +397,7 @@ This ensures viseme timing origin = audio playback origin.
 - [ ] **Step 1: Read HiyoriWebView.tsx first**
 
 Read the full file. Find:
+
 1. Where `sendVRMCommand` is defined/used
 2. Where TTSQueue config is passed (look for `onItemStart`, `onItemEnd`, or where TTSQueue is instantiated/configured)
 3. How the component receives or references the TTSQueue instance
@@ -500,6 +508,7 @@ git commit -m "feat: drive lip sync via prepareVisemes + lipSyncStart for zero-l
 ## Task 6: Handle cancel case — close mouth on TTS cancel
 
 **Files:**
+
 - Modify: whichever file(s) call `ttsQueue.cancel()` (find by searching for `.cancel()`)
 
 `TTSQueue.cancel()` marks items as `failed` without calling `onItemEnd`, so the mouth stays open. Fix by sending `stopVisemes` at every cancel call site.

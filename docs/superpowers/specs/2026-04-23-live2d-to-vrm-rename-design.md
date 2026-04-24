@@ -94,34 +94,42 @@
 ## 执行顺序（由内到外，TypeScript 引导）
 
 ### Step 1 — 核心类型层
+
 - `useAIStatus.ts`：`HiyoriMotion` → `AvatarMotion`
 - `monitor.ts`：`Live2DStatus` → `AvatarStatus`，`live2dSystem` → `avatarSystem`
 
 ### Step 2 — Store 层
+
 - `index.ts`：更新导出
 - `monitorStore.ts`：函数名、state key
 
 ### Step 3 — 能力 / 常量层
+
 - `motionMapper.ts`：类型名、函数名
 - `ai.ts`、`personality.ts`：注释和配置值
 
 ### Step 4 — 组件层
+
 - 重命名 `HiyoriWebView.tsx` → `CharacterWebView.tsx`，更新内部引用
 - 重命名 `Live2DCharacter.tsx` → `CharacterAvatar.tsx`，更新内部引用
 - `EmotionAwareCharacter.tsx`、`FunctionMonitor.tsx`、`HomeScreen.tsx`：import + 引用
 - `components/index.ts`：导出路径
 
 ### Step 5 — 配置层
+
 - `app.config.ts`：`hiyoriViewUrl` → `characterViewUrl`
 - `fishAudioAPI.ts`：注释
 
 ### Step 6 — 文档层
+
 - 更新 3 个 CLAUDE.md
 
 ### Step 7 — 清理
+
 - 删除 3 个遗留文档
 
 ### 验证节点
+
 每步完成后运行 `npx tsc --noEmit`（在 EmoMate 目录）。Step 4 完成后应达到零 TypeScript 错误。
 
 ## 不在范围内

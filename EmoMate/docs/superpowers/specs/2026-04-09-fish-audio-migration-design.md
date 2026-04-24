@@ -21,10 +21,12 @@ Swap the ElevenLabs TTS provider for Fish Audio with minimal architectural chang
 ## File Changes
 
 ### New Files
+
 - `src/capabilities/speak/fishAudioAPI.ts` — Fish Audio REST call (replaces `elevenLabsAPI.ts`)
 - `src/capabilities/speak/providers/FishAudioProvider.ts` — implements `TTSProvider` interface (replaces `ElevenLabsProvider.ts`)
 
 ### Modified Files
+
 - `src/capabilities/speak/queue/TTSQueue.ts` — replace `ElevenLabsProvider` import/usage with `FishAudioProvider`
 - `src/constants/ai.ts`:
   - Replace `ELEVENLABS_CONFIG` with `FISH_AUDIO_CONFIG` (new shape defined below)
@@ -37,10 +39,12 @@ Swap the ElevenLabs TTS provider for Fish Audio with minimal architectural chang
 - `app.config.ts` — replace `elevenLabsApiKey` extra field with `fishAudioApiKey`
 
 ### Deleted Files
+
 - `src/capabilities/speak/elevenLabsAPI.ts`
 - `src/capabilities/speak/providers/ElevenLabsProvider.ts`
 
 ### Environment Variables
+
 - Remove: `ELEVENLABS_API_KEY`
 - Add: `FISH_AUDIO_API_KEY`
 
@@ -122,6 +126,7 @@ export const FISH_AUDIO_CONFIG = {
 ## FishAudioProvider
 
 Implements `TTSProvider` interface identically to `ElevenLabsProvider`:
+
 - `name = 'fishaudio'`
 - `isAvailable()` — checks `getFishAudioApiKey()`
 - `synthesize()` — delegates to `fishAudioAPI.ts`
@@ -146,6 +151,7 @@ constructor(...) { this.provider = provider || new FishAudioProvider(); }
 ## Error Handling
 
 Fish Audio returns standard HTTP errors. The existing error handling pattern in `elevenLabsAPI.ts` (read response blob as text for error message) applies unchanged. Map HTTP status codes to meaningful errors:
+
 - `401` — invalid API key
 - `402` — quota exceeded
 - `429` — rate limit

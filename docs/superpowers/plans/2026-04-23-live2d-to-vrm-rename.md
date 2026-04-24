@@ -41,6 +41,7 @@
 ## Task 1: 核心类型层 — useAIStatus.ts
 
 **Files:**
+
 - Modify: `EmoMate/src/store/useAIStatus.ts`
 
 - [ ] **Step 1: 重命名 HiyoriMotion → AvatarMotion**
@@ -92,6 +93,7 @@
 ## Task 2: 核心类型层 — monitor.ts
 
 **Files:**
+
 - Modify: `EmoMate/src/types/monitor.ts`
 
 - [ ] **Step 1: 更新 monitor.ts 中的类型名和字段名**
@@ -143,6 +145,7 @@
 ## Task 3: Store 层 — index.ts + monitorStore.ts
 
 **Files:**
+
 - Modify: `EmoMate/src/store/index.ts`
 - Modify: `EmoMate/src/store/monitorStore.ts`
 
@@ -208,6 +211,7 @@
 ## Task 4: 能力层 — motionMapper.ts
 
 **Files:**
+
 - Modify: `EmoMate/src/capabilities/motion/motionMapper.ts`
 
 - [ ] **Step 1: 更新文件头注释**
@@ -289,6 +293,7 @@
 ## Task 5: 常量层 — ai.ts + personality.ts
 
 **Files:**
+
 - Modify: `EmoMate/src/constants/ai.ts`
 - Modify: `EmoMate/src/constants/personality.ts`
 
@@ -326,6 +331,7 @@
 ## Task 6: 组件层 — 重命名 HiyoriWebView → CharacterWebView
 
 **Files:**
+
 - Rename + Modify: `EmoMate/src/components/HiyoriWebView.tsx` → `CharacterWebView.tsx`
 
 - [ ] **Step 1: 用 git mv 重命名文件**
@@ -367,9 +373,11 @@
   ```
 
   > **注意**：web 侧 JavaScript 代码 `window.HiyoriBridge` 也存在于 character 项目的 `VRMAvatar.tsx`，但 character 端已改为 VRM，检查一下是否还有 `HiyoriBridge` 字符串：
+>
   > ```bash
   > grep -n "HiyoriBridge" /Users/yaonangu/Local_doc/GitHub/video-chat/character/app/components/VRMAvatar.tsx | head -5
   > ```
+>
   > 如果有，保持 character 端不变（本次不改 character 端代码）；EmoMate 端注入的 JS bridge 名改为 `AvatarBridge`，同时 character 端的 VRMAvatar.tsx 需要在下一个任务之外单独确认是否也用了这个字符串。
 
 - [ ] **Step 3: 暂存**
@@ -383,6 +391,7 @@
 ## Task 7: 组件层 — 重命名 Live2DCharacter → CharacterAvatar
 
 **Files:**
+
 - Rename + Modify: `EmoMate/src/components/Live2DCharacter.tsx` → `CharacterAvatar.tsx`
 
 - [ ] **Step 1: 用 git mv 重命名文件**
@@ -441,6 +450,7 @@
 ## Task 8: 消费方组件更新
 
 **Files:**
+
 - Modify: `EmoMate/src/components/EmotionAwareCharacter.tsx`
 - Modify: `EmoMate/src/components/FunctionMonitor.tsx`
 - Modify: `EmoMate/src/components/index.ts`
@@ -505,6 +515,7 @@
 - [ ] **Step 4: 更新 HomeScreen.tsx**
 
   搜索并替换 JSX 注释：
+
   ```tsx
   {/* Live2D Character */}  →  {/* Avatar Character */}
   ```
@@ -530,6 +541,7 @@
 ## Task 9: 配置层 — app.config.ts + fishAudioAPI.ts
 
 **Files:**
+
 - Modify: `EmoMate/app.config.ts`
 - Modify: `EmoMate/src/capabilities/speak/fishAudioAPI.ts`
 
@@ -545,6 +557,7 @@
 - [ ] **Step 2: 更新 fishAudioAPI.ts 注释**
 
   找到 "future Live2D integration" 注释行，改为：
+
   ```typescript
   // annotate intended animations/expressions for future avatar integration.
   ```
@@ -569,6 +582,7 @@
 ## Task 10: 文档更新 — 三个 CLAUDE.md
 
 **Files:**
+
 - Modify: `CLAUDE.md`（根目录）
 - Modify: `EmoMate/CLAUDE.md`
 - Modify: `character/CLAUDE.md`
@@ -596,11 +610,13 @@
   ```
 
   同时更新 "Current Development Status" 中 Live2D 相关条目，改为：
+
   ```
   - **VRM Character System**: ✅ VRM avatar (兰兰) with motion + lip sync support
   ```
 
   更新 Tech Stack 中的 character 项目描述：
+
   ```
   - Three.js + @pixiv/three-vrm for VRM rendering (replaces PIXI.js + Live2D)
   ```
@@ -636,6 +652,7 @@
   ```
 
   同时更新项目结构树，将 `HiyoriLive2D.tsx`、`ShizukuLive2D.tsx`、`live2d.d.ts`、`live2d/` 改为：
+
   ```
   VRMAvatar.tsx
   ExpressionController.tsx
@@ -655,6 +672,7 @@
 ## Task 11: 删除遗留 Live2D 文档
 
 **Files:**
+
 - Delete: `EmoMate/docs/LIVE2D.md`
 - Delete: `character/hiyori_bridge_documentation.md`
 - Delete: `character/SHIZUKU_MODEL_ANALYSIS.md`

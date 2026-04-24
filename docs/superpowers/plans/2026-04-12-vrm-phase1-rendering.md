@@ -14,7 +14,7 @@
 
 Before starting any code task:
 
-- [ ] Go to https://hub.vroid.com/en/characters/7443348617497937928/models/6730821026004308050
+- [ ] Go to <https://hub.vroid.com/en/characters/7443348617497937928/models/6730821026004308050>
 - [ ] Log in with pixiv account → click "Use this model" → Download `.vrm` file
 - [ ] Place the file at: `character/public/assets/vrm/girl_c.vrm`
 - [ ] Verify the file exists: `ls character/public/assets/vrm/girl_c.vrm`
@@ -24,6 +24,7 @@ Before starting any code task:
 ## Task 1: Update Dependencies
 
 **Files:**
+
 - Modify: `character/package.json`
 
 - [ ] **Step 1: Remove old dependencies, add new ones**
@@ -42,6 +43,7 @@ cat package.json | grep -E "three|react-three|pixiv"
 ```
 
 Expected output includes:
+
 ```
 "three": "...",
 "@react-three/fiber": "...",
@@ -62,6 +64,7 @@ git commit -m "chore: replace pixi/live2d deps with three-vrm stack"
 ## Task 2: Remove Live2D Scripts from root.tsx
 
 **Files:**
+
 - Modify: `character/app/root.tsx`
 
 - [ ] **Step 1: Remove the two Live2D script tags**
@@ -98,6 +101,7 @@ git commit -m "chore: remove Live2D CDN scripts from root"
 ## Task 3: Create VRMAvatar Component
 
 **Files:**
+
 - Create: `character/app/components/VRMAvatar.tsx`
 - Delete: `character/app/components/HiyoriLive2D.tsx` (after Task 4)
 
@@ -302,6 +306,7 @@ git commit -m "feat: add VRMAvatar component with three-vrm rendering"
 ## Task 4: Update Route to Use VRMAvatar
 
 **Files:**
+
 - Modify: `character/app/routes/_index.tsx`
 
 - [ ] **Step 1: Replace HiyoriLive2D with VRMAvatar**
@@ -381,6 +386,7 @@ npm run dev
 ```
 
 Expected output:
+
 ```
   ➜  Local:   http://localhost:5174/
   ➜  Network: http://192.168.x.x:5174/
@@ -389,6 +395,7 @@ Expected output:
 - [ ] **Step 2: Open browser and check**
 
 Open `http://localhost:5174/` in Chrome. Verify:
+
 - Girl C character is visible
 - Background is transparent (checkerboard in browser dev, transparent in WebView)
 - No red error screen
@@ -397,6 +404,7 @@ Open `http://localhost:5174/` in Chrome. Verify:
 - [ ] **Step 3: Check bridge message**
 
 In Chrome DevTools Console, run:
+
 ```javascript
 // Simulate what React Native does — check that vrmReady fires
 window.ReactNativeWebView = { postMessage: (m) => console.log('Bridge:', JSON.parse(m)) };
@@ -404,6 +412,7 @@ location.reload();
 ```
 
 After reload, you should see in the console:
+
 ```
 Bridge: { id: "msg_...", type: "vrmReady", data: { modelName: "girl_c.vrm" }, ... }
 ```
@@ -417,6 +426,7 @@ In the browser, try tilting your screen or scrolling — if the model's hair mov
 ## Task 6: Update EmoMate Bridge Handler
 
 **Files:**
+
 - Modify: `EmoMate/src/components/HiyoriWebView.tsx`
 
 The existing bridge handler in `HiyoriWebView.tsx` handles `modelReady` messages. We need to also accept `vrmReady` so EmoMate knows the new model is loaded.

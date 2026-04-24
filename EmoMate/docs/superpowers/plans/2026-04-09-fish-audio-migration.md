@@ -29,11 +29,13 @@
 ## Task 1: Update environment config
 
 **Files:**
+
 - Modify: `app.config.ts:81`
 
 - [ ] **Step 1: Replace ElevenLabs key with Fish Audio key in `app.config.ts`**
 
 In `app.config.ts`, replace line 81:
+
 ```typescript
 // Before
 elevenLabsApiKey: process.env.ELEVENLABS_API_KEY,
@@ -45,6 +47,7 @@ fishAudioApiKey: process.env.FISH_AUDIO_API_KEY,
 - [ ] **Step 2: Update `.env` file**
 
 In your `.env` file (or equivalent), remove the old key and add the new one:
+
 ```
 # Remove this line:
 ELEVENLABS_API_KEY=...
@@ -65,6 +68,7 @@ git commit -m "config: replace ElevenLabs API key with Fish Audio API key"
 ## Task 2: Update `constants/ai.ts`
 
 **Files:**
+
 - Modify: `src/constants/ai.ts`
 
 This task has several sub-steps. Make all changes to `ai.ts` before committing.
@@ -72,6 +76,7 @@ This task has several sub-steps. Make all changes to `ai.ts` before committing.
 - [ ] **Step 1: Add `getFishAudioApiKey()` after `getClaudeApiKey()` (line ~33)**
 
 Replace the existing `getElevenLabsApiKey` function (lines 35-38):
+
 ```typescript
 // Remove this:
 // 获取 ElevenLabs API Key
@@ -89,6 +94,7 @@ export const getFishAudioApiKey = (): string | undefined => {
 - [ ] **Step 2: Replace `ELEVENLABS_CONFIG` with `FISH_AUDIO_CONFIG` (line ~381)**
 
 Remove the entire `ELEVENLABS_CONFIG` block (lines 380–467) and replace with:
+
 ```typescript
 // Fish Audio configuration - optimized for 兰兰 (gentle older sister)
 export const FISH_AUDIO_CONFIG = {
@@ -121,6 +127,7 @@ export const FISH_AUDIO_CONFIG = {
 - [ ] **Step 3: Update `getAICapabilities()` (line ~486–504)**
 
 Replace the two changed lines inside `getAICapabilities()`:
+
 ```typescript
 // Before
 const elevenLabsApiKey = getElevenLabsApiKey();
@@ -138,6 +145,7 @@ const fishAudioApiKey = getFishAudioApiKey();
 - [ ] **Step 4: Remove deleted helper functions**
 
 Delete these three functions from `ai.ts` (they were only used by `elevenLabsAPI.ts`):
+
 - `getLanLanVoiceId()` (line ~770)
 - `getEmotionalVoiceSettings()` (line ~739)
 - `preprocessTextForNaturalSpeech()` (line ~775)
@@ -145,6 +153,7 @@ Delete these three functions from `ai.ts` (they were only used by `elevenLabsAPI
 - [ ] **Step 5: Update `VOICE_CONFIG` export (line ~1288)**
 
 Replace the entire `VOICE_CONFIG` block with:
+
 ```typescript
 // Export voice config for external access
 export const VOICE_CONFIG = {
@@ -172,11 +181,13 @@ git commit -m "refactor(ai): replace ELEVENLABS_CONFIG with FISH_AUDIO_CONFIG"
 ## Task 3: Update TTS provider type
 
 **Files:**
+
 - Modify: `src/types/speak/common.ts:6`
 
 - [ ] **Step 1: Change `TTSProviderType`**
 
 In `src/types/speak/common.ts`, replace line 6:
+
 ```typescript
 // Before
 export type TTSProviderType = 'expo' | 'elevenlabs';
@@ -197,11 +208,13 @@ git commit -m "types: update TTSProviderType to fishaudio"
 ## Task 4: Create `fishAudioAPI.ts`
 
 **Files:**
+
 - Create: `src/capabilities/speak/fishAudioAPI.ts`
 
 - [ ] **Step 1: Create the file**
 
 Create `src/capabilities/speak/fishAudioAPI.ts` with this content:
+
 ```typescript
 // src/capabilities/speak/fishAudioAPI.ts
 
@@ -339,11 +352,13 @@ git commit -m "feat(speak): add Fish Audio API synthesis function"
 ## Task 5: Create `FishAudioProvider.ts`
 
 **Files:**
+
 - Create: `src/capabilities/speak/providers/FishAudioProvider.ts`
 
 - [ ] **Step 1: Create the file**
 
 Create `src/capabilities/speak/providers/FishAudioProvider.ts` with this content:
+
 ```typescript
 // src/capabilities/speak/providers/FishAudioProvider.ts
 
@@ -479,6 +494,7 @@ git commit -m "feat(speak): add FishAudioProvider implementing TTSProvider inter
 ## Task 6: Update `TTSQueue.ts`
 
 **Files:**
+
 - Modify: `src/capabilities/speak/queue/TTSQueue.ts`
 
 - [ ] **Step 1: Swap import and type**
@@ -506,6 +522,7 @@ this.provider = provider || new FishAudioProvider();
 ```
 
 Also update the constructor parameter type on line ~29:
+
 ```typescript
 // Before:
 constructor(
@@ -533,6 +550,7 @@ git commit -m "refactor(speak): swap ElevenLabsProvider for FishAudioProvider in
 ## Task 7: Update barrel export and delete old files
 
 **Files:**
+
 - Modify: `src/capabilities/speak/index.ts`
 - Delete: `src/capabilities/speak/elevenLabsAPI.ts`
 - Delete: `src/capabilities/speak/providers/ElevenLabsProvider.ts`
@@ -540,6 +558,7 @@ git commit -m "refactor(speak): swap ElevenLabsProvider for FishAudioProvider in
 - [ ] **Step 1: Update `index.ts`**
 
 Replace the two ElevenLabs lines in `src/capabilities/speak/index.ts`:
+
 ```typescript
 // Remove these two lines:
 export { ElevenLabsProvider } from './providers/ElevenLabsProvider';
@@ -578,6 +597,7 @@ cd EmoMate && npx tsc --noEmit
 ```
 
 Expected: zero errors. Common errors to fix:
+
 - `Cannot find name 'getElevenLabsApiKey'` → you missed a reference in `ai.ts`, search and replace
 - `Property 'voiceId' does not exist` → `VOICE_CONFIG.lanlan` now uses `referenceId`, update caller
 - `Module not found: elevenLabsAPI` → an import wasn't updated; search for remaining `elevenLabsAPI` imports
@@ -593,11 +613,13 @@ Expected: `0 errors`
 - [ ] **Step 3: Manual smoke test**
 
 Start the app and send a text message to trigger TTS:
+
 ```bash
 cd EmoMate && npx expo start
 ```
 
 Verify in the Metro logs:
+
 - `[FishAudioProvider] 🔊 Created audio player for: ...` appears
 - `[FishAudioProvider] ▶️ Playback started` appears
 - `[FishAudioProvider] ✅ Playback finished` appears

@@ -51,9 +51,11 @@ Note: No testing or linting commands are currently configured in the project.
 ## Debug Mode System
 
 ### Overview
+
 EmoMate implements a comprehensive debug mode system that provides detailed logging, status indicators, and debugging panels for VRM avatar integration while maintaining a clean production interface.
 
 ### Environment Variable Configuration
+
 Debug mode is controlled via the `SHOW_TEST_COMPONENTS` environment variable:
 
 ```bash
@@ -65,6 +67,7 @@ SHOW_TEST_COMPONENTS=true npm start
 ```
 
 ### Configuration Files
+
 - **`app.config.ts`**: Defines environment variables for Expo configuration
 - **`src/utils/debug.ts`**: Central debug utilities and logging functions
 - **Avatar Components**: CharacterWebView, CharacterAvatar, etc.
@@ -72,13 +75,17 @@ SHOW_TEST_COMPONENTS=true npm start
 ### Debug Features
 
 #### 1. Debug Logging System
+
 Comprehensive logging with component-specific prefixes:
+
 - **[CharacterWebView]**: WebView lifecycle, bridge communication, connection status
 - **[CharacterAvatar]**: Motion mapping, state transitions, model readiness
 - **[AnimatedCharacter]**: Status forwarding and integration
 
 #### 2. Visual Status Indicators
+
 Enhanced status panels showing:
+
 - **Connection Status**: WebView ↔ Character server connection
 - **Model Readiness**: VRM model loading progress
 - **Motion Queue**: Pending motion commands
@@ -86,13 +93,17 @@ Enhanced status panels showing:
 - **Performance Metrics**: Load times and response latency
 
 #### 3. Debug Panels
+
 Multiple debug overlays:
+
 - **CharacterWebView Status Panel**: Connection, model ready, queue status
 - **CharacterAvatar Debug Overlay**: Current status, motion, ready state, playing indicator
 - **Motion History**: Recent motion executions with success/failure tracking
 
 #### 4. Performance Monitoring
+
 Real-time performance tracking:
+
 - WebView initialization time
 - Model loading duration
 - Motion execution latency
@@ -101,6 +112,7 @@ Real-time performance tracking:
 ### Debug Mode Implementation
 
 #### Environment Variable Setup
+
 ```typescript
 // app.config.ts
 export default ({ config }: ConfigContext): ExpoConfig => ({
@@ -113,6 +125,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
 ```
 
 #### Debug Utilities
+
 ```typescript
 // src/utils/debug.ts
 export const isDebugMode = (): boolean => {
@@ -128,6 +141,7 @@ export const debugLog = (component: string, message: string, data?: any) => {
 ```
 
 #### Component Debug Integration
+
 ```typescript
 // Example: CharacterWebView.tsx
 import { isDebugMode, debugLog, debugError } from '../utils/debug';
@@ -146,17 +160,20 @@ debugLog('CharacterWebView', 'Model ready for interaction');
 ### Debug Components Coverage
 
 #### Core Avatar Components
+
 1. **CharacterWebView.tsx**: Main WebView component with full debug integration
 2. **CharacterAvatar.tsx**: Motion mapping and state management debugging
 3. **AnimatedCharacter.tsx**: Status forwarding debug information
 
 #### Debug Features per Component
+
 - **CharacterWebView**: Connection status, message logging, performance metrics
 - **CharacterAvatar**: Motion mapping, state transitions, model readiness
 
 ### Usage Guidelines
 
 #### For Development
+
 1. **Regular Development**: Use `npm start` for normal app development
 2. **Debug Mode**: Use `SHOW_TEST_COMPONENTS=true npm start` when:
    - Debugging VRM avatar integration issues
@@ -165,11 +182,13 @@ debugLog('CharacterWebView', 'Model ready for interaction');
    - Investigating performance problems
 
 #### For Production
+
 - Production builds automatically exclude all debug code
 - Clean user interface without debug panels
 - No performance impact from debug logging
 
 ### Network Configuration with Debug
+
 When debugging connection issues between EmoMate and character server:
 
 ```bash
@@ -182,6 +201,7 @@ SHOW_TEST_COMPONENTS=true npm run dev
 ```
 
 Debug logs will show:
+
 - WebView connection attempts to character server
 - Bridge initialization progress
 - Motion command transmission
@@ -190,21 +210,27 @@ Debug logs will show:
 ### Debugging Common Issues
 
 #### 1. WebView Connection Problems
+
 Enable debug mode and check:
+
 - Network connectivity status
 - Character server availability (192.168.31.28:5174)
 - Bridge initialization progress
 - WebView ready state
 
 #### 2. Motion Execution Issues
+
 Debug information includes:
+
 - Motion request parameters
 - Model readiness status
 - Motion mapping validation
 - Execution success/failure results
 
 #### 3. Performance Problems
+
 Performance metrics show:
+
 - WebView initialization time
 - Model loading duration
 - Motion execution latency
@@ -230,6 +256,7 @@ Performance metrics show:
 ## Architecture Overview
 
 ### Tech Stack
+
 - **Expo SDK 53** with React Native 0.79.5 and React 19.0.0
 - **TypeScript** in strict mode for type safety
 - **Zustand + Immer** for state management with immutable updates
@@ -237,18 +264,23 @@ Performance metrics show:
 - **Expo Camera & Audio** for video/audio functionality
 
 ### State Management Pattern
+
 The app uses Zustand with Immer middleware for clean, immutable state updates:
+
 - `src/store/userStore.ts` - Central user state including AI character selection and emotion logs
 - State is organized with typed interfaces and action creators
 - Immer enables clean mutations that are safely immutable
 
 ### Permission Management
+
 The app implements a permission-first design:
+
 - Camera and microphone permissions are requested on app launch
 - `src/utils/permissions.ts` provides centralized permission utilities
 - UI gracefully handles permission denied states with user guidance
 
 ### Navigation Structure
+
 - Stack navigator with TypeScript-typed route parameters
 - Initial flow: WelcomeScreen → HomeScreen
 - Navigation types defined in `App.tsx` and imported across screens
@@ -256,6 +288,7 @@ The app implements a permission-first design:
 ## Key Files and Patterns
 
 ### Project Structure
+
 ```
 src/
 ├── screens/     # Screen components (WelcomeScreen, HomeScreen)
@@ -266,6 +299,7 @@ src/
 ```
 
 ### Core Utility Modules
+
 - **`useChatAI.ts`** - Claude AI integration hook with hybrid TTS support
 - **`useTTS.ts`** - Text-to-speech functionality using expo-speech (fallback)
 - **`useElevenLabsTTS.ts`** - High-quality TTS using ElevenLabs API
@@ -274,6 +308,7 @@ src/
 - **`permissions.ts`** - Camera and microphone permission utilities
 
 ### AI Configuration (constants/ai.ts)
+
 - **`CLAUDE_API_CONFIG`** - API endpoints, models, and dynamic token settings
 - **`ELEVENLABS_CONFIG`** - ElevenLabs TTS API configuration with emotion-based voice settings
 - **`PERSONALITY_PROMPTS`** - Pre-defined AI personality templates
@@ -282,6 +317,7 @@ src/
 - **`getElevenLabsApiKey()`** - Secure ElevenLabs API key retrieval function
 
 ### Advanced AI Personality System (constants/personality.ts)
+
 - **`AI_PERSONALITY`** - Complete personality configuration for 兰兰 character
 - **Character Definition**: 17-year-old gentle Japanese high school girl inspired by 毛利兰
 - **Speaking Patterns**: Natural Chinese conversation with gentle Japanese-style mannerisms
@@ -289,6 +325,7 @@ src/
 - **Behavior Guidelines**: Detailed do's and don'ts for consistent character portrayal
 
 ### AI Capability Management System
+
 - **`getAICapabilities()`** - Dynamically checks and returns available AI capabilities
 - **`generateCapabilityPrompt()`** - Creates system prompt text describing AI's current abilities
 - **`buildSystemPrompt()`** - Combines personality with capability information for Claude
@@ -296,6 +333,7 @@ src/
 - **`getCapabilityStatus()`** - Returns comprehensive capability status object
 
 ### Intelligent Conversation System
+
 - **`detectConversationType()`** - Analyzes user input to determine response complexity (simple/normal/detailed/storytelling)
 - **`getResponseLengthConfig()`** - Dynamic token and character limits based on conversation type
 - **`validateAndOptimizeResponse()`** - Smart response formatting and length optimization
@@ -304,12 +342,14 @@ src/
 - **`preprocessTextForNaturalSpeech()`** - SSML-like text processing for natural speech patterns
 
 ### Proactive Conversation System
+
 - **Silence Detection**: 1min → 2min → 3min graduated response intervals
 - **Context Awareness**: Remembers current discussion topics (movies, books, games, etc.)
 - **Intelligent Topics**: Generates relevant follow-up questions based on conversation context
 - **Emotional Adaptation**: Adjusts proactive messages based on user's emotional state
 
-#### Current AI Capabilities:
+#### Current AI Capabilities
+
 - **Text Conversation** (Claude) - Intelligent dialogue with dynamic response length
 - **Voice Synthesis** (ElevenLabs) - Emotion-aware natural text-to-speech conversion
 - **Voice Recognition** (Device) - Speech-to-text input processing
@@ -317,12 +357,14 @@ src/
 - **Proactive Engagement** - Smart conversation continuation with topic awareness
 
 ### TypeScript Patterns
+
 - All files use TypeScript with proper interfaces
 - Navigation params are strictly typed
 - State interfaces are defined alongside store implementations
 - Barrel exports (`index.ts`) for clean imports
 
 ### UI/UX Patterns
+
 - Responsive design using centralized constants
 - Mixed Chinese/English interface (ready for i18n)
 - Permission-aware UI that adapts based on user permissions
@@ -331,9 +373,11 @@ src/
 ## AI Character System: 兰兰 (LanLan)
 
 ### Character Overview
+
 EmoMate features **兰兰 (LanLan)**, a sophisticated AI companion with a carefully crafted personality system designed for natural, engaging conversations.
 
 #### Core Character Traits
+
 - **Name**: 兰兰 (LanLan)
 - **Age**: 17 years old
 - **Personality**: 温柔的日本女高中生 (Gentle Japanese high school girl)
@@ -341,6 +385,7 @@ EmoMate features **兰兰 (LanLan)**, a sophisticated AI companion with a carefu
 - **Role**: 温柔姐姐 (Gentle older sister figure)
 
 #### Language & Communication Style
+
 - **Primary Language**: Chinese conversation with natural expressiveness
 - **Speaking Style**: Short, natural responses (1-2 sentences preferred)
 - **Tone**: Gentle, caring, occasionally shy
@@ -350,6 +395,7 @@ EmoMate features **兰兰 (LanLan)**, a sophisticated AI companion with a carefu
 ### Dynamic Conversation System
 
 #### Intelligent Response Adaptation
+
 ```typescript
 // Response types based on user input analysis
 - Simple (20-50 chars): Greetings, confirmations → "嗯嗯，好的呢~"
@@ -359,11 +405,13 @@ EmoMate features **兰兰 (LanLan)**, a sophisticated AI companion with a carefu
 ```
 
 #### Context-Aware Proactive Conversation
+
 - **1 Minute Silence**: Gentle check-ins related to current topic
 - **2 Minute Silence**: Topic-specific follow-up questions
 - **3 Minute Silence**: Deeper engagement attempts
 
 **Example Context Awareness**:
+
 ```
 If discussing movies: "嗯…你觉得这个电影怎么样呢？"
 If discussing games: "这个游戏好玩吗？"
@@ -373,11 +421,13 @@ If discussing personal topics: "嗯…还想说什么吗？"
 ### Advanced Voice System
 
 #### ElevenLabs Integration
+
 - **Voice ID**: `hkfHEbBvdQFNX4uWHqRF` (专为兰兰优化)
 - **Emotion-Aware Settings**: Dynamic voice parameters based on user emotion
 - **Natural Prosody**: SSML-enhanced text processing for realistic speech patterns
 
 #### Voice Parameter Optimization
+
 ```typescript
 // Emotional voice settings examples
 gentle: { stability: 0.4, similarity_boost: 0.7, style: 0.25 }
@@ -389,6 +439,7 @@ shy: { stability: 0.45, similarity_boost: 0.75, style: 0.35 }
 ### Conversation Flow Examples
 
 #### Movie Discussion
+
 ```
 User: "我最近看了《流浪地球》"
 兰兰: "哇，《流浪地球》很棒呢！剧情怎么样？" (storytelling mode)
@@ -401,6 +452,7 @@ User: "给我讲讲剧情"
 ```
 
 #### Personal Chat
+
 ```
 User: "今天心情不好"
 兰兰: "诶？怎么了…要不要和我说说？" (caring mode, emotion detection)
@@ -412,11 +464,13 @@ User: "今天心情不好"
 ### Technical Implementation
 
 #### Key Configuration Files
+
 - **`constants/personality.ts`**: Complete character definition and behavioral patterns
 - **`constants/ai.ts`**: Dynamic conversation system and voice optimization
 - **`utils/useChatAI.ts`**: Intelligent conversation management with context awareness
 
 #### Character Consistency Features
+
 - **Memory System**: Maintains conversation context across interactions
 - **Behavioral Constraints**: Defined do's and don'ts for consistent personality
 - **Emotional Adaptation**: Responds appropriately to user's emotional state
@@ -425,17 +479,20 @@ User: "今天心情不好"
 ## Development Workflow
 
 ### Expo Managed Workflow
+
 - Uses Expo managed workflow for simplified development
 - `app.json` configures app metadata and permissions
 - Hot reload enabled for fast iteration
 - Cross-platform support (iOS, Android, Web)
 
 ### State Management Workflow
+
 - Use `useUserStore` hook to access global state
 - Actions are defined within the store for consistency
 - Immer enables readable state updates without mutation
 
 ### Permission Workflow
+
 - Check permissions on app launch
 - Request permissions progressively based on user actions
 - Provide clear feedback when permissions are denied
@@ -444,6 +501,7 @@ User: "今天心情不好"
 ## Current Implementation Status
 
 ### ✅ Completed Core Features
+
 - **Navigation System**: Stack navigation with TypeScript route typing
 - **Permission Management**: Camera/microphone with user-friendly UX
 - **State Management**: Zustand + Immer with immutable updates
@@ -455,6 +513,7 @@ User: "今天心情不好"
 - **Environment Config**: Secure API key management with Expo Constants
 
 ### 🎯 Advanced Features Implemented
+
 - **AI Capability Management**: Dynamic service detection and capability awareness
 - **Multi-Provider TTS**: ElevenLabs (voice ID: `hkfHEbBvdQFNX4uWHqRF`) with emotion-aware settings
 - **Voice-First UX**: Complete speech recognition → AI response → TTS pipeline with natural prosody
@@ -467,6 +526,7 @@ User: "今天心情不好"
 - **Natural Speech**: SSML-enhanced text processing for natural voice synthesis
 
 ### 🔄 Architecture Achievements
+
 - **TypeScript Integration**: 100% typed codebase with strict mode
 - **Component Architecture**: Reusable, composable UI components
 - **Hook-Based Utils**: Custom hooks for AI, TTS, speech recognition
@@ -474,6 +534,7 @@ User: "今天心情不好"
 - **Modern React Patterns**: Functional components, custom hooks, context
 
 ### 📱 Production Readiness
+
 - **Build Configuration**: Expo 53 with React Native 0.79.5
 - **Platform Support**: iOS/Android with native permissions
 - **Bundle Optimization**: Tree-shaking and code splitting ready
@@ -481,6 +542,7 @@ User: "今天心情不好"
 - **Asset Management**: Icons, splash screens, adaptive icons
 
 ### 🚧 Ready for Implementation
+
 - **Testing Framework**: Jest + React Native Testing Library setup ready
 - **Code Quality**: ESLint + Prettier configuration ready
 - **CI/CD Pipeline**: GitHub Actions or EAS Build integration
@@ -492,6 +554,7 @@ User: "今天心情不好"
 ## Development Progress Summary
 
 ### 📊 Feature Completion Status
+
 | Category | Progress | Status |
 |----------|----------|---------|
 | Core Navigation | 100% | ✅ Complete |
@@ -506,6 +569,7 @@ User: "今天心情不好"
 | Build Configuration | 100% | ✅ Complete |
 
 ### 🎯 Key Technical Achievements
+
 1. **Advanced AI Integration**: Claude API with capability-aware system prompts and dynamic response adaptation
 2. **Sophisticated Character System**: 兰兰 personality with complete behavioral patterns and emotional intelligence
 3. **Intelligent Conversation Management**: Context-aware topic tracking and proactive engagement system
@@ -516,6 +580,7 @@ User: "今天心情不好"
 8. **Production Architecture**: TypeScript, modern React patterns, scalable structure
 
 ### 🚀 Next Phase Recommendations
+
 1. **Quality Assurance**: Implement testing framework and code quality tools
 2. **User Experience**: Add accessibility features and performance optimization
 3. **DevOps**: Set up CI/CD pipeline and deployment automation
@@ -523,6 +588,7 @@ User: "今天心情不好"
 5. **Feature Expansion**: Emotion analysis, advanced personality system
 
 ### 📈 Codebase Metrics
+
 - **Components**: 10 reusable UI components
 - **Screens**: 2 main screens (Welcome, Home)
 - **Utils**: 6 custom hooks for core functionality
@@ -573,6 +639,7 @@ Root Level Documentation:
 ### 🔄 Documentation Updates
 
 **重大变更时必须更新相关文档**：
+
 - 添加新组件时更新架构文档
 - 修复问题时更新故障排除指南
 - API变更时更新功能文档
@@ -581,6 +648,7 @@ Root Level Documentation:
 ### 📊 Current Documentation Status
 
 **EmoMate 功能文档** (`/docs`):
+
 - ✅ **情绪检测MVP**: 完整文档覆盖 (`EMOTION_DETECTION_MVP.md`)
 - ✅ **技术架构**: 详细设计文档 (`EMOTION_DETECTION_ARCHITECTURE.md`)
 - ✅ **故障排除**: 全面问题解决指南 (`EMOTION_DETECTION_TROUBLESHOOTING.md`)
@@ -588,12 +656,14 @@ Root Level Documentation:
 - ✅ **VRM集成**: VRM avatar集成文档 (`VRM_INTEGRATION.md`)
 
 **项目级文档** (root level):
+
 - ✅ **项目进度**: 完整进度报告和路线图 (`../PROGRESS.md`)
 - ✅ **项目探索**: 详细代码库分析 (`../PROJECT_EXPLORATION_REPORT.md`, 20 KB)
 - ✅ **快速参考**: 开发者速查指南 (`../QUICK_REFERENCE.md`, 6.3 KB)
 - ✅ **多项目架构**: 集成架构文档 (`../CLAUDE.md`)
 
 **文档更新记录**:
+
 - **2025-10-21**: 创建项目进度和完整探索报告
 - **2025-01-20**: 创建情绪检测完整文档体系
 - **版本**: v1.0.0 - 生产就绪状态 (85% 完成)
@@ -601,6 +671,7 @@ Root Level Documentation:
 ### 🎯 Feature Implementation Status
 
 **已完成的核心功能** (12/12):
+
 1. ✅ 语音对话系统 (`useChatAI.ts`, 410 lines)
 2. ✅ 表情识别系统 (`BasicEmotionDetector.tsx`, 17 KB, 5 emotions)
 3. ✅ 动画交互系统 (`CharacterWebView.tsx`, 11 motions)
@@ -615,6 +686,7 @@ Root Level Documentation:
 12. ✅ 文档体系 (7+ 份完整文档)
 
 **待开发功能** (优先级排序):
+
 1. ⏳ **环境感知系统** - 光线、噪音、天气检测 (高优先级, 2-3天)
 2. ⏳ **动作识别系统** - 手势、运动检测 (高优先级, 3-5天)
 3. ⏳ **性能优化** - 长时间对话内存管理 (高优先级, 2天)

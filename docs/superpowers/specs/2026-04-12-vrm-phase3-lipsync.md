@@ -19,11 +19,13 @@ wawa-lipsync 需要在浏览器（WebView）内捕获音频信号才能分析口
 ## 音频路由变更
 
 ### 现有流程
+
 ```
 ElevenLabs API → AudioCache（本地文件）→ TTSQueue → expo-av.playAsync()
 ```
 
 ### 新流程
+
 ```
 ElevenLabs API → AudioCache（本地文件）→ TTSQueue
                                               ↓
@@ -47,6 +49,7 @@ ElevenLabs API → AudioCache（本地文件）→ TTSQueue
 ### EmoMate → WebView
 
 **播放音频（触发口型同步）**
+
 ```typescript
 {
   type: 'playAudio',
@@ -59,6 +62,7 @@ ElevenLabs API → AudioCache（本地文件）→ TTSQueue
 ```
 
 **停止当前音频**
+
 ```typescript
 { type: 'stopAudio' }
 ```
@@ -66,6 +70,7 @@ ElevenLabs API → AudioCache（本地文件）→ TTSQueue
 ### WebView → EmoMate
 
 **音频播放完毕**
+
 ```typescript
 {
   type: 'audioComplete',
@@ -74,6 +79,7 @@ ElevenLabs API → AudioCache（本地文件）→ TTSQueue
 ```
 
 **口型开始/结束（可选，用于调试）**
+
 ```typescript
 { type: 'lipSyncStart' }
 { type: 'lipSyncEnd' }
@@ -84,6 +90,7 @@ ElevenLabs API → AudioCache（本地文件）→ TTSQueue
 ## character/ 侧实现
 
 ### 新增依赖
+
 ```
 wawa-lipsync
 ```
@@ -91,6 +98,7 @@ wawa-lipsync
 ### AudioPlayer.tsx
 
 WebView 内的音频播放组件，职责：
+
 - 监听 bridge `playAudio` 消息
 - 创建 `Audio` 元素，设置 base64 data URL 作为 src
 - 播放完成后发送 `audioComplete` 消息
@@ -99,6 +107,7 @@ WebView 内的音频播放组件，职责：
 ### LipSyncController.tsx
 
 口型同步控制组件，职责：
+
 - 接收 AudioPlayer 的 sourceNode
 - 使用 wawa-lipsync 分析音频，输出 viseme 数据
 - 将 viseme 映射到 VRM 口型 Blend Shape（A/E/I/O/U）

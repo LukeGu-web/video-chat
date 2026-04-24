@@ -22,6 +22,7 @@ No source files are expected to change. If `expo install --fix` or the Batch 2 i
 ### Task 1: Create the upgrade branch
 
 **Files:**
+
 - No file changes — git branch operation only
 
 - [ ] **Step 1: Ensure main is up to date**
@@ -47,6 +48,7 @@ Expected: `Switched to a new branch 'deps/upgrade-expo-55'`
 ### Task 2: Batch 1 — Upgrade Expo SDK to v55
 
 **Files:**
+
 - Modify: `EmoMate/package.json` (expo + expo-* versions)
 - Modify: `EmoMate/package-lock.json`
 
@@ -68,6 +70,7 @@ npx expo install --fix
 This command reads the installed expo version and installs the correct peer versions of all expo-* packages, babel-preset-expo, react, and react-native. Expected output lists packages being updated, ending with no errors.
 
 Packages this touches:
+
 - expo-asset, expo-audio, expo-build-properties, expo-constants
 - expo-dev-client, expo-file-system, expo-image-manipulator
 - expo-speech, expo-speech-recognition (2.x → 3.x), expo-sqlite
@@ -94,6 +97,7 @@ git commit -m "deps: upgrade Expo SDK 54 → 55 (expo install --fix)"
 ### Task 3: Batch 2 — Update safe non-expo packages
 
 **Files:**
+
 - Modify: `EmoMate/package.json`
 - Modify: `EmoMate/package-lock.json`
 
@@ -142,6 +146,7 @@ git commit -m "deps: update safe non-expo packages to latest minor/patch"
 ### Task 4: Verify — TypeScript compilation
 
 **Files:**
+
 - No changes — read-only verification
 
 - [ ] **Step 1: Run TypeScript compiler**
@@ -152,7 +157,7 @@ npx tsc --noEmit
 
 Expected: exits with code 0, no errors printed.
 
-If errors appear: they are likely caused by a changed API in `expo-speech-recognition` (2.x → 3.x), which is the one expo-* package with a major version jump. Check `src/capabilities/listen/` for any usage of the old API and fix accordingly. Common breaking change: hook or function rename. Refer to the expo-speech-recognition changelog at https://github.com/jamsch/expo-speech-recognition/releases for the 3.x migration notes.
+If errors appear: they are likely caused by a changed API in `expo-speech-recognition` (2.x → 3.x), which is the one expo-* package with a major version jump. Check `src/capabilities/listen/` for any usage of the old API and fix accordingly. Common breaking change: hook or function rename. Refer to the expo-speech-recognition changelog at <https://github.com/jamsch/expo-speech-recognition/releases> for the 3.x migration notes.
 
 - [ ] **Step 2: Commit any type fixes**
 
@@ -170,6 +175,7 @@ If no errors, no commit needed.
 ### Task 5: Verify — App startup
 
 **Files:**
+
 - No changes — runtime verification
 
 - [ ] **Step 1: Clear Metro cache and start Expo**
@@ -183,6 +189,7 @@ Expected: Metro bundler starts, no startup errors in the terminal. Open on a sim
 - [ ] **Step 2: Smoke test core features**
 
 Manually verify these critical paths work after the upgrade:
+
 1. App launches and HomeScreen renders
 2. Voice recognition starts when the mic button is tapped (uses `expo-speech-recognition`)
 3. TTS plays a response (uses `expo-audio` + `expo-speech`)
@@ -196,6 +203,7 @@ If any of these fail, investigate the specific package that owns that feature an
 ### Task 6: Confirm skipped packages and close
 
 **Files:**
+
 - No changes
 
 - [ ] **Step 1: Document skipped packages**

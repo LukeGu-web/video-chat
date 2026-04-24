@@ -9,6 +9,7 @@
 ## Goal
 
 Update EmoMate dependencies in two batches:
+
 1. Upgrade Expo SDK 54 → 55 (all expo-* packages aligned via `expo install --fix`)
 2. Update safe non-expo packages (minor/patch, no breaking changes)
 
@@ -19,6 +20,7 @@ Packages with major breaking changes are explicitly skipped and left for manual 
 ## Batch 1 — Expo SDK 55 Upgrade
 
 **Commands:**
+
 ```bash
 cd EmoMate
 npx expo install expo@^55
@@ -28,6 +30,7 @@ npx expo install --fix
 `expo install --fix` automatically aligns all expo-* packages, babel-preset-expo, react, and react-native to the versions compatible with SDK 55.
 
 **Packages affected:**
+
 | Package | Current | Target |
 |---------|---------|--------|
 | expo | ~54.0.33 | ~55.x |
@@ -55,6 +58,7 @@ npx expo install --fix
 ## Batch 2 — Safe Non-Expo Package Updates
 
 **Command:**
+
 ```bash
 npm install \
   @react-navigation/native@^7.2.2 \
@@ -96,6 +100,7 @@ All updates are within the same major version. No API changes expected.
 ## Post-Upgrade Verification
 
 After both batches:
+
 1. Run `npx tsc --noEmit` — confirm no TypeScript errors
 2. Run `npx expo start --clear` — confirm app starts without errors
 3. Manually test: voice recognition, TTS, Live2D WebView, camera/face detection
