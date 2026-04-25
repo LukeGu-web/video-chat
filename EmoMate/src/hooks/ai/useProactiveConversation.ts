@@ -20,7 +20,7 @@ import {
   FISH_AUDIO_CONFIG,
 } from '../../constants/ai';
 import { TTSQueue } from '../../capabilities/speak';
-import { lipSyncBridge } from '../../capabilities/speak/lipSyncBridge';
+import { motionCoordinator } from '../../capabilities/motion';
 import { textToViseme } from '../../capabilities/speak/textToViseme';
 import { ChatMessage } from '../useChatAI';
 import { useTopicSeeds } from './useTopicSeeds';
@@ -106,7 +106,7 @@ export const useProactiveConversation = (
             onItemStart: (item) => {
               onSpeakingStateChange?.(true, item.text);
               const { visemes, totalDuration } = textToViseme(item.text);
-              lipSyncBridge.sendVRMCommand({ type: 'prepareVisemes', data: { visemes, totalDuration } });
+              motionCoordinator.onVisemes({ visemes, totalDuration });
             },
             onItemEnd: () => {
               const status = ttsQueue.getStatus();
@@ -116,7 +116,7 @@ export const useProactiveConversation = (
                 status.synthesizing === 0;
               if (isLastItem) {
                 onSpeakingStateChange?.(false, '');
-                lipSyncBridge.sendVRMCommand({ type: 'stopVisemes' });
+                motionCoordinator.onStopVisemes();
               }
             },
           });
@@ -203,7 +203,7 @@ export const useProactiveConversation = (
     if (proactiveTTSQueue.current) {
       proactiveTTSQueue.current.cancel();
       // Close VRM mouth immediately since onItemEnd is not called on cancel
-      lipSyncBridge.sendVRMCommand({ type: 'stopVisemes' });
+      motionCoordinator.onStopVisemes();
       proactiveTTSQueue.current = null;
     }
   }, [clearTimer]);
