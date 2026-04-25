@@ -359,7 +359,6 @@ const HomeScreen: React.FC = () => {
           <View className='items-center -mb-24'>
             <EmotionAwareCharacter
               size={450}
-              loop={true}
               className='shadow-lg'
               enableEmotionMapping={true}
             />
