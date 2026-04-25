@@ -26,8 +26,11 @@ import {
 import { debugLog } from '../utils/debug'; // Debug logging utilities
 import { executeRAG, type RAGResult } from '../capabilities/retrieval'; // RAG system (Phase 1: Retrieval-Augmented Generation)
 import { textToViseme } from '../capabilities/speak/textToViseme';
-import { lipSyncBridge } from '../capabilities/speak/lipSyncBridge';
 import { parseVRMAction } from '../utils/parseVRMAction';
+import { motionCoordinator } from '../capabilities/motion';
+import { useEmotionStore } from '../store';
+import { TTSSynthesisOptions } from '../types/speak';
+import { EmotionType } from '../types/emotion';
 import {
   shouldRequestFeedback,
   submitFeedback,
@@ -163,7 +166,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       | 'normal'
       | 'detailed'
       | 'storytelling' = 'normal',
-    onSentence: (sentence: string) => void
+    onSentence: (sentence: string, options?: TTSSynthesisOptions) => void
   ): Promise<string> => {
     // Get current language from user store
     const currentLanguage = useUserStore.getState().currentLanguage;
@@ -232,6 +235,8 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       xhr.onprogress = () => {
         const responseText = xhr.responseText;
 
+        let pendingHint: string | null = null; // attached to the next enqueued sentence
+
         // Only process new content
         if (responseText.length > processedLength) {
           const newContent = responseText.slice(processedLength);
@@ -251,8 +256,14 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
 
               // Strip complete <action> blocks; dispatch last found action
               const { intent, cleanText, hasPartialTag } = parseVRMAction(rawBuffer);
-              // TODO Task 6: wire intent to motionCoordinator
-              void intent;
+              if (intent) {
+                const STORE_EMOTION_MAP: Record<string, string> = { laugh: 'joy', sad: 'sadness' };
+                const storeEmotion = STORE_EMOTION_MAP[intent.emotion] ?? intent.emotion;
+                useEmotionStore.getState().setTextEmotion(storeEmotion as EmotionType);
+                motionCoordinator.onAIAction(intent.emotion);
+                pendingHint = intent.emotion;
+                debugLog('ChatAI', 'AI action dispatched', intent);
+              }
 
               // Keep only unprocessed raw text in rawBuffer
               rawBuffer = hasPartialTag
@@ -274,10 +285,14 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
                 if (sentenceEndings.includes(char)) {
                   const sentence = stripActionDescriptions(currentSentence.trim());
                   if (sentence) {
+                    const LAUGH_PATTERN = /^[哈嘿呵hH]+[哈嘿呵!！~～\s]*$/;
+                    const hint = pendingHint ?? (LAUGH_PATTERN.test(sentence) ? 'laugh' : undefined);
+                    pendingHint = null; // consume after first sentence
+
                     debugLog('ChatAI', 'Playing complete sentence (unfiltered)', {
                       sentence,
                     });
-                    onSentence(sentence);
+                    onSentence(sentence, hint ? { animationHint: hint } : undefined);
                     fullText += sentence;
                   }
                   currentSentence = '';
@@ -427,7 +442,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
           }
           // Lip sync: prepare visemes (two-phase: store without starting)
           const { visemes, totalDuration } = textToViseme(item.text);
-          lipSyncBridge.sendVRMCommand({ type: 'prepareVisemes', data: { visemes, totalDuration } });
+          motionCoordinator.onVisemes({ visemes, totalDuration });
         },
         onItemEnd: () => {
           const status = ttsQueue.getStatus();
@@ -438,7 +453,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
           if (isLastItem) {
             setCurrentStreamSegment('');
             // Only close mouth when no more items follow to avoid race with next prepareVisemes
-            lipSyncBridge.sendVRMCommand({ type: 'stopVisemes' });
+            motionCoordinator.onStopVisemes();
           }
         },
       });
@@ -455,13 +470,14 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
           updatedMessages,
           enhancedConfig,
           conversationType,
-          async (sentence) => {
+          async (sentence, sentenceOptions) => {
             // Enqueue sentence for TTS
             if (enhancedConfig?.enableTTS !== false) {
               debugLog('ChatAI', 'Phase 2: 加入TTS队列', { sentence });
               await ttsQueue.enqueue(sentence, {
                 voiceId,
                 emotion: userEmotion,
+                ...sentenceOptions,
               });
             }
           }
@@ -513,7 +529,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
 
         // Cancel TTS queue on error
         ttsQueue.cancel();
-        lipSyncBridge.sendVRMCommand({ type: 'stopVisemes' });
+        motionCoordinator.onStopVisemes();
 
         // Add error message
         const errorMessage: ChatMessage = {
@@ -564,7 +580,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       try {
         await currentTTSQueue.current.cancel();
         // Close VRM mouth immediately since onItemEnd is not called on cancel
-        lipSyncBridge.sendVRMCommand({ type: 'stopVisemes' });
+        motionCoordinator.onStopVisemes();
         debugLog('ChatAI', 'Conversation TTS queue cancelled');
       } catch (error) {
         console.error(
