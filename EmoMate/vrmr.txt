@@ -1,62 +1,17 @@
-  当前实现方式：手写关键帧                                                                                                   
+请使用 superpowers:subagent-driven-development skill 执行 VRMA 动画支持的实现计划。                                                                                                       
                                                                                                                                                                                             
-  motionPresets.ts 里的每个"动作"实际上是手动编写的骨骼旋转关键帧序列：
+  实现计划文件： docs/superpowers/plans/2026-04-25-vrma-animation.md                                                                                                                        
                                                                                                                                                                                             
-  wave: {                        
-    keyframes: [                                                                                                                                                                            
-      { time: 0.0, bones: { rightUpperArm: { z: 1.5 } } },   // 手臂垂下                                                                                                                    
-      { time: 0.4, bones: { rightUpperArm: { z: -1.1 } } },  // 手臂抬起                                                                                                                    
-      { time: 0.8, bones: { rightHand: { z: 0.3 } } },       // 手腕摆动                                                                                                                    
-      ...                                                   
-    ]                                                    
-  }                                                                                                                                                                                         
-                                       
-  ExpressionController 在每一帧里对关键帧之间做线性插值，实现动画。                                                                                                                         
-                                 
-  ---                                                                                                                                                                                       
-  当前的根本限制                                                                                                                                                                            
+  设计文档： docs/superpowers/specs/2026-04-25-vrma-animation-design.md                                                                                                                     
+                                                             
+  背景：                                                                                                                                                                                    
+  - 项目根目录：/Users/yaonangu/Local_doc/GitHub/video-chat
+  - 有两个子项目：character/（Remix + Three.js WebApp）和 EmoMate/（React Native + Expo）                                                                                                   
+  - 7 个 .vrma 动画文件已存放在 character/public/assets/vrma/VRMA_01.vrma ~ VRMA_07.vrma 
+  - TypeScript 验证命令：character 端用 cd character && npm run typecheck，EmoMate 端用 cd EmoMate && npx tsc --noEmit                                                                      
                                                                                                                                                                                             
-  ┌────────────────────┬───────────────────────────────────────────────────────────────────────────────┐                                                                                    
-  │        限制        │                                     原因                                      │                                                                                    
-  ├────────────────────┼───────────────────────────────────────────────────────────────────────────────┤
-  │ 只有上半身         │ BoneMap 里只有 head/neck/spine/arm，没有 hip/leg/knee/foot                    │                                                                                    
-  ├────────────────────┼───────────────────────────────────────────────────────────────────────────────┤
-  │ 只有旋转，没有位移 │ 只能转骨头角度，角色不能在空间中移动（跳起来、跑步时的重心位移做不了）        │                                                                                    
-  ├────────────────────┼───────────────────────────────────────────────────────────────────────────────┤
-  │ 手写费力且机械     │ 一个跳舞动作需要写 30+ 个关键帧，且感觉僵硬（你的记忆笔记里也记录了这个问题） │                                                                                    
-  └────────────────────┴───────────────────────────────────────────────────────────────────────────────┘
-                                                                                                                                                                                            
-  结论：跳舞、跑步用手写关键帧做不了，或者做出来效果很差。
-                                                         
-  ---                                  
-  正确的解法：VRMA 文件                                                                                                                                                                     
-                                                                                                                                                                                            
-  VRM 1.0 有一个官方动画格式 .vrma（基于 GLTF），支持全身骨骼 + 位移动画，就是专门为 VRM 设计的。                                                                                           
-                                                                                                                                                                                            
-  播放方式：                                             
-  .vrma 文件 → @pixiv/three-vrm-animation（需要安装） → 直接驱动 VRM 全身骨骼                                                                                                               
-                                                                             
-  资源从哪来：                                                                                                                                                                              
-  - Blender + VRM 插件：自己制作，或从 Mixamo 下载 FBX 动画后导出为 VRMA
-  - Booth / VRoid Hub：有大量免费/付费的 .vrma 动作包                   
-  - Mixamo 免费库：数百个舞蹈、跑步、跳跃动画，转换成本低
-                                                                                                                                                                                            
-  ---                                  
-  对当前方案三的影响                                                                                                                                                                        
-                                 
-  如果你想支持复杂动作（舞蹈、跑步），方案三的 MotionCoordinator 需要同时支持两类动作：                                                                                                     
-                                                                                                                                                                                            
-  ┌───────────────────────┬──────────────────────────────────────┬───────────────────────┐                                                                                                  
-  │         类型          │               适合场景               │       实现方式        │                                                                                                  
-  ├───────────────────────┼──────────────────────────────────────┼───────────────────────┤                                                                                                  
-  │ 关键帧 preset（现有） │ 情绪反应：wave、shy、happy、thinking │ 手写 motionPresets.ts │                                                                                                  
-  ├───────────────────────┼──────────────────────────────────────┼───────────────────────┤                                                                                                  
-  │ VRMA clip（新增）     │ 复杂全身动作：dance、run、jump       │ 加载 .vrma 文件播放   │                                                                                                  
-  └───────────────────────┴──────────────────────────────────────┴───────────────────────┘
-                                                                                                                                                                                            
-  需要额外加：              
-  1. 安装 @pixiv/three-vrm-animation                                                                                                                                                        
-  2. character 端 ExpressionController 加 VRMA 播放器
-  3. MotionCoordinator 发送 { type: 'playVRMA', data: { name: 'dance' } } 命令
-                                                                              
-  这部分工作量大约 +1～2 天（主要是 VRMA 播放器集成 + 准备几个动画文件），与主干方案三并行度较高。 
+  重要前置条件：                                                                                                                                                                            
+  Task 1–3（character 端：安装依赖、VRMAPlayer、ExpressionController 集成）可以立即执行。Task 4–7（EmoMate 端）依赖 docs/superpowers/plans/2026-04-24-motion-coordinator.md 先完成——如果    
+  MotionCoordinator.ts 还不存在，请先暂停并告知。                                                                                                                                           
+                                                             
+  请从 Task 1 开始执行。 
