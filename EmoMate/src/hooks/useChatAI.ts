@@ -439,11 +439,13 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
           if (!isStreamSpeaking) {
             setIsStreamSpeaking(true);
           }
+          motionCoordinator.onTTSStart(item.options?.animationHint ?? 'speaking');
           // Lip sync: prepare visemes (two-phase: store without starting)
           const { visemes, totalDuration } = textToViseme(item.text);
           motionCoordinator.onVisemes({ visemes, totalDuration });
         },
         onItemEnd: () => {
+          motionCoordinator.onTTSEnd();
           const status = ttsQueue.getStatus();
           const isLastItem =
             status.pending === 0 &&
