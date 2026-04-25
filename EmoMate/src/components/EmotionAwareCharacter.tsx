@@ -150,10 +150,7 @@ export const EmotionAwareCharacter: React.FC<EmotionAwareCharacterProps> = ({
   return (
     <View className={`relative ${className}`}>
       <CharacterAvatar
-        status={currentMotion}
-        emotion={combinedEmotion}
         size={size}
-        loop={loop}
         onMotionComplete={handleMotionComplete}
       />
     </View>
