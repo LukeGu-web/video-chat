@@ -226,6 +226,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       let partialSentence = '';
       let rawBuffer = ''; // accumulates raw text to handle cross-chunk <action> blocks
       let prevCleanCommitted = 0; // tracks cleanText length from previous iteration
+      let pendingHint: string | null = null; // attached to the next enqueued sentence
       const sentenceEndings = ['。', '！', '？', '~', '…', '呢', '哦', '啊', '呀'];
 
       // Track processed lines to avoid duplicates
@@ -234,8 +235,6 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
       // Handle streaming progress
       xhr.onprogress = () => {
         const responseText = xhr.responseText;
-
-        let pendingHint: string | null = null; // attached to the next enqueued sentence
 
         // Only process new content
         if (responseText.length > processedLength) {
