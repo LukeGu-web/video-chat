@@ -110,6 +110,7 @@ function playEmotionThenIdle(emotion: string): void {
 
   const duration = PRESET_DURATION[preset] ?? 3000;
   clearPostTimer();
+  clearCamTimer();
   _postTimer = setTimeout(() => {
     _state = 'Idle';
     sendPreset('idle');
@@ -173,6 +174,7 @@ export const motionCoordinator = {
 
   /** Called by useTTSQueue when a segment finishes playing. */
   onTTSEnd(): void {
+    if (!isTTSActive(_state)) return;
     if (_pending) {
       const emotion = _pending;
       _pending = null;
