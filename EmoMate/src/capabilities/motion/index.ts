@@ -4,3 +4,4 @@
  */
 
 export * from './motionMapper';
+export { motionCoordinator } from './MotionCoordinator';
