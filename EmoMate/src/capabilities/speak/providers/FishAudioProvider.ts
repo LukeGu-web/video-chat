@@ -10,7 +10,6 @@ import { synthesizeWithFishAudio } from '../fishAudioAPI';
 import { getFishAudioApiKey } from '../../../constants/ai';
 import { audioModeManager } from '../../../utils/audioModeManager';
 import { amplifiedAudioBridge, AUDIO_GAIN } from './amplifiedAudioBridge';
-import { motionCoordinator } from '../../motion';
 
 /**
  * Fish Audio TTS Provider
