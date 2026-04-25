@@ -43,6 +43,7 @@ export interface TTSSynthesisOptions {
   language?: string;
   pitch?: number;
   rate?: number;
+  animationHint?: string; // "laugh" | "speaking" | EmotionType — attached by useChatAI
 }
 
 /**
