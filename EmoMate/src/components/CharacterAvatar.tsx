@@ -32,10 +32,6 @@ const CharacterAvatar: React.FC<CharacterAvatarProps> = ({
   const handleModelReady = useCallback(() => {
     debugLog('CharacterAvatar', 'Model ready');
     setIsModelReady(true);
-
-    motionCoordinator.register((cmd) => {
-      webViewRef.current?.avatarBridge.sendVRMCommand(cmd);
-    });
   }, []);
 
   const handleMotionResult = useCallback(
@@ -47,10 +43,14 @@ const CharacterAvatar: React.FC<CharacterAvatarProps> = ({
   );
 
   useEffect(() => {
+    if (!isModelReady) return;
+    motionCoordinator.register((cmd) => {
+      webViewRef.current?.avatarBridge.sendVRMCommand(cmd);
+    });
     return () => {
       motionCoordinator.unregister();
     };
-  }, []);
+  }, [isModelReady]);
 
   return (
     <View style={{ width: size, height: size * 1.6 }}>
