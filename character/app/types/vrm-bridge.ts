@@ -66,4 +66,5 @@ export type PresetName =
   | 'excited'
   | 'surprised'
   | 'happy'
+  | 'laugh'
   | 'sleepy';

@@ -158,6 +158,21 @@ export const MOTION_PRESETS: Record<PresetName, MotionPreset> = {
     ],
   },
 
+  // ── Laugh: forward bouncing with joy ─────────────────────────────────────────
+  laugh: {
+    name: 'laugh',
+    loop: false,
+    keyframes: [
+      { time: 0.0,  bones: { ...R, spine: { z: 0 },    head: { x: 0 } },   blendShapes: { joy: 0 } },
+      { time: 0.3,  bones: { ...R, spine: { z: 0.08 }, head: { x: 0.12 } }, blendShapes: { joy: 0.9 } },
+      { time: 0.6,  bones: { ...R, spine: { z: 0.03 }, head: { x: 0.04 } } },
+      { time: 0.9,  bones: { ...R, spine: { z: 0.08 }, head: { x: 0.1 } } },
+      { time: 1.2,  bones: { ...R, spine: { z: 0.03 }, head: { x: 0.04 } } },
+      { time: 1.5,  bones: { ...R, spine: { z: 0.06 }, head: { x: 0.08 } } },
+      { time: 2.0,  bones: { ...R, spine: { z: 0 },    head: { x: 0 } },   blendShapes: { joy: 0 } },
+    ],
+  },
+
   // ── Sleepy: head drooping forward, slight slump ───────────────────────────
   sleepy: {
     name: 'sleepy',
