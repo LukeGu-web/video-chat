@@ -250,11 +250,9 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
               rawBuffer += text;
 
               // Strip complete <action> blocks; dispatch last found action
-              const { action, cleanText, hasPartialTag } = parseVRMAction(rawBuffer);
-              if (action) {
-                lipSyncBridge.sendVRMCommand({ type: 'playPose', data: action });
-                debugLog('ChatAI', 'Phase 4: AI action dispatched', action);
-              }
+              const { intent, cleanText, hasPartialTag } = parseVRMAction(rawBuffer);
+              // TODO Task 6: wire intent to motionCoordinator
+              void intent;
 
               // Keep only unprocessed raw text in rawBuffer
               rawBuffer = hasPartialTag
