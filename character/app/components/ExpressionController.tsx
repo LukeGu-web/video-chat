@@ -97,6 +97,10 @@ interface PresetState {
   loop: boolean;
 }
 
+// ─── Priority constants (module-level, never changes) ─────────────────────────
+
+const CMD_PRIORITY = { setExpression: 0, playPose: 1, playPreset: 2 } as const;
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 interface ExpressionControllerProps {
@@ -134,6 +138,7 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
   const presetBlendShapeActive = useRef(false);
 
   const idleReturnTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentPriority = useRef(0);
 
   // ─── setValue helpers (no em.update — called once at end of frame) ──────────
 
@@ -255,6 +260,7 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
         }
 
         case 'playPreset': {
+          if (CMD_PRIORITY.playPreset < currentPriority.current) break; // blocked by higher priority
           const newPresetDef = MOTION_PRESETS[cmd.data.name];
           if (newPresetDef) {
             const current = presetState.current;
@@ -273,6 +279,7 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
                 elapsed: 0,
                 loop: cmd.data.loop ?? newPresetDef.loop,
               };
+              currentPriority.current = CMD_PRIORITY.playPreset;
             }
           }
           break;
@@ -285,6 +292,12 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
           state.transitionDuration = 0.5;
           state.transitionElapsed = 0;
           state.isAnimating = true;
+          break;
+
+        case 'playVRMA':
+          // Reserved for future VRMA clip support.
+          // Implement by loading and playing a .vrma file via @pixiv/three-vrm-animation.
+          console.warn('[ExpressionController] playVRMA not yet implemented:', cmd.data);
           break;
       }
     };
@@ -408,6 +421,7 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
             state.isAnimating = true;
           }
           presetState.current = { name: 'idle', elapsed: 0, loop: true };
+          currentPriority.current = 0; // preset finished — accept new commands
         }
       }
     }

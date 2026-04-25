@@ -54,7 +54,8 @@ export type VRMBridgeCommand =
   | { type: 'playVisemes'; data: { visemes: VisemeFrame[]; totalDuration: number } }
   | { type: 'stopVisemes' }
   | { type: 'stopAll' }
-  | { type: 'ping' };
+  | { type: 'ping' }
+  | { type: 'playVRMA'; data: { url: string; loop?: boolean } };
 
 export type PresetName =
   | 'idle'
