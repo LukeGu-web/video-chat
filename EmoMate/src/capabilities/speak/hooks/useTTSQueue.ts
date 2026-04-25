@@ -9,7 +9,7 @@ import {
 import { TTSQueue } from '../queue/TTSQueue';
 import { FishAudioProvider } from '../providers/FishAudioProvider';
 import { globalAudioCache } from '../cache/AudioCache';
-import { lipSyncBridge } from '../lipSyncBridge';
+import { motionCoordinator } from '../../motion';
 
 /**
  * useTTSQueue Hook return type
@@ -55,9 +55,12 @@ export function useTTSQueue(config?: TTSQueueConfig): UseTTSQueueReturn {
       ...config,
       onItemStart: (item) => {
         setIsPlaying(true);
+        const hint = item.options?.animationHint ?? 'speaking';
+        motionCoordinator.onTTSStart(hint);
         config?.onItemStart?.(item);
       },
       onItemEnd: (item) => {
+        motionCoordinator.onTTSEnd();
         config?.onItemEnd?.(item);
         // Update status after item ends
         updateStatus();
@@ -125,8 +128,9 @@ export function useTTSQueue(config?: TTSQueueConfig): UseTTSQueueReturn {
     if (!queueRef.current) return;
 
     await queueRef.current.cancel();
-    // Close VRM mouth immediately since onItemEnd is not called on cancel
-    lipSyncBridge.sendVRMCommand({ type: 'stopVisemes' });
+    // Stop visemes and reset coordinator since onItemEnd is not called on cancel
+    motionCoordinator.onStopVisemes();
+    motionCoordinator.reset();
     setIsPlaying(false);
     setIsSynthesizing(false);
     updateStatus();
