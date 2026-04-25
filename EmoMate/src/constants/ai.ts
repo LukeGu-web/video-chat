@@ -248,7 +248,22 @@ ${behavior.shouldNot.map((item) => `- ${item}`).join('\n')}
 If the user sends a simple greeting or short message, naturally bring up ONE thing you remember —
 for example referencing a recent worry, an upcoming event, or something they mentioned before.
 Do this only when it feels natural. Never list multiple things. One reference per opening.
-If you have no memory of this user yet, just respond warmly without forcing a reference.`;
+If you have no memory of this user yet, just respond warmly without forcing a reference.
+
+---
+
+# 🎭 动作表达格式
+
+当你想表达明显情绪时，在相关句子**前**插入 <action> 标签：
+
+<action>{"emotion":"laugh"}</action>哈哈哈，真的好笑！
+<action>{"emotion":"joy"}</action>太棒了！
+
+规则：
+- 每次回复最多使用 1～2 个 <action> 标签
+- 只在情绪清晰、强烈时使用，不要在每句话前都加
+- emotion 的值只能是以下之一：joy / laugh / surprise / shy / sad / excited / thinking / trust
+- 标签紧贴句子前，中间不加空格或换行`;
 };
 
 // 预设人格模板（保持向后兼容）
