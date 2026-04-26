@@ -9,7 +9,7 @@ import {
 } from '../constants/ai';
 import { parseSSEChunk } from '../capabilities/speak/sentenceDetector'; // Phase 2: 句子检测
 import { TTSQueue } from '../capabilities/speak'; // Phase 2: TTS队列管理 - NEW ARCHITECTURE
-import { stripActionDescriptions } from '../capabilities/speak/fishAudioAPI'; // Strip (动作) tags before TTS/display
+import { stripActionDescriptions, hasMeaningfulContent } from '../capabilities/speak/fishAudioAPI'; // Strip (动作) tags before TTS/display
 // import { SmartSentenceBuffer } from '../capabilities/speak/smartSentenceBuffer'; // Phase 3: 智能句子过滤 - DISABLED (causes incomplete sentences)
 import { useSceneStore } from '../store/sceneStore'; // Scene context
 import { SceneData } from '../types/scene'; // Scene data type
@@ -292,7 +292,10 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
                       sentence,
                     });
                     onSentence(sentence, hint ? { animationHint: hint } : undefined);
-                    fullText += sentence;
+                    // Only accumulate sentences with real linguistic content
+                    if (hasMeaningfulContent(sentence)) {
+                      fullText += sentence;
+                    }
                   }
                   currentSentence = '';
                 }
@@ -368,6 +371,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
 
       setIsLoading(true);
       setError(null);
+      motionCoordinator.onAIThinking(true); // start thinking immediately, before RAG
 
       // Add user message
       const userMessage: ChatMessage = {
@@ -484,9 +488,6 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
           }
         );
 
-        // Phase 3: Generating complete, now speaking
-        setIsStreamGenerating(false);
-
         // Add AI message with full response
         const aiMessage: ChatMessage = {
           id: generateMessageId(),
@@ -503,10 +504,17 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
         // Wait for TTS queue to finish
         if (enhancedConfig?.enableTTS !== false) {
           debugLog('ChatAI', 'Phase 2: 等待TTS队列完成');
-          setIsStreamSpeaking(true); // Phase 3: Set speaking state
+          // Set speaking BEFORE clearing generating so both state updates batch
+          // in the same React render → aiStatus goes Thinking→Speaking, never Idle
+          setIsStreamSpeaking(true);
+          setIsStreamGenerating(false);
           await ttsQueue.waitForCompletion();
-          setIsStreamSpeaking(false); // Phase 3: Clear speaking state
+          setIsStreamSpeaking(false);
+          motionCoordinator.reset(); // safety: return to Idle if no TTS item played
           debugLog('ChatAI', 'Phase 2: TTS队列播放完成');
+        } else {
+          setIsStreamGenerating(false);
+          motionCoordinator.reset();
         }
 
         // Phase 3: Check if we should request user feedback
@@ -531,6 +539,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
         // Cancel TTS queue on error
         ttsQueue.cancel();
         motionCoordinator.onStopVisemes();
+        motionCoordinator.reset();
 
         // Add error message
         const errorMessage: ChatMessage = {

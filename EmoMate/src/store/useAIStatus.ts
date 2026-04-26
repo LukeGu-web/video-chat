@@ -91,10 +91,10 @@ const PRIORITY_RULES: PriorityRule[] = [
     motion: 'Speaking',
     activity: 'speaking',
   },
-  // Priority 3: Listening to user
+  // Priority 3: Listening to user — stay Idle while recording; Thinking only when AI processes
   {
     condition: (s) => s.isListening,
-    motion: 'Thinking',
+    motion: 'Idle',
     activity: 'listening',
   },
   // Priority 4: Looking at object (object recognition)

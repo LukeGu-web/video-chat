@@ -18,13 +18,18 @@ export const CLAUDE_API_CONFIG = {
   defaultModel: 'haiku' as const,
   version: '2023-06-01',
 
-  // 动态token配置 (Phase 2 优化 - 更短更生活化)
+  // Speech-content token budget (excludes action tag overhead).
+  // maxTokens sent to API = dynamicTokens[type] + actionOverhead.
   dynamicTokens: {
-    simple: 30, // 简单回应 (5-15字符，如"你好呀~") - Phase 2: 50 -> 30
-    normal: 60, // 正常对话 (15-35字符，如"今天过得怎么样？") - Phase 2: 100 -> 60
-    detailed: 120, // 详细讲解 (40-80字符，少用) - Phase 2: 200 -> 120
-    storytelling: 250, // 故事讲述 (80-150字符，罕见) - Phase 2: 400 -> 250
+    simple: 60,          // ~5-15 chars of speech
+    normal: 80,          // ~15-35 chars
+    detailed: 130,       // ~40-80 chars
+    storytelling: 280,   // ~80-150 chars
   },
+
+  // Tokens reserved for one <action>{"emotion":"..."}</action> tag per reply.
+  // Adjust here if the action format changes (e.g. multiple actions, richer payload).
+  actionOverhead: 20,
 };
 
 // 获取 API Key
@@ -263,7 +268,8 @@ If you have no memory of this user yet, just respond warmly without forcing a re
 - 每次回复最多使用 1～2 个 <action> 标签
 - 只在情绪清晰、强烈时使用，不要在每句话前都加
 - emotion 的值只能是以下之一：joy / laugh / surprise / shy / sad / excited / thinking / trust
-- 标签紧贴句子前，中间不加空格或换行`;
+- 标签紧贴句子前，中间不加空格或换行
+- **严禁**使用括号格式描述动作（如 (打招呼)、(举手)），只用 <action> 标签`;
 };
 
 // 预设人格模板（保持向后兼容）
@@ -1146,46 +1152,48 @@ export const detectConversationType = (
 };
 
 // 智能长度控制 - 根据对话类型调整 (Phase 2.1: 平衡简短和完整性)
+// maxTokens = speech budget + actionOverhead, keeping the two concerns separate.
 export const getResponseLengthConfig = (
   conversationType: 'simple' | 'normal' | 'detailed' | 'storytelling',
 ) => {
+  const { dynamicTokens, actionOverhead } = CLAUDE_API_CONFIG;
   switch (conversationType) {
     case 'simple':
       return {
-        maxTokens: CLAUDE_API_CONFIG.dynamicTokens.simple,
-        maxCharacters: 50, // Phase 2.1: 15 -> 50 (允许完整句子，但通过Token控制简短)
+        maxTokens: dynamicTokens.simple + actionOverhead,
+        maxCharacters: 50,
         targetSentences: 1,
         allowMultiParagraph: false,
       };
 
     case 'normal':
       return {
-        maxTokens: CLAUDE_API_CONFIG.dynamicTokens.normal,
-        maxCharacters: 80, // Phase 2.1: 35 -> 80 (允许1-2个完整句子)
+        maxTokens: dynamicTokens.normal + actionOverhead,
+        maxCharacters: 80,
         targetSentences: 1,
         allowMultiParagraph: false,
       };
 
     case 'detailed':
       return {
-        maxTokens: CLAUDE_API_CONFIG.dynamicTokens.detailed,
-        maxCharacters: 150, // Phase 2.1: 80 -> 150
+        maxTokens: dynamicTokens.detailed + actionOverhead,
+        maxCharacters: 150,
         targetSentences: 3,
         allowMultiParagraph: false,
       };
 
     case 'storytelling':
       return {
-        maxTokens: CLAUDE_API_CONFIG.dynamicTokens.storytelling,
-        maxCharacters: 250, // Phase 2.1: 150 -> 250
+        maxTokens: dynamicTokens.storytelling + actionOverhead,
+        maxCharacters: 250,
         targetSentences: 5,
         allowMultiParagraph: false,
       };
 
     default:
       return {
-        maxTokens: CLAUDE_API_CONFIG.dynamicTokens.normal,
-        maxCharacters: 80, // Phase 2.1: 35 -> 80
+        maxTokens: dynamicTokens.normal + actionOverhead,
+        maxCharacters: 80,
         targetSentences: 2,
         allowMultiParagraph: false,
       };

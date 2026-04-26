@@ -138,6 +138,8 @@ export const motionCoordinator = {
       _state = 'Thinking';
       sendPreset('thinking');
     } else {
+      // Guard: only transition away from Thinking; don't interrupt TTS or PostTTS states
+      if (_state !== 'Thinking') return;
       if (_pending) {
         const emotion = _pending;
         _pending = null;

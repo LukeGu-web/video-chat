@@ -24,9 +24,15 @@ export const EmotionAwareCharacter: React.FC<EmotionAwareCharacterProps> = ({
   // Route AI thinking state to coordinator (highest priority signal)
   useEffect(() => {
     if (!enableEmotionMapping) return;
-    const isThinking = aiStatus === 'Thinking';
-    debugLog('EmotionAwareCharacter', `AI thinking: ${isThinking}`);
-    motionCoordinator.onAIThinking(isThinking);
+    if (aiStatus === 'Thinking') {
+      debugLog('EmotionAwareCharacter', 'AI thinking: true');
+      motionCoordinator.onAIThinking(true);
+    } else if (aiStatus !== 'Speaking') {
+      // When Speaking, coordinator is already in TTS_Speaking (driven by onTTSStart).
+      // Calling onAIThinking(false) here would race against that transition.
+      debugLog('EmotionAwareCharacter', 'AI thinking: false');
+      motionCoordinator.onAIThinking(false);
+    }
   }, [aiStatus, enableEmotionMapping]);
 
   // Route camera facial emotion to coordinator (only acts when idle)

@@ -4,11 +4,30 @@
 
 **Goal:** Add `.vrma` full-body animation playback to the VRM character, triggered by AI `<action>{"motion":"..."}` tags and (in debug mode) manual UI buttons.
 
-**Architecture:** The character side gets a new `VRMAPlayer` class loaded into `ExpressionController` that preloads seven VRMA clips on mount and plays them on `playVRMA` commands. The EmoMate side extends `parseVRMAction` to recognise `{ motion }` payloads, and `MotionCoordinator` to queue VRMA playback after TTS ends via a new `pendingMotion` slot symmetric to the existing `pendingEmotion`.
+**Architecture:** The character side gets a new `VRMAPlayer` class loaded into `ExpressionController` that preloads seven VRMA clips on mount and plays them on `playVRMA` commands. The EmoMate side extends `parseVRMAction` to recognise `{ motion }` payloads, and `MotionCoordinator` to queue VRMA playback after TTS ends via a new `_pendingMotion` slot symmetric to the existing `_pending` (emotion).
 
 **Tech Stack:** `@pixiv/three-vrm-animation` (new), Three.js AnimationMixer, TypeScript. No test runner — verify each task with `cd character && npm run typecheck` or `cd EmoMate && npx tsc --noEmit` (must produce zero errors).
 
-> **Prerequisite:** Complete `docs/superpowers/plans/2026-04-24-motion-coordinator.md` first. This plan assumes `MotionCoordinator.ts` exists with `onAIAction`, `onTTSStart`, `onTTSEnd`, `pendingEmotion`, and that `parseVRMAction` already returns `{ intent: { emotion: EmotionType } | null, cleanText, hasPartialTag }`.
+> **Prerequisite:** `docs/superpowers/plans/2026-04-24-motion-coordinator.md` is complete. `MotionCoordinator.ts` exists with `onAIAction`, `onTTSStart`, `onTTSEnd`, module-level `_pending` / `_state` variables, and `parseVRMAction` returns `{ intent: { emotion: string } | null, cleanText, hasPartialTag }`.
+
+---
+
+## Current State (verified 2026-04-26)
+
+| Item | Status | Notes |
+|------|--------|-------|
+| VRMA files | ✅ Done | `character/public/assets/vrma/VRMA_0[1-7].vrma` |
+| `@pixiv/three-vrm-animation` | ❌ Not installed | only `@pixiv/three-vrm` is present |
+| `VRMCommand` in `EmoMate/src/types/vrm.ts` | ✅ Done | already includes `'playVRMA'` |
+| `VRMBridgeCommand.playVRMA` in `vrm-bridge.ts` | ⚠️ Wrong shape | exists as `{ url: string; loop?: boolean }` — must change to `{ name: string }` |
+| `ExpressionController` `case 'playVRMA':` | ⚠️ Stub only | `console.warn` placeholder, no real implementation |
+| `VRMAPlayer.ts` | ❌ Not created | |
+| `vrmaManifest.ts` | ❌ Not created | |
+| `parseVRMAction.ts` discriminated union | ❌ Not done | still `{ emotion: string }` only |
+| `MotionCoordinator` motion support | ❌ Not done | no `_pendingMotion`, no `onAIMotion` |
+| `useChatAI.ts` motion dispatch | ❌ Not done | |
+| `ai.ts` motion prompt rules | ❌ Not done | |
+| `HomeScreen.tsx` debug buttons | ❌ Not done | |
 
 ---
 
@@ -18,11 +37,12 @@
 |---|---|---|
 | `character/package.json` | Modify | Add `@pixiv/three-vrm-animation` dependency |
 | `character/app/components/VRMAPlayer.ts` | **Create** | Encapsulates VRMA load + Three.js AnimationMixer playback |
-| `character/app/components/vrmaManifest.ts` | **Create** | Maps motion ID → file path + UI label for all 7 clips |
-| `character/app/components/ExpressionController.tsx` | Modify | Mount `VRMAPlayer`, preload clips, handle `playVRMA` command |
-| `EmoMate/src/types/vrm.ts` | Modify | Add `VRMAMotionName` type; add `'playVRMA'` to `VRMCommand` |
+| `character/app/components/vrmaManifest.ts` | **Create** | Maps motion name → file path for all 7 clips |
+| `character/app/types/vrm-bridge.ts` | Modify | Change `playVRMA` data shape from `{ url }` to `{ name }` |
+| `character/app/components/ExpressionController.tsx` | Modify | Replace stub with VRMAPlayer integration |
+| `EmoMate/src/types/vrm.ts` | Modify | Add `VRMAMotionName` type (VRMCommand already has `playVRMA`) |
 | `EmoMate/src/utils/parseVRMAction.ts` | Modify | Extend `ActionIntent` to discriminated union; parse `{ motion }` |
-| `EmoMate/src/capabilities/motion/MotionCoordinator.ts` | Modify | Add `pendingMotion` field + `onAIMotion()` method; update `onTTSEnd` |
+| `EmoMate/src/capabilities/motion/MotionCoordinator.ts` | Modify | Add `_pendingMotion` + `onAIMotion()`; update `onTTSEnd` and `reset` |
 | `EmoMate/src/hooks/useChatAI.ts` | Modify | Dispatch `onAIMotion` when motion intent parsed |
 | `EmoMate/src/constants/ai.ts` | Modify | Add motion `<action>` rules to system prompt |
 | `EmoMate/src/screens/HomeScreen.tsx` | Modify | Add VRMA debug button row (debug mode only) |
@@ -68,7 +88,7 @@ git commit -m "chore(character): install @pixiv/three-vrm-animation"
 
 - [ ] **Step 1: Create the file**
 
-Create `character/app/components/VRMAPlayer.ts` with this exact content:
+Create `character/app/components/VRMAPlayer.ts`:
 
 ```typescript
 import { VRM } from '@pixiv/three-vrm';
@@ -144,6 +164,7 @@ git commit -m "feat(character): add VRMAPlayer class for VRMA clip playback"
 
 **Files:**
 - Create: `character/app/components/vrmaManifest.ts`
+- Modify: `character/app/types/vrm-bridge.ts`
 - Modify: `character/app/components/ExpressionController.tsx`
 
 - [ ] **Step 1: Create vrmaManifest.ts**
@@ -160,6 +181,7 @@ export type VRMAMotionName =
   | 'model_pose'
   | 'crouch';
 
+// VRoid official free VRMA pack (7 clips)
 export const VRMA_MANIFEST: Record<VRMAMotionName, string> = {
   full_pose:  '/assets/vrma/VRMA_01.vrma',
   greeting:   '/assets/vrma/VRMA_02.vrma',
@@ -171,18 +193,34 @@ export const VRMA_MANIFEST: Record<VRMAMotionName, string> = {
 };
 ```
 
-- [ ] **Step 2: Add imports to ExpressionController.tsx**
+- [ ] **Step 2: Fix VRMBridgeCommand.playVRMA shape in vrm-bridge.ts**
 
-Open `character/app/components/ExpressionController.tsx`. Find the last import line (currently `import { MOTION_PRESETS, Keyframe } from './motionPresets';`) and add two more lines directly after it:
+> **Context:** `playVRMA` already exists in `VRMBridgeCommand` but with `{ url: string; loop?: boolean }`. Change it to `{ name: string }` so EmoMate sends a name and the character looks up the URL from `vrmaManifest`.
+
+Open `character/app/types/vrm-bridge.ts`. Find:
+
+```typescript
+  | { type: 'playVRMA'; data: { url: string; loop?: boolean } };
+```
+
+Replace with:
+
+```typescript
+  | { type: 'playVRMA'; data: { name: string } };
+```
+
+- [ ] **Step 3: Add imports to ExpressionController.tsx**
+
+Open `character/app/components/ExpressionController.tsx`. Find the last import line and add two more lines directly after it:
 
 ```typescript
 import { VRMAPlayer } from './VRMAPlayer';
-import { VRMA_MANIFEST } from './vrmaManifest';
+import { VRMA_MANIFEST, VRMAMotionName } from './vrmaManifest';
 ```
 
-- [ ] **Step 3: Add VRMA refs**
+- [ ] **Step 4: Add VRMA refs**
 
-Inside `ExpressionController`, find this line:
+Inside `ExpressionController`, find:
 
 ```typescript
 const idleReturnTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -195,9 +233,9 @@ const vrmaPlayer = useRef<VRMAPlayer | null>(null);
 const vrmaClips = useRef<Map<string, THREE.AnimationClip>>(new Map());
 ```
 
-- [ ] **Step 4: Add VRMA mount useEffect**
+- [ ] **Step 5: Add VRMA mount useEffect**
 
-Find the closing `};` and `}, []);` of the existing `useEffect` (the one that adds `window.addEventListener('message', handleMessage)`). Add a new, separate `useEffect` immediately after that closing block:
+Add a new `useEffect` immediately after the existing message-listener effect:
 
 ```typescript
   useEffect(() => {
@@ -212,13 +250,23 @@ Find the closing `};` and `}, []);` of the existing `useEffect` (the one that ad
   }, [vrm]);
 ```
 
-- [ ] **Step 5: Add playVRMA case to the message handler switch**
+- [ ] **Step 6: Replace the playVRMA stub**
 
-Inside the existing `switch (cmd.type)` block, find `case 'stopAll':` and add the following new case **directly before** it:
+Find the existing stub (around line 297):
+
+```typescript
+        case 'playVRMA':
+          // Reserved for future VRMA clip support.
+          // Implement by loading and playing a .vrma file via @pixiv/three-vrm-animation.
+          console.warn('[ExpressionController] playVRMA not yet implemented:', cmd.data);
+          break;
+```
+
+Replace it with:
 
 ```typescript
         case 'playVRMA': {
-          const clip = vrmaClips.current.get(cmd.data.name as string);
+          const clip = vrmaClips.current.get((cmd.data as { name: string }).name);
           if (!clip || !vrmaPlayer.current) break;
           presetState.current = { name: null, elapsed: 0, loop: false };
           vrmaPlayer.current.play(clip, () => {
@@ -228,39 +276,21 @@ Inside the existing `switch (cmd.type)` block, find `case 'stopAll':` and add th
         }
 ```
 
-Also update the `VRMBridgeCommand` type import — `vrm-bridge.ts` must include `playVRMA` (done in Task 4 below). The TypeScript check in Step 6 will catch any type mismatch.
+- [ ] **Step 7: Add update() call in useFrame**
 
-- [ ] **Step 6: Add update() call in useFrame**
-
-Inside `useFrame`, find this line (near the end of the callback):
+Inside `useFrame`, find:
 
 ```typescript
     if (em) em.update();
     vrm.update(delta);
 ```
 
-Insert `vrmaPlayer.current?.update(delta);` **between** those two lines:
+Insert `vrmaPlayer.current?.update(delta);` between them:
 
 ```typescript
     if (em) em.update();
     vrmaPlayer.current?.update(delta);
     vrm.update(delta);
-```
-
-- [ ] **Step 7: Add playVRMA to VRMBridgeCommand in vrm-bridge.ts**
-
-Open `character/app/types/vrm-bridge.ts`. Find the `VRMBridgeCommand` union type and add one new member at the end, before the closing semicolon:
-
-```typescript
-  | { type: 'playVRMA'; data: { name: string } }
-```
-
-The full union should now end with:
-
-```typescript
-  | { type: 'stopAll' }
-  | { type: 'ping' }
-  | { type: 'playVRMA'; data: { name: string } };
 ```
 
 - [ ] **Step 8: TypeScript check**
@@ -276,31 +306,24 @@ Expected: zero errors.
 
 ```bash
 git add character/app/components/vrmaManifest.ts \
-        character/app/components/ExpressionController.tsx \
-        character/app/types/vrm-bridge.ts
+        character/app/types/vrm-bridge.ts \
+        character/app/components/ExpressionController.tsx
 git commit -m "feat(character): integrate VRMAPlayer into ExpressionController"
 ```
 
 ---
 
-## Task 4: EmoMate — Extend types + parseVRMAction
+## Task 4: EmoMate — Add VRMAMotionName type + extend parseVRMAction
 
 **Files:**
 - Modify: `EmoMate/src/types/vrm.ts`
 - Modify: `EmoMate/src/utils/parseVRMAction.ts`
 
+> **Note:** `VRMCommand.type` already includes `'playVRMA'`. Only need to add the `VRMAMotionName` union type and update `parseVRMAction`.
+
 - [ ] **Step 1: Add VRMAMotionName to vrm.ts**
 
-Open `EmoMate/src/types/vrm.ts`. Find the `VRMCommand` interface:
-
-```typescript
-export interface VRMCommand {
-  type: 'setExpression' | 'playPreset' | 'playPose' | 'stopAll' | 'prepareVisemes' | 'stopVisemes' | 'lipSyncStart';
-  data?: any;
-}
-```
-
-Replace it with:
+Open `EmoMate/src/types/vrm.ts`. Find the `VRMCommand` interface and add the new type **above** it:
 
 ```typescript
 export type VRMAMotionName =
@@ -311,12 +334,9 @@ export type VRMAMotionName =
   | 'spin'
   | 'model_pose'
   | 'crouch';
-
-export interface VRMCommand {
-  type: 'setExpression' | 'playPreset' | 'playPose' | 'stopAll' | 'prepareVisemes' | 'stopVisemes' | 'lipSyncStart' | 'playVRMA';
-  data?: any;
-}
 ```
+
+(`VRMCommand` already has `'playVRMA'` in its type union — no further change needed.)
 
 - [ ] **Step 2: Rewrite parseVRMAction.ts**
 
@@ -346,7 +366,6 @@ const VALID_MOTIONS = new Set<string>([
 
 export function parseVRMAction(text: string): ParseActionResult {
   let intent: ActionIntent | null = null;
-  let cleanText = text;
 
   const completeRegex = /<action>([\s\S]*?)<\/action>/g;
   let match: RegExpExecArray | null;
@@ -359,13 +378,13 @@ export function parseVRMAction(text: string): ParseActionResult {
         intent = { type: 'motion', motion: payload.motion as VRMAMotionName };
       }
     } catch {
-      // invalid JSON — discard tag but still strip it from text
+      // malformed JSON — discard tag but still strip it from text
     }
   }
-  cleanText = text.replace(/<action>[\s\S]*?<\/action>/g, '').trim();
+  let cleanText = text.replace(/<action>[\s\S]*?<\/action>/g, '').trim();
 
-  const partialStart = cleanText.lastIndexOf('<action>');
   let hasPartialTag = false;
+  const partialStart = cleanText.lastIndexOf('<action>');
   if (partialStart !== -1) {
     hasPartialTag = true;
     cleanText = cleanText.slice(0, partialStart).trim();
@@ -382,13 +401,13 @@ cd EmoMate
 npx tsc --noEmit
 ```
 
-Expected: zero errors. If there are errors in `useChatAI.ts` about `intent.emotion` (because `intent` is now a discriminated union), those will be fixed in Task 6 — they are expected at this stage.
+Expected: errors in `useChatAI.ts` about `intent.emotion` (because `intent` is now a discriminated union) — these are **expected** and will be fixed in Task 6.
 
 - [ ] **Step 4: Commit**
 
 ```bash
 git add EmoMate/src/types/vrm.ts EmoMate/src/utils/parseVRMAction.ts
-git commit -m "feat(EmoMate): extend VRMCommand and parseVRMAction for VRMA motion type"
+git commit -m "feat(EmoMate): add VRMAMotionName and extend parseVRMAction discriminated union"
 ```
 
 ---
@@ -398,63 +417,120 @@ git commit -m "feat(EmoMate): extend VRMCommand and parseVRMAction for VRMA moti
 **Files:**
 - Modify: `EmoMate/src/capabilities/motion/MotionCoordinator.ts`
 
-- [ ] **Step 1: Import VRMAMotionName**
+> **IMPORTANT — Architecture:** `MotionCoordinator.ts` uses **module-level variables** (not a class). All new code must follow that pattern: module-level `let _pendingMotion`, and `onAIMotion` added as a property of the exported `motionCoordinator` object. Do NOT use `this.` anywhere.
 
-Open `EmoMate/src/capabilities/motion/MotionCoordinator.ts`. Find the imports at the top and add:
+- [ ] **Step 1: Add _pendingMotion module variable**
+
+Open `EmoMate/src/capabilities/motion/MotionCoordinator.ts`. Find the existing module-level variable declarations:
+
+```typescript
+let _handler: VRMCommandFn | null = null;
+let _state: CoordState = 'Idle';
+let _pending: string | null = null;      // emotion waiting for TTS to end
+let _postTimer: ReturnType<typeof setTimeout> | null = null;
+let _camTimer:  ReturnType<typeof setTimeout> | null = null;
+```
+
+Add one line after `_pending`:
+
+```typescript
+let _pendingMotion: string | null = null; // VRMA motion name waiting for TTS to end
+```
+
+- [ ] **Step 2: Add VRMAMotionName import**
+
+At the top of the file, add:
 
 ```typescript
 import { VRMAMotionName } from '../../types/vrm';
 ```
 
-- [ ] **Step 2: Add pendingMotion field**
+- [ ] **Step 3: Update reset() to clear _pendingMotion**
 
-Find the `private pendingEmotion` field declaration inside the `MotionCoordinator` class. Add the new field directly after it:
-
-```typescript
-  private pendingMotion: VRMAMotionName | null = null;
-```
-
-- [ ] **Step 3: Add onAIMotion method**
-
-Find the `onAIAction` method. Add a new `onAIMotion` method directly after it:
+Find the `reset()` method:
 
 ```typescript
-  onAIMotion(motionName: VRMAMotionName): void {
-    const isSpeaking =
-      this.state === 'TTS_Speaking' ||
-      this.state === 'TTS_Laughing' ||
-      this.state.startsWith('TTS_Emotion');
-    if (isSpeaking) {
-      this.pendingMotion = motionName;
-      this.pendingEmotion = null;
-    } else {
-      this.sendCommand({ type: 'playVRMA', data: { name: motionName } });
-    }
-  }
+  reset(): void {
+    clearPostTimer();
+    clearCamTimer();
+    _state = 'Idle';
+    _pending = null;
+    sendPreset('idle');
+  },
 ```
 
-- [ ] **Step 4: Update onTTSEnd to check pendingMotion first**
+Add `_pendingMotion = null;` after `_pending = null;`:
 
-Find the `onTTSEnd` method. It currently starts by checking `this.pendingEmotion`. Add a `pendingMotion` check **before** that existing check, so the method begins with:
+```typescript
+  reset(): void {
+    clearPostTimer();
+    clearCamTimer();
+    _state = 'Idle';
+    _pending = null;
+    _pendingMotion = null;
+    sendPreset('idle');
+  },
+```
+
+- [ ] **Step 4: Update onTTSEnd() to check _pendingMotion first**
+
+Find the `onTTSEnd()` method:
 
 ```typescript
   onTTSEnd(): void {
-    if (this.pendingMotion) {
-      const name = this.pendingMotion;
-      this.pendingMotion = null;
-      this.pendingEmotion = null;
-      this.sendCommand({ type: 'playVRMA', data: { name } });
-      this.setState('Idle');
-      return;
+    if (!isTTSActive(_state)) return;
+    if (_pending) {
+      const emotion = _pending;
+      _pending = null;
+      _state = { tag: 'PostTTS_Emotion', emotion };
+      playEmotionThenIdle(emotion);
+    } else {
+      _state = 'Idle';
+      sendPreset('idle');
     }
-    // existing pendingEmotion check follows unchanged ...
+  },
 ```
 
-Leave everything after the new block unchanged.
+Replace with (add `_pendingMotion` check **before** the `_pending` check):
 
-- [ ] **Step 5: Export onAIMotion from capabilities/motion/index.ts**
+```typescript
+  onTTSEnd(): void {
+    if (!isTTSActive(_state)) return;
+    if (_pendingMotion) {
+      const name = _pendingMotion;
+      _pendingMotion = null;
+      _pending = null;
+      _state = 'Idle';
+      send({ type: 'playVRMA', data: { name } });
+      return;
+    }
+    if (_pending) {
+      const emotion = _pending;
+      _pending = null;
+      _state = { tag: 'PostTTS_Emotion', emotion };
+      playEmotionThenIdle(emotion);
+    } else {
+      _state = 'Idle';
+      sendPreset('idle');
+    }
+  },
+```
 
-Open `EmoMate/src/capabilities/motion/index.ts`. Verify it exports `motionCoordinator` (added by the motion coordinator plan). No new line needed unless the export is missing.
+- [ ] **Step 5: Add onAIMotion() to the motionCoordinator object**
+
+Find the `onAIAction` method in the `motionCoordinator` export. Add `onAIMotion` directly after it:
+
+```typescript
+  onAIMotion(motionName: VRMAMotionName): void {
+    if (isTTSActive(_state) || _state === 'Thinking') {
+      _pendingMotion = motionName;
+      _pending = null; // motion takes priority over any queued emotion
+    } else {
+      _state = 'Idle';
+      send({ type: 'playVRMA', data: { name: motionName } });
+    }
+  },
+```
 
 - [ ] **Step 6: TypeScript check**
 
@@ -463,13 +539,13 @@ cd EmoMate
 npx tsc --noEmit
 ```
 
-Expected: zero errors.
+Expected: zero errors (or only the pre-existing `useChatAI.ts` errors from Task 4).
 
 - [ ] **Step 7: Commit**
 
 ```bash
 git add EmoMate/src/capabilities/motion/MotionCoordinator.ts
-git commit -m "feat(EmoMate): add pendingMotion and onAIMotion to MotionCoordinator"
+git commit -m "feat(EmoMate): add _pendingMotion and onAIMotion to MotionCoordinator"
 ```
 
 ---
@@ -482,12 +558,17 @@ git commit -m "feat(EmoMate): add pendingMotion and onAIMotion to MotionCoordina
 
 - [ ] **Step 1: Update the action dispatch in useChatAI.ts**
 
-Open `EmoMate/src/hooks/useChatAI.ts`. Find the block that currently handles `intent` from `parseVRMAction` (added by the motion coordinator plan). It looks like:
+Open `EmoMate/src/hooks/useChatAI.ts`. Find the block that handles `intent` from `parseVRMAction`. It currently looks like:
 
 ```typescript
 const { intent, cleanText, hasPartialTag } = parseVRMAction(rawBuffer);
 if (intent) {
+  const STORE_EMOTION_MAP: Record<string, string> = { laugh: 'joy', sad: 'sadness' };
+  const storeEmotion = STORE_EMOTION_MAP[intent.emotion] ?? intent.emotion;
+  useEmotionStore.getState().setTextEmotion(storeEmotion as EmotionType);
   motionCoordinator.onAIAction(intent.emotion);
+  pendingHint = intent.emotion;
+  debugLog('ChatAI', 'AI action dispatched', intent);
 }
 ```
 
@@ -496,24 +577,21 @@ Replace the `if (intent)` block with a discriminated check:
 ```typescript
               const { intent, cleanText, hasPartialTag } = parseVRMAction(rawBuffer);
               if (intent?.type === 'emotion') {
+                const STORE_EMOTION_MAP: Record<string, string> = { laugh: 'joy', sad: 'sadness' };
+                const storeEmotion = STORE_EMOTION_MAP[intent.emotion] ?? intent.emotion;
+                useEmotionStore.getState().setTextEmotion(storeEmotion as EmotionType);
                 motionCoordinator.onAIAction(intent.emotion);
+                pendingHint = intent.emotion;
+                debugLog('ChatAI', 'AI action dispatched', intent);
               } else if (intent?.type === 'motion') {
                 motionCoordinator.onAIMotion(intent.motion);
+                debugLog('ChatAI', 'AI motion dispatched', intent);
               }
 ```
 
 - [ ] **Step 2: Add motion action rules to the system prompt in ai.ts**
 
-Open `EmoMate/src/constants/ai.ts`. Find the `<action>` format rule that the motion coordinator plan added to the system prompt. It will look something like:
-
-```
-When expressing emotion, insert an <action> tag before the relevant sentence:
-<action>{"emotion":"laugh"}</action>哈哈哈，真的好笑！
-...
-emotion values: joy / laugh / surprise / shy / sad / excited / thinking / trust
-```
-
-Append the following paragraph directly after the existing emotion action rules (inside the same string, before the closing quote):
+Open `EmoMate/src/constants/ai.ts`. Find the `<action>` format rules in the system prompt (the block describing emotion action format). Append the following directly after the emotion action rules:
 
 ```
 When the user asks you to pose, gesture, or move your body, insert a motion <action> tag before the response:
@@ -530,7 +608,7 @@ Available motion values:
 - model_pose  模特走秀姿势
 - crouch      蹲下
 
-Motion rules: max 1 motion action per reply; do not use motion and emotion actions together in the same reply; only use when the user explicitly requests a pose or movement.
+Motion rules: max 1 motion action per reply; do not combine motion and emotion actions in the same reply; only use when the user explicitly requests a pose or movement.
 ```
 
 - [ ] **Step 3: TypeScript check**
@@ -558,28 +636,12 @@ git commit -m "feat(EmoMate): dispatch onAIMotion in useChatAI; add motion actio
 
 - [ ] **Step 1: Add missing imports**
 
-Open `EmoMate/src/screens/HomeScreen.tsx`. Find the existing React Native import line at the top:
-
-```typescript
-import { View, Text, ImageBackground, ActivityIndicator } from 'react-native';
-```
-
-Add `ScrollView` and `TouchableOpacity` to that import:
-
-```typescript
-import { View, Text, ImageBackground, ActivityIndicator, ScrollView, TouchableOpacity } from 'react-native';
-```
-
-Also add an import for `isDebugMode` if it is not already imported:
+Open `EmoMate/src/screens/HomeScreen.tsx`. Add `ScrollView` and `TouchableOpacity` to the React Native import if not already present. Also add:
 
 ```typescript
 import { isDebugMode } from '../utils/debug';
-```
-
-Add an import for `VRMAMotionName` and the label map. Add this line with the other imports:
-
-```typescript
 import { VRMAMotionName } from '../types/vrm';
+import { motionCoordinator } from '../capabilities/motion';
 ```
 
 - [ ] **Step 2: Add the label constant**
@@ -591,24 +653,16 @@ const VRMA_MOTION_LABELS: Record<VRMAMotionName, string> = {
   full_pose:  '全身照',
   greeting:   '问候',
   v_sign:     'V字',
-  photo_pose: '拍摄',
+  photo_pose: '拍照',
   spin:       '旋转',
   model_pose: '模特',
   crouch:     '蹲姿',
 };
 ```
 
-- [ ] **Step 3: Add the import for motionCoordinator**
+- [ ] **Step 3: Add the debug button row to the JSX**
 
-Add this import alongside the other capability imports at the top of `HomeScreen.tsx`:
-
-```typescript
-import { motionCoordinator } from '../capabilities/motion';
-```
-
-- [ ] **Step 4: Add the debug button row to the JSX**
-
-Find the location where other debug UI is rendered (look for `{isDebugMode() && ...}`). Add the following block after the existing debug UI:
+Find where other debug UI is rendered (look for `{isDebugMode() && ...}`). Add the following block:
 
 ```tsx
         {isDebugMode() && (
@@ -638,8 +692,6 @@ Find the location where other debug UI is rendered (look for `{isDebugMode() && 
         )}
 ```
 
-> **Note:** `onAIMotion` plays the clip immediately when the coordinator is Idle (typical in debug use). If TTS is active when the button is tapped, the clip queues and plays after speech ends — same as the normal AI flow.
-
 - [ ] **Step 4: TypeScript check**
 
 ```bash
@@ -665,7 +717,8 @@ After all tasks pass TypeScript checks:
 - [ ] Start the character server: `cd character && npm run dev`
 - [ ] Start EmoMate in debug mode: `cd EmoMate && SHOW_TEST_COMPONENTS=true npx expo start`
 - [ ] Open the app — verify the VRMA debug button row appears at the bottom
-- [ ] Tap each button and confirm the matching animation plays and the character returns to idle afterward
-- [ ] Say "转一圈" to the AI — confirm the character spins after the AI finishes speaking (not during)
+- [ ] Tap each of the 7 buttons; confirm the matching animation plays and character returns to idle
+- [ ] Say "转一圈" — confirm spin plays after AI finishes speaking (not during TTS)
 - [ ] Say "比个V" — confirm v_sign plays after TTS ends
-- [ ] Verify that during a VRMA clip, sending `playPreset` (e.g. from camera emotion) does not interrupt
+- [ ] Say "打个招呼" — confirm greeting plays; should NOT conflict with the speaking animation
+- [ ] Verify that during a VRMA clip, `playPreset` from camera emotion is ignored (coordinator is in Idle after VRMA, so camera emotion only fires when truly idle)

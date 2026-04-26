@@ -62,14 +62,9 @@ export const MOTION_PRESETS: Record<PresetName, MotionPreset> = {
     name: 'thinking',
     loop: false,
     keyframes: [
-      { time: 0.0, bones: { ...R, head: { z: 0, x: 0 }, rightLowerArm: { z: 0 } } },
-      { time: 0.8, bones: {
-        rightUpperArm: { z: -0.2, y: -0.4 },
-        rightLowerArm: { z: -1.0 },
-        leftUpperArm:  { z: -1.5 },
-        head: { z: 0.18, x: 0.05 },
-        spine: { z: 0.02 },
-      }},
+      { time: 0.0, bones: { ...R, rightLowerArm: { z: 0 }, head: { z: 0, x: 0 } } },
+      // Arms stay at rest (no arm bones here); only head tilts
+      { time: 0.8, bones: { head: { z: 0.18, x: 0.05 }, spine: { z: 0.02 } } },
     ],
   },
 
