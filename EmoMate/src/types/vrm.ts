@@ -1,5 +1,14 @@
 // EmoMate/src/types/vrm.ts
 
+export type VRMAMotionName =
+  | 'full_pose'
+  | 'greeting'
+  | 'v_sign'
+  | 'photo_pose'
+  | 'spin'
+  | 'model_pose'
+  | 'crouch';
+
 export interface VRMBlendShapeMap {
   joy?: number;
   angry?: number;

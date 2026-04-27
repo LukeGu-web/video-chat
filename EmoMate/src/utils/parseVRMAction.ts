@@ -1,6 +1,9 @@
-export interface ActionIntent {
-  emotion: string; // "joy" | "laugh" | "surprise" | "shy" | "sad" | "excited" | "thinking" | "trust"
-}
+import { EmotionType } from '../types/emotion';
+import { VRMAMotionName } from '../types/vrm';
+
+export type ActionIntent =
+  | { type: 'emotion'; emotion: EmotionType }
+  | { type: 'motion';  motion: VRMAMotionName };
 
 export interface ParseActionResult {
   intent: ActionIntent | null;
@@ -8,40 +11,31 @@ export interface ParseActionResult {
   hasPartialTag: boolean;
 }
 
-const VALID_EMOTIONS = new Set([
-  'joy', 'laugh', 'surprise', 'shy', 'sad', 'sadness',
-  'excited', 'thinking', 'trust', 'fear', 'anger', 'disgust',
-  'anticipation', 'neutral',
+const VALID_EMOTIONS = new Set<string>([
+  'joy', 'laugh', 'surprise', 'shy', 'sad', 'excited', 'thinking', 'trust',
 ]);
 
-function parseIntent(raw: string): ActionIntent | null {
-  try {
-    const parsed = JSON.parse(raw.trim()) as Record<string, unknown>;
-    if (typeof parsed.emotion === 'string' && VALID_EMOTIONS.has(parsed.emotion)) {
-      return { emotion: parsed.emotion };
-    }
-  } catch {
-    // malformed JSON — discard
-  }
-  return null;
-}
+const VALID_MOTIONS = new Set<string>([
+  'full_pose', 'greeting', 'v_sign', 'photo_pose', 'spin', 'model_pose', 'crouch',
+]);
 
-/**
- * Processes a raw streaming text buffer.
- * - Strips complete <action>...</action> blocks from cleanText.
- * - Returns the last parsed ActionIntent found (if any).
- * - Sets hasPartialTag=true when an unclosed <action> is at the end.
- */
 export function parseVRMAction(text: string): ParseActionResult {
   let intent: ActionIntent | null = null;
 
   const completeRegex = /<action>([\s\S]*?)<\/action>/g;
   let match: RegExpExecArray | null;
   while ((match = completeRegex.exec(text)) !== null) {
-    const parsed = parseIntent(match[1]);
-    if (parsed) intent = parsed; // keep last valid intent
+    try {
+      const payload = JSON.parse(match[1].trim()) as Record<string, unknown>;
+      if (typeof payload.emotion === 'string' && VALID_EMOTIONS.has(payload.emotion)) {
+        intent = { type: 'emotion', emotion: payload.emotion as EmotionType };
+      } else if (typeof payload.motion === 'string' && VALID_MOTIONS.has(payload.motion)) {
+        intent = { type: 'motion', motion: payload.motion as VRMAMotionName };
+      }
+    } catch {
+      // malformed JSON — discard tag but still strip it from text
+    }
   }
-
   let cleanText = text.replace(/<action>[\s\S]*?<\/action>/g, '').trim();
 
   let hasPartialTag = false;
