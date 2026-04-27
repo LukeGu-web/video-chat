@@ -327,7 +327,10 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
         .then(clip => { vrmaClips.current.set(name, clip); })
         .catch(err => { console.error(`[VRMAPlayer] Failed to load "${name}":`, err); });
     });
-    return () => { player.dispose(); };
+    return () => {
+      player.dispose();
+      vrmaClips.current.clear();
+    };
   }, [vrm]);
 
   // ─── Per-frame update ──────────────────────────────────────────────────────

@@ -251,6 +251,7 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
             // Parse SSE chunk
             const text = parseSSEChunk(line);
             if (text) {
+              prevCleanCommitted = 0;
               rawBuffer += text;
 
               // Strip complete <action> blocks; dispatch last found action
