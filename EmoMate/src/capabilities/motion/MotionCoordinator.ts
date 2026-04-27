@@ -141,7 +141,14 @@ export const motionCoordinator = {
     } else {
       // Guard: only transition away from Thinking; don't interrupt TTS or PostTTS states
       if (_state !== 'Thinking') return;
-      if (_pending) {
+      if (_pendingMotion) {
+        // Motion-only reply: no TTS will follow, dispatch immediately
+        const name = _pendingMotion;
+        _pendingMotion = null;
+        _pending = null;
+        _state = 'Idle';
+        send({ type: 'playVRMA', data: { name } });
+      } else if (_pending) {
         const emotion = _pending;
         _pending = null;
         _state = { tag: 'PostTTS_Emotion', emotion };

@@ -10,6 +10,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 export class VRMAPlayer {
   private mixer: THREE.AnimationMixer;
   private action: THREE.AnimationAction | null = null;
+  private finishHandler: (() => void) | null = null;
 
   constructor(private vrm: VRM) {
     this.mixer = new THREE.AnimationMixer(vrm.scene);
@@ -19,19 +20,24 @@ export class VRMAPlayer {
     const loader = new GLTFLoader();
     loader.register(parser => new VRMAnimationLoaderPlugin(parser));
     const gltf = await loader.loadAsync(url);
-    const anim: VRMAnimation = gltf.userData.vrmAnimations[0];
+    const anims = gltf.userData.vrmAnimations as VRMAnimation[] | undefined;
+    if (!anims || anims.length === 0) {
+      throw new Error(`No VRM animations found in "${url}"`);
+    }
     // Cast needed: three-vrm-animation bundles its own three-vrm-core, causing
     // private-property structural mismatch between the two VRMCore declarations.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return createVRMAnimationClip(anim, this.vrm as any);
+    return createVRMAnimationClip(anims[0], this.vrm as any);
   }
 
   play(clip: THREE.AnimationClip, onFinish: () => void): void {
     this.stop();
     const handler = () => {
+      this.finishHandler = null;
       this.mixer.removeEventListener('finished', handler);
       onFinish();
     };
+    this.finishHandler = handler;
     this.mixer.addEventListener('finished', handler);
     this.action = this.mixer.clipAction(clip);
     this.action.setLoop(THREE.LoopOnce, 1);
@@ -40,6 +46,10 @@ export class VRMAPlayer {
   }
 
   stop(): void {
+    if (this.finishHandler) {
+      this.mixer.removeEventListener('finished', this.finishHandler);
+      this.finishHandler = null;
+    }
     this.mixer.stopAllAction();
     this.action = null;
   }
