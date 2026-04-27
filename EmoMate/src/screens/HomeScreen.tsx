@@ -1,5 +1,5 @@
 import React, { useEffect, useCallback, useState, useRef } from 'react';
-import { View, Text, ImageBackground, ActivityIndicator } from 'react-native';
+import { View, Text, ImageBackground, ActivityIndicator, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useIsFocused } from '@react-navigation/native';
 import { useAIStatus, useSceneStore } from '../store';
@@ -37,12 +37,25 @@ import {
   createRecognitionPrompt,
   isConfidenceAcceptable,
 } from '../utils/objectRecognitionHelper';
+import { isDebugMode } from '../utils/debug';
+import { VRMAMotionName } from '../types/vrm';
+import { motionCoordinator } from '../capabilities/motion';
 
 // Emotion detector configuration constants (avoid re-creating on each render)
 const EMOTION_DETECTOR_CONFIG = {
   detectionInterval: 30000,
   frameCaptureInterval: 5000, // 5 seconds - faster initial capture for scene understanding
 } as const;
+
+const VRMA_MOTION_LABELS: Record<VRMAMotionName, string> = {
+  full_pose:  '全身照',
+  greeting:   '问候',
+  v_sign:     'V字',
+  photo_pose: '拍照',
+  spin:       '旋转',
+  model_pose: '模特',
+  crouch:     '蹲姿',
+};
 
 // HomeScreen内容组件
 const HomeScreen: React.FC = () => {
@@ -395,6 +408,33 @@ const HomeScreen: React.FC = () => {
           isActive={isFocused} // Stop detection when screen loses focus
           {...EMOTION_DETECTOR_CONFIG}
         />
+
+        {/* VRMA Animation Debug Buttons */}
+        {isDebugMode() && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ position: 'absolute', bottom: 120, left: 0, right: 0 }}
+            contentContainerStyle={{ paddingHorizontal: 8, gap: 8 }}
+          >
+            {(Object.entries(VRMA_MOTION_LABELS) as [VRMAMotionName, string][]).map(
+              ([name, label]) => (
+                <TouchableOpacity
+                  key={name}
+                  onPress={() => motionCoordinator.onAIMotion(name)}
+                  style={{
+                    backgroundColor: 'rgba(100,60,200,0.75)',
+                    borderRadius: 8,
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontSize: 12 }}>{label}</Text>
+                </TouchableOpacity>
+              )
+            )}
+          </ScrollView>
+        )}
 
         {/* Function Monitor - Unified Debug Panel */}
         <FunctionMonitor
