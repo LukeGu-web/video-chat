@@ -1,8 +1,7 @@
-import { EmotionType } from '../types/emotion';
 import { VRMAMotionName } from '../types/vrm';
 
 export type ActionIntent =
-  | { type: 'emotion'; emotion: EmotionType }
+  | { type: 'emotion'; emotion: string }
   | { type: 'motion';  motion: VRMAMotionName };
 
 export interface ParseActionResult {
@@ -28,7 +27,7 @@ export function parseVRMAction(text: string): ParseActionResult {
     try {
       const payload = JSON.parse(match[1].trim()) as Record<string, unknown>;
       if (typeof payload.emotion === 'string' && VALID_EMOTIONS.has(payload.emotion)) {
-        intent = { type: 'emotion', emotion: payload.emotion as EmotionType };
+        intent = { type: 'emotion', emotion: payload.emotion };
       } else if (typeof payload.motion === 'string' && VALID_MOTIONS.has(payload.motion)) {
         intent = { type: 'motion', motion: payload.motion as VRMAMotionName };
       }
