@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@pixiv/three-vrm": "^3.5.1",
+    "@pixiv/three-vrm-animation": "^3.5.2",
     "@react-three/drei": "^9.122.0",
     "@react-three/fiber": "^8.18.0",
     "@remix-run/node": "^2.16.8",
