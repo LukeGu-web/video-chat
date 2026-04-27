@@ -1,5 +1,5 @@
 import { EmotionType } from '../../types/emotion';
-import { VRMCommand } from '../../types/vrm';
+import { VRMCommand, VRMAMotionName } from '../../types/vrm';
 
 // ─── Emotion → preset name ────────────────────────────────────────────────────
 
@@ -66,6 +66,7 @@ type VRMCommandFn = (cmd: VRMCommand) => void;
 let _handler: VRMCommandFn | null = null;
 let _state: CoordState = 'Idle';
 let _pending: string | null = null;      // emotion waiting for TTS to end
+let _pendingMotion: string | null = null; // VRMA motion name waiting for TTS to end
 let _postTimer: ReturnType<typeof setTimeout> | null = null;
 let _camTimer:  ReturnType<typeof setTimeout> | null = null;
 
@@ -177,6 +178,14 @@ export const motionCoordinator = {
   /** Called by useTTSQueue when a segment finishes playing. */
   onTTSEnd(): void {
     if (!isTTSActive(_state)) return;
+    if (_pendingMotion) {
+      const name = _pendingMotion;
+      _pendingMotion = null;
+      _pending = null;
+      _state = 'Idle';
+      send({ type: 'playVRMA', data: { name } });
+      return;
+    }
     if (_pending) {
       const emotion = _pending;
       _pending = null;
@@ -199,6 +208,16 @@ export const motionCoordinator = {
     } else {
       _state = { tag: 'PostTTS_Emotion', emotion };
       playEmotionThenIdle(emotion);
+    }
+  },
+
+  onAIMotion(motionName: VRMAMotionName): void {
+    if (isTTSActive(_state) || _state === 'Thinking') {
+      _pendingMotion = motionName;
+      _pending = null; // motion takes priority over any queued emotion
+    } else {
+      _state = 'Idle';
+      send({ type: 'playVRMA', data: { name: motionName } });
     }
   },
 
@@ -244,6 +263,7 @@ export const motionCoordinator = {
     clearCamTimer();
     _state = 'Idle';
     _pending = null;
+    _pendingMotion = null;
     sendPreset('idle');
   },
 };
