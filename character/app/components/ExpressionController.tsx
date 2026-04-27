@@ -291,6 +291,7 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
 
         case 'stopAll':
           presetState.current = { name: 'idle', elapsed: 0, loop: true };
+          vrmaPlayer.current?.stop();   // stop any in-progress VRMA clip
           state.targetBlendShapes = {};
           state.targetBones = {};
           state.transitionDuration = 0.5;
@@ -322,11 +323,11 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
     const player = new VRMAPlayer(vrm);
     vrmaPlayer.current = player;
     Object.entries(VRMA_MANIFEST).forEach(([name, url]) => {
-      player.load(url).then(clip => {
-        vrmaClips.current.set(name, clip);
-      });
+      player.load(url)
+        .then(clip => { vrmaClips.current.set(name, clip); })
+        .catch(err => { console.error(`[VRMAPlayer] Failed to load "${name}":`, err); });
     });
-    return () => { player.stop(); };
+    return () => { player.dispose(); };
   }, [vrm]);
 
   // ─── Per-frame update ──────────────────────────────────────────────────────

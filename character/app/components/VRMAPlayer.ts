@@ -47,4 +47,9 @@ export class VRMAPlayer {
   update(delta: number): void {
     this.mixer.update(delta);
   }
+
+  dispose(): void {
+    this.stop();
+    this.mixer.uncacheRoot(this.vrm.scene);
+  }
 }
