@@ -6,6 +6,8 @@ import { VRM, VRMExpressionPresetName } from '@pixiv/three-vrm';
 import * as THREE from 'three';
 import { VRMBridgeCommand, BlendShapeMap, BoneMap, EasingType } from '../types/vrm-bridge';
 import { MOTION_PRESETS, Keyframe } from './motionPresets';
+import { VRMAPlayer } from './VRMAPlayer';
+import { VRMA_MANIFEST, VRMAMotionName } from './vrmaManifest';
 
 // ─── Easing functions ─────────────────────────────────────────────────────────
 
@@ -138,6 +140,8 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
   const presetBlendShapeActive = useRef(false);
 
   const idleReturnTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const vrmaPlayer = useRef<VRMAPlayer | null>(null);
+  const vrmaClips = useRef<Map<string, THREE.AnimationClip>>(new Map());
   const currentPriority = useRef(0);
 
   // ─── setValue helpers (no em.update — called once at end of frame) ──────────
@@ -294,11 +298,16 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
           state.isAnimating = true;
           break;
 
-        case 'playVRMA':
-          // Reserved for future VRMA clip support.
-          // Implement by loading and playing a .vrma file via @pixiv/three-vrm-animation.
-          console.warn('[ExpressionController] playVRMA not yet implemented:', cmd.data);
+        case 'playVRMA': {
+          const motionData = cmd.data as { name: VRMAMotionName };
+          const clip = vrmaClips.current.get(motionData.name);
+          if (!clip || !vrmaPlayer.current) break;
+          presetState.current = { name: null, elapsed: 0, loop: false };
+          vrmaPlayer.current.play(clip, () => {
+            presetState.current = { name: 'idle', elapsed: 0, loop: true };
+          });
           break;
+        }
       }
     };
 
@@ -308,6 +317,17 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
       if (idleReturnTimer.current) clearTimeout(idleReturnTimer.current);
     };
   }, []);
+
+  useEffect(() => {
+    const player = new VRMAPlayer(vrm);
+    vrmaPlayer.current = player;
+    Object.entries(VRMA_MANIFEST).forEach(([name, url]) => {
+      player.load(url).then(clip => {
+        vrmaClips.current.set(name, clip);
+      });
+    });
+    return () => { player.stop(); };
+  }, [vrm]);
 
   // ─── Per-frame update ──────────────────────────────────────────────────────
 
@@ -471,6 +491,7 @@ export function ExpressionController({ vrm }: ExpressionControllerProps) {
     // All em.setValue calls (including those from LipSyncController which runs
     // before this component in the render tree) are compiled here in one shot.
     if (em) em.update();
+    vrmaPlayer.current?.update(delta);
     vrm.update(delta);
   });
 
