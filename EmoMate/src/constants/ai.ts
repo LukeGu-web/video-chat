@@ -269,7 +269,27 @@ If you have no memory of this user yet, just respond warmly without forcing a re
 - 只在情绪清晰、强烈时使用，不要在每句话前都加
 - emotion 的值只能是以下之一：joy / laugh / surprise / shy / sad / excited / thinking / trust
 - 标签紧贴句子前，中间不加空格或换行
-- **严禁**使用括号格式描述动作（如 (打招呼)、(举手)），只用 <action> 标签`;
+- **严禁**使用括号格式描述动作（如 (打招呼)、(举手)），只用 <action> 标签
+
+---
+
+# 🕺 动作指令格式
+
+当用户要求你做动作、摆姿势或展示时，在回复**前**插入 motion <action> 标签：
+
+<action>{"motion":"spin"}</action>好的，转一圈给你看！
+<action>{"motion":"v_sign"}</action>这样可以吗？
+
+可用的 motion 值：
+- full_pose   全身展示
+- greeting    问候/打招呼
+- v_sign      比V字手势
+- photo_pose  拍照姿势
+- spin        旋转一圈
+- model_pose  模特走秀姿势
+- crouch      蹲下
+
+动作规则：每次回复最多使用 1 个 motion 标签；同一回复中不得同时使用 motion 和 emotion 标签；仅当用户明确要求某个动作或姿势时才使用。`;
 };
 
 // 预设人格模板（保持向后兼容）

@@ -255,13 +255,16 @@ export const useChatAI = (initialConfig?: ChatAIConfig): UseChatAIReturn => {
 
               // Strip complete <action> blocks; dispatch last found action
               const { intent, cleanText, hasPartialTag } = parseVRMAction(rawBuffer);
-              if (intent) {
+              if (intent?.type === 'emotion') {
                 const STORE_EMOTION_MAP: Record<string, string> = { laugh: 'joy', sad: 'sadness' };
                 const storeEmotion = STORE_EMOTION_MAP[intent.emotion] ?? intent.emotion;
                 useEmotionStore.getState().setTextEmotion(storeEmotion as EmotionType);
                 motionCoordinator.onAIAction(intent.emotion);
                 pendingHint = intent.emotion;
                 debugLog('ChatAI', 'AI action dispatched', intent);
+              } else if (intent?.type === 'motion') {
+                motionCoordinator.onAIMotion(intent.motion);
+                debugLog('ChatAI', 'AI motion dispatched', intent);
               }
 
               // Keep only unprocessed raw text in rawBuffer
