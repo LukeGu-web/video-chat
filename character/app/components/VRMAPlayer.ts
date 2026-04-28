@@ -33,8 +33,11 @@ export class VRMAPlayer {
   play(clip: THREE.AnimationClip, onFinish: () => void): void {
     this.stop();
     const handler = () => {
-      this.finishHandler = null;
       this.mixer.removeEventListener('finished', handler);
+      this.finishHandler = null;
+      // Release the clamped pose so preset bones can take over immediately.
+      this.mixer.stopAllAction();
+      this.action = null;
       onFinish();
     };
     this.finishHandler = handler;

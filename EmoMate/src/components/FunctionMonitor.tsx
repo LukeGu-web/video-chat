@@ -15,6 +15,19 @@ import {
 import { useMonitorStore } from '../store/monitorStore';
 import { isDebugMode } from '../utils/debug';
 import { useSimpleDraggable } from '../hooks/useSimpleDraggable';
+import { VRMAMotionName } from '../types/vrm';
+import { motionCoordinator } from '../capabilities/motion';
+
+const VRMA_MOTION_LABELS: Record<VRMAMotionName, string> = {
+  full_pose:  '全身照',
+  greeting:   '问候',
+  v_sign:     'V字',
+  photo_pose: '拍照',
+  spin:       '旋转',
+  model_pose: '模特',
+  crouch:     '蹲姿',
+  angry:      '愤怒',
+};
 
 // ============================================
 // Props Interface
@@ -142,6 +155,7 @@ export const FunctionMonitor: React.FC<FunctionMonitorProps> = ({
     avatar: true,
     emotion: true,
     scene: false,
+    vrma: false,
   });
 
   // Use simple draggable hook
@@ -338,6 +352,35 @@ export const FunctionMonitor: React.FC<FunctionMonitorProps> = ({
             value={data.emotion.mappingEnabled ? 'ON' : 'OFF'}
             valueColor={data.emotion.mappingEnabled ? 'green' : 'gray'}
           />
+        </CollapsibleSection>
+
+        {/* VRMA Motion Section */}
+        <CollapsibleSection
+          title='VRMA Motion'
+          isExpanded={expandedSections.vrma}
+          onToggle={() => toggleSection('vrma')}
+          statusColor='purple'
+        >
+          <Text className='mb-2 text-xs font-semibold text-gray-300'>
+            Trigger Animation
+          </Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+            {(Object.entries(VRMA_MOTION_LABELS) as [VRMAMotionName, string][]).map(
+              ([name, label]) => (
+                <TouchableOpacity
+                  key={name}
+                  onPress={() => motionCoordinator.onAIMotion(name)}
+                  style={{ minWidth: 52, flex: 1 }}
+                  className='items-center bg-purple-800 rounded px-2 py-1.5'
+                  activeOpacity={0.7}
+                >
+                  <Text className='text-xs font-semibold text-center text-white'>
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              )
+            )}
+          </View>
         </CollapsibleSection>
 
         {/* Scene Understanding Section */}
