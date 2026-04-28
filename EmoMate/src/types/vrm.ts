@@ -7,7 +7,8 @@ export type VRMAMotionName =
   | 'photo_pose'
   | 'spin'
   | 'model_pose'
-  | 'crouch';
+  | 'crouch'
+  | 'angry';
 
 export interface VRMBlendShapeMap {
   joy?: number;

@@ -55,6 +55,7 @@ const VRMA_MOTION_LABELS: Record<VRMAMotionName, string> = {
   spin:       '旋转',
   model_pose: '模特',
   crouch:     '蹲姿',
+  angry:      '愤怒',
 };
 
 // HomeScreen内容组件

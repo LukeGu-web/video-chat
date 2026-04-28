@@ -5,9 +5,10 @@ export type VRMAMotionName =
   | 'photo_pose'
   | 'spin'
   | 'model_pose'
-  | 'crouch';
+  | 'crouch'
+  | 'angry';
 
-// VRoid official free VRMA pack (7 clips)
+// VRoid official free VRMA pack (7 clips) + custom clips
 export const VRMA_MANIFEST: Record<VRMAMotionName, string> = {
   full_pose:  '/assets/vrma/VRMA_01.vrma',
   greeting:   '/assets/vrma/VRMA_02.vrma',
@@ -16,4 +17,5 @@ export const VRMA_MANIFEST: Record<VRMAMotionName, string> = {
   spin:       '/assets/vrma/VRMA_05.vrma',
   model_pose: '/assets/vrma/VRMA_06.vrma',
   crouch:     '/assets/vrma/VRMA_07.vrma',
+  angry:      '/assets/vrma/angry.vrma',
 };
